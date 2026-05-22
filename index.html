@@ -77,6 +77,9 @@ header.app{display:flex;align-items:flex-end;justify-content:space-between;gap:1
 .speedtbl select{font-family:var(--sans);font-size:calc(12px*var(--fs));background:#fff;color:var(--txt);border:1px solid var(--line2);border-radius:7px;padding:4px 6px;min-width:auto;cursor:pointer}
 .speedtbl select:hover{border-color:var(--accent)}
 .speedtbl .sev{white-space:nowrap}
+.speedtbl tr.row-dirty{background:rgba(255,194,75,.16)}
+.speedtbl tr.row-dirty td{border-bottom-color:var(--warn)}
+.speedtbl tr.row-dirty .b::before{content:"●";color:var(--warn);font-size:9px;margin-right:5px;vertical-align:middle}
 .kpi.clickable{cursor:pointer}
 .kpi.clickable:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 22px rgba(230,0,126,.16)}
 .kpi.clickable .ex{color:var(--accent);font-weight:700}
@@ -179,6 +182,23 @@ td.b{font-weight:700}
 #drop .inner{border:2px dashed #fff;border-radius:20px;padding:60px 80px;text-align:center}
 #drop h2{color:#fff;font-size:calc(22px*var(--fs))}#drop p{color:#ffe3ef;margin-top:8px}
 #toast{position:fixed;right:20px;bottom:20px;z-index:100;display:flex;flex-direction:column;gap:9px}
+#modal{position:fixed;inset:0;background:rgba(140,20,70,.45);backdrop-filter:blur(3px);z-index:120;display:none;align-items:center;justify-content:center;padding:20px}
+#modal.show{display:flex}
+.modal-card{background:var(--panel);border:1px solid var(--line2);border-radius:16px;max-width:640px;width:100%;max-height:84vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(140,20,70,.35);animation:fade .25s ease}
+.modal-h{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line);font-weight:900;font-size:calc(16px*var(--fs));color:var(--accent)}
+.modal-h #modalX{border:none;background:transparent;color:var(--muted);font-size:18px;cursor:pointer;border-radius:8px;padding:2px 8px}
+.modal-h #modalX:hover{background:var(--panel2);color:var(--bad)}
+.modal-b{padding:16px 20px;overflow:auto}
+.modal-f{padding:12px 20px;border-top:1px solid var(--line);text-align:right}
+.sumsec{margin-bottom:16px}
+.sumsec h4{font-size:calc(13.5px*var(--fs));color:var(--txt);margin-bottom:6px;border-left:3px solid var(--accent);padding-left:8px}
+.sumsec p{font-size:calc(13px*var(--fs));color:var(--txt);margin-bottom:6px}
+.sumsec p.dim,.dim{color:var(--dim)}
+.warnx{color:var(--bad)}
+.sumlabel{font-size:calc(12px*var(--fs));color:var(--muted);font-weight:700;margin:6px 0 4px}
+.sumbox{background:var(--panel2);border:1px solid var(--line);border-radius:9px;max-height:200px;overflow:auto;padding:4px 0}
+.sumrow{font-family:var(--mono);font-size:calc(11.5px*var(--fs));color:var(--txt);padding:4px 12px;border-bottom:1px solid var(--line);white-space:nowrap}
+.sumrow:last-child{border-bottom:none}
 .tmsg{background:var(--panel);border:1px solid var(--line2);border-left:3px solid var(--good);padding:12px 16px;border-radius:10px;font-size:calc(13px*var(--fs));max-width:360px;box-shadow:0 10px 30px rgba(140,20,70,.25);animation:slideIn .3s ease}
 .tmsg.err{border-left-color:var(--bad)}.tmsg.warn{border-left-color:var(--warn)}
 .tmsg b{display:block;margin-bottom:2px}
@@ -217,6 +237,7 @@ td.b{font-weight:700}
     <div class="tab" data-tab="trend">趨勢分析</div>
     <div class="tab" data-tab="detail">異常明細查詢</div>
     <div class="tab" data-tab="speed">超速人名分類</div>
+    <div class="tab" data-tab="branchppl">站所人員統計</div>
   </div>
 
   <section class="panel on" id="p-rank">
@@ -253,11 +274,23 @@ td.b{font-weight:700}
 
   <section class="panel" id="p-speed">
     <div class="toolbar">
+      <div class="field"><label>日期</label><select id="spDate"><option value="">全部（累積）</option></select></div>
       <div class="field"><label>站所</label><select id="spBranch"><option value="">全部站所</option></select></div>
       <div class="field"><label>最低程度</label><select id="spSev"><option value="">全部</option><option value="中度">中度以上</option><option value="重度">重度以上</option><option value="嚴重">僅嚴重</option></select></div>
       <div class="field"><label>&nbsp;</label><label class="chkbox"><input type="checkbox" id="spDisc"> 只看已設定處置／懲處</label></div>
+      <div class="field" style="margin-left:auto"><label>&nbsp;</label><button class="btn primary" id="spSave" disabled>儲存變更</button></div>
     </div>
     <div id="speedGroups" class="groups"></div>
+  </section>
+
+  <section class="panel" id="p-branchppl">
+    <div class="toolbar">
+      <div class="field"><label>檢視</label><select id="bpView"><option value="branch">站所彙總</option><option value="person">人員明細</option></select></div>
+      <div class="field"><label>日期</label><select id="bpDate"><option value="">全部（累積）</option></select></div>
+      <div class="field"><label>站所</label><select id="bpBranch"><option value="">全部站所</option></select></div>
+      <div class="field"><label>&nbsp;</label><button class="btn" id="bpExport">匯出 CSV</button></div>
+    </div>
+    <div class="card"><div class="tablewrap"><table id="bpTable"></table></div></div>
   </section>
 
   <div class="note" id="footnote"></div>
@@ -377,23 +410,41 @@ async function handleFiles(files){
   if(busy)return;
   if(IMPORT_PASSCODE){const p=prompt('請輸入匯入通行碼：');if(p!==IMPORT_PASSCODE){toast('通行碼錯誤','未執行匯入','err');return;}}
   setBusy(true,'解析中…');
-  let dDays=0,dCount=0,aRead=0,aNew=0,aUpd=0,bad=0;
+  let bad=0;
   const dailySnake=[],dateSet=new Set(),anomSnake=[];
   const byUniq={};ANOM.records.forEach(r=>{byUniq[anomUniq(r)]=r;});
+  // 統計：站所新增/更新；超速新增/更新/重複略過
+  const rep={dDates:new Set(),dAdd:0,dUpd:[],aNew:0,aUpd:0,aDup:[],aUpdList:[]};
+  const seenInThisImport={};
   for(const f of files){
     let wb;try{const buf=await f.arrayBuffer();wb=XLSX.read(buf,{type:'array'});}catch(e){bad++;continue;}
     for(const name of wb.SheetNames){
       const aoa=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:false,defval:''});
       const d=parseDaily(aoa);
-      if(d){DAILY.days[d.date]={branches:d.branches};dDays++;dCount+=d.branches.length;dateSet.add(d.date);d.branches.forEach(b=>dailySnake.push(toDailySnake(b,d.date)));continue;}
+      if(d){
+        rep.dDates.add(d.date);
+        const day=DAILY.days[d.date]=DAILY.days[d.date]||{branches:[]};
+        d.branches.forEach(b=>{
+          const i=day.branches.findIndex(x=>x.branch===b.branch);
+          if(i>=0){if(JSON.stringify(day.branches[i])!==JSON.stringify(b)){day.branches[i]=b;rep.dUpd.push(d.date+' '+b.branch);}}
+          else{day.branches.push(b);rep.dAdd++;}
+          dailySnake.push(toDailySnake(b,d.date));
+        });
+        dateSet.add(d.date);continue;
+      }
       const a=parseAnom(aoa);
-      if(a){aRead+=a.length;a.forEach(x=>{const u=anomUniq(x);const ex=byUniq[u];
-        if(ex){ // 更新分類欄位，保留已手動設定的處置/懲處
+      if(a){a.forEach(x=>{const u=anomUniq(x);
+        if(seenInThisImport[u]){rep.aDup.push(x);return;}        // 同次匯入內重複
+        seenInThisImport[u]=1;
+        const ex=byUniq[u];
+        if(ex){
+          const same=txt(ex.maxSpeed)===txt(x.maxSpeed)&&txt(ex.legal)===txt(x.legal)&&num(ex.over)===num(x.over)&&txt(ex.location)===txt(x.location)&&txt(ex.degText)===txt(x.degText);
+          if(same){rep.aDup.push(x);return;}                    // 已存在且內容相同 → 重複略過
           const keepDisp=txt(ex.disposal)&&txt(ex.disposal)!=='-';const keepDisc=txt(ex.disc)&&txt(ex.disc)!=='-';
           Object.assign(ex,{legal:x.legal,selfLimit:x.selfLimit,over:x.over,maxSpeed:x.maxSpeed,location:x.location,level:x.level,degText:x.degText,degCode:x.degCode});
           if(!keepDisp)ex.disposal=x.disposal;if(!keepDisc)ex.disc=x.disc;
-          anomSnake.push(toAnomSnake(ex));aUpd++;
-        }else{byUniq[u]=x;ANOM.records.push(x);anomSnake.push(toAnomSnake(x));aNew++;}
+          anomSnake.push(toAnomSnake(ex));rep.aUpd++;rep.aUpdList.push(x);
+        }else{byUniq[u]=x;ANOM.records.push(x);anomSnake.push(toAnomSnake(x));rep.aNew++;}
       });}
     }
   }
@@ -406,9 +457,39 @@ async function handleFiles(files){
     }else{ saveLocal(); }
   }catch(e){ toast('上傳失敗',String(e.message||e)+'（請檢查 GAS 部署/網址）','err'); setBusy(false); renderAll(); return; }
   setBusy(false);
-  if(!dDays&&!aRead){toast('未辨識到有效資料',bad?'檔案讀取失敗':'請確認是站所統計表或異常明細表','warn');}
-  else{const parts=[];if(dDays)parts.push('統計表 '+dDays+' 天／'+dCount+' 站所列');if(aRead)parts.push('異常明細 新增 '+aNew+'／更新 '+aUpd+' 筆');toast('匯入完成 ✓',parts.join('　·　'));}
   lastSig=signature();renderAll();
+  showImportSummary(rep,bad);
+}
+function showImportSummary(rep,bad){
+  const hasData=rep.dDates.size||rep.aNew||rep.aUpd||rep.aDup.length;
+  if(!hasData){toast('未辨識到有效資料',bad?'檔案讀取失敗':'請確認是站所統計表或異常明細表','warn');return;}
+  const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+  const rowList=(arr,fn)=>arr.map(fn).map(s=>'<div class="sumrow">'+s+'</div>').join('');
+  let html='<div class="sumsec"><h4>站所統計表</h4>';
+  if(rep.dDates.size){
+    html+='<p>匯入日期：'+[...rep.dDates].sort().join('、')+'<br>新增站所 <b>'+rep.dAdd+'</b> 列'+(rep.dUpd.length?('，更新（同站所同日覆蓋）<b>'+rep.dUpd.length+'</b> 列'):'')+'</p>';
+    if(rep.dUpd.length)html+='<div class="sumbox">'+rowList(rep.dUpd,x=>'更新：'+esc(x))+'</div>';
+  }else html+='<p class="dim">本次無站所統計表</p>';
+  html+='</div><div class="sumsec"><h4>超速異常明細</h4>';
+  if(rep.aNew||rep.aUpd||rep.aDup.length){
+    html+='<p>新增 <b>'+rep.aNew+'</b> 筆'+(rep.aUpd?('，內容有異動更新 <b>'+rep.aUpd+'</b> 筆'):'')+(rep.aDup.length?('，<span class="warnx">重複排除 '+rep.aDup.length+' 筆</span>'):'')+'</p>';
+    if(rep.aDup.length){html+='<div class="sumlabel warnx">⚠ 以下與既有資料重複，已自動排除：</div><div class="sumbox">'+
+      rowList(rep.aDup,x=>esc(x.date)+'｜'+esc(x.branch)+'｜'+esc(x.driver)+'｜'+esc(x.plate)+'｜'+esc((x.time||'').replace(/\s+/g,' '))+'｜'+esc(x.maxSpeed))+'</div>';}
+    if(rep.aUpd){html+='<div class="sumlabel">內容有異動、已更新（保留你設定的處置／懲處）：</div><div class="sumbox">'+
+      rowList(rep.aUpdList,x=>esc(x.date)+'｜'+esc(x.branch)+'｜'+esc(x.driver)+'｜'+esc(x.plate))+'</div>';}
+  }else html+='<p class="dim">本次無超速明細</p>';
+  html+='</div>';
+  if(bad)html+='<div class="sumsec warnx">有 '+bad+' 個檔案讀取失敗（格式可能不符）。</div>';
+  openModal('匯入結果',html);
+}
+function openModal(title,bodyHtml){
+  let m=$('#modal');
+  if(!m){m=document.createElement('div');m.id='modal';m.innerHTML='<div class="modal-card"><div class="modal-h"><span id="modalTitle"></span><button id="modalX">✕</button></div><div class="modal-b" id="modalBody"></div><div class="modal-f"><button class="btn primary" id="modalOk">知道了</button></div></div>';document.body.appendChild(m);
+    m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('show');});
+    m.querySelector('#modalX').onclick=()=>m.classList.remove('show');
+    m.querySelector('#modalOk').onclick=()=>m.classList.remove('show');
+  }
+  m.querySelector('#modalTitle').textContent=title;m.querySelector('#modalBody').innerHTML=bodyHtml;m.classList.add('show');
 }
 
 /* ---------- helpers / render ---------- */
@@ -465,6 +546,8 @@ function fillDetailFilters(){
   setOpts('#dfBranch',[...br].sort());setOpts('#dfBehavior',[...be].sort());
   const ord=['輕度','中度','重度','嚴重'];setOpts('#dfDegree',[...de].sort((a,b)=>ord.indexOf(a)-ord.indexOf(b)));
   setOpts('#spBranch',[...br].sort(),'全部站所');
+  const dates=[...new Set(ANOM.records.filter(r=>r.behavior&&r.behavior.includes('超速')).map(r=>r.date).filter(Boolean))].sort().reverse();
+  setOpts('#spDate',dates,'全部（累積）');setOpts('#bpDate',dates,'全部（累積）');
 }
 function filteredAnom(){const b=$('#dfBranch').value,be=$('#dfBehavior').value,de=$('#dfDegree').value,q=$('#dfSearch').value.trim();return ANOM.records.filter(r=>(!b||r.branch===b)&&(!be||r.behavior===be)&&(!de||r.degText===de)&&(!q||(r.driver+r.plate+r.location).includes(q)));}
 function renderDetail(){
@@ -496,8 +579,10 @@ function renderSpeed(){
   const box=$('#speedGroups');const ord=['輕度','中度','重度','嚴重'];
   const onlyDisc=$('#spDisc')&&$('#spDisc').checked;
   const minSev=$('#spSev').value,brF=$('#spBranch').value,mi=minSev?ord.indexOf(minSev):-1;
+  const dF=$('#spDate')?$('#spDate').value:'';
   const sevFilter=it=>{const t=sevOf(it).text;if(minSev==='嚴重')return t==='嚴重';if(mi>=0)return ord.indexOf(t)>=mi;return true;};
   let recs=ANOM.records.filter(r=>r.behavior&&r.behavior.includes('超速'));
+  if(dF)recs=recs.filter(r=>r.date===dF);
   if(brF)recs=recs.filter(r=>r.branch===brF);
   recs=recs.filter(sevFilter);
   if(onlyDisc){const has=v=>{v=txt(v);return v&&v!=='-';};recs=recs.filter(r=>has(r.disposal)||has(r.disc));}
@@ -510,14 +595,17 @@ function renderSpeed(){
   const keyVal=(it)=>{if(k==='sev')return sevRank[sevOf(it).text]||0;if(k==='over')return num(it.over);if(k==='maxSpeed')return num(it.maxSpeed);if(k==='legal')return num(it.legal);if(k==='cnt')return drvCount[it.branch+'|'+it.driver];return txt(it[k]);};
   recs.sort((a,b)=>{let x=keyVal(a),y=keyVal(b);if(typeof x==='number'&&typeof y==='number')return (x-y)*dir;return String(x).localeCompare(String(y),'zh-Hant')*dir;});
   speedRows=[];
-  const cols=[['branch','站所'],['driver','駕駛'],['cnt','本人次數'],['plate','車號'],['time','時間'],['maxSpeed','最高'],['legal','法定'],['over','超過km'],['sev','程度'],['location','地點'],['disposal','處置'],['disc','懲處']];
+  const cols=[['date','日期'],['branch','站所'],['driver','駕駛'],['cnt','本人次數'],['plate','車號'],['time','時間'],['maxSpeed','最高'],['legal','法定'],['over','超過km'],['sev','程度'],['location','地點'],['disposal','處置'],['disc','懲處']];
   const arrow=key=>speedSort.key===key?(speedSort.dir>0?' ▲':' ▼'):'';
   let html='<thead><tr>'+cols.map(c=>'<th class="sortable" data-k="'+c[0]+'">'+c[1]+arrow(c[0])+'</th>').join('')+'</tr></thead><tbody>';
   recs.forEach(it=>{
     const idx=speedRows.push(it)-1;const sv=sevOf(it);const over=num(it.over);
     const overCls=sv.text?(' over-cell over-'+sv.text):'';
     const sevCell=sv.text?'<span class="sev sev-'+sv.text+'">'+sv.text+(sv.code?'（'+sv.code+'）':'')+'</span>':'';
-    html+='<tr>'+
+    const u=anomUniq(it);const pend=pendingEdits[u];
+    const dispVal=pend?pend.disposal:effDisposal(it);const discVal=pend?pend.disc:effDisc(it);
+    html+='<tr class="'+(pend?'row-dirty':'')+'">'+
+      '<td style="font-family:var(--mono)">'+(it.date||'')+'</td>'+
       '<td class="b">'+it.branch+'</td>'+
       '<td>'+it.driver+'</td>'+
       '<td class="num">'+(drvCount[it.branch+'|'+it.driver])+'</td>'+
@@ -528,39 +616,112 @@ function renderSpeed(){
       '<td class="num'+overCls+'">'+(over?('+'+over):'')+'</td>'+
       '<td>'+sevCell+'</td>'+
       '<td class="loc" title="'+(it.location||'').replace(/"/g,'')+'">'+(it.location||'')+'</td>'+
-      '<td><select class="esel" data-idx="'+idx+'" data-field="disposal">'+optsHtml(effDisposal(it),DISPOSAL_OPTIONS)+'</select></td>'+
-      '<td><select class="esel" data-idx="'+idx+'" data-field="disc">'+optsHtml(effDisc(it),DISCIPLINE_OPTIONS)+'</select></td>'+
+      '<td><select class="esel" data-idx="'+idx+'" data-field="disposal">'+optsHtml(dispVal,DISPOSAL_OPTIONS)+'</select></td>'+
+      '<td><select class="esel" data-idx="'+idx+'" data-field="disc">'+optsHtml(discVal,DISCIPLINE_OPTIONS)+'</select></td>'+
     '</tr>';
   });
   box.innerHTML='<div class="card"><div class="tablewrap"><table class="speedtbl">'+html+'</tbody></table></div></div>';
   box.querySelectorAll('th.sortable').forEach(th=>th.onclick=()=>{const key=th.dataset.k;if(speedSort.key===key)speedSort.dir*=-1;else{speedSort.key=key;speedSort.dir=1;}renderSpeed();});
   box.querySelectorAll('select.esel').forEach(sel=>{
     sel.dataset.prev=sel.value;
-    sel.onchange=async()=>{
+    const rec=speedRows[+sel.dataset.idx];const u=anomUniq(rec);
+    if(pendingEdits[u])sel.closest('tr').classList.add('row-dirty');
+    sel.onchange=()=>{
       let val=sel.value;
-      if(val==='__custom__'){const c=prompt('輸入自訂內容：','');if(c==null){sel.value=sel.dataset.prev;return;}val=c.trim();}
-      const rec=speedRows[+sel.dataset.idx];const field=sel.dataset.field;
-      const old=rec[field];rec[field]=val;
-      const okSave=await saveAnomEdit(rec);
-      if(!okSave){rec[field]=old;}
-      renderSpeed();renderDetail();
+      if(val==='__custom__'){const c=prompt('輸入自訂內容：','');if(c==null){sel.value=sel.dataset.prev;return;}val=c.trim();const o=document.createElement('option');o.textContent=val;o.selected=true;sel.insertBefore(o,sel.lastElementChild);}
+      sel.dataset.prev=sel.value;
+      const field=sel.dataset.field;
+      const p=pendingEdits[u]=pendingEdits[u]||{rec:rec,disposal:effDisposal(rec),disc:effDisc(rec)};
+      p[field]=val;
+      sel.closest('tr').classList.add('row-dirty');
+      updateSaveBtn();
     };
   });
+  updateSaveBtn();
 }
-async function saveAnomEdit(rec){
-  if(ONLINE){
-    try{const resp=await gasPost({type:'update_anom',uniq:anomUniq(rec),disposal:txt(rec.disposal),disc:txt(rec.disc)});
-      if(resp&&resp.ok){toast('已儲存 ✓','處置／懲處已更新至共享後台');return true;}
-      toast('儲存失敗',(resp&&resp.error)||'請確認後台已更新為最新版 Code.gs','err');return false;
-    }catch(e){toast('儲存失敗',String(e.message||e),'err');return false;}
-  }else{saveLocal();toast('已更新（本機）','');return true;}
+const pendingEdits={};
+function pendingCount(){return Object.keys(pendingEdits).length;}
+function updateSaveBtn(){const b=$('#spSave');if(!b)return;const n=pendingCount();b.disabled=n===0;b.textContent=n?('儲存變更（'+n+'）'):'儲存變更';}
+async function saveAllEdits(){
+  const keys=Object.keys(pendingEdits);if(!keys.length)return;
+  setBusy(true,'儲存中…');
+  let ok=0,fail=0;
+  for(const u of keys){const p=pendingEdits[u];p.rec.disposal=p.disposal;p.rec.disc=p.disc;
+    if(ONLINE){
+      try{const resp=await gasPost({type:'update_anom',uniq:u,disposal:txt(p.disposal),disc:txt(p.disc)});if(resp&&resp.ok){ok++;delete pendingEdits[u];}else{fail++;}}
+      catch(e){fail++;}
+    }else{delete pendingEdits[u];ok++;}
+  }
+  if(!ONLINE)saveLocal();
+  setBusy(false);
+  if(fail){toast('部分儲存失敗','成功 '+ok+'／失敗 '+fail+'（請確認後台為最新版 Code.gs）','err');}
+  else{toast('已儲存 ✓',ok+' 筆處置／懲處已更新');}
+  lastSig=signature();renderSpeed();renderDetail();updateSaveBtn();
 }
 function renderFoot(){
   const dates=sortedDates();
   const mode=ONLINE?'資料儲存於 Google 試算表（後台），所有開啟者看到同一份累積資料。':'目前為本機預覽模式：資料只存在你的瀏覽器，不會與他人共享。請依 README 設定 GAS_URL 開啟共享。';
   $('#footnote').innerHTML=mode+(dates.length?('　目前涵蓋 '+dates.length+' 天（'+dates[0]+' ~ '+dates[dates.length-1]+'）'):'')+'<br>每日匯入新的一天統計表即可持續累積；同一天重複匯入會以最新內容覆蓋，異常明細自動去重。';
 }
-function renderAll(){renderKpis();renderRank();renderTrend();fillDetailFilters();renderDetail();renderSpeed();renderFoot();}
+// ---------- 站所人員統計（超速）----------
+let bpRows=[];
+function bpData(){
+  const ord=['輕度','中度','重度','嚴重'];
+  const dF=$('#bpDate')?$('#bpDate').value:'';
+  let recs=ANOM.records.filter(r=>r.behavior&&r.behavior.includes('超速'));
+  if(dF)recs=recs.filter(r=>r.date===dF);
+  const branches={};
+  recs.forEach(r=>{
+    const sv=sevOf(r).text;const sevN=ord.indexOf(sv);
+    const b=branches[r.branch]=branches[r.branch]||{branch:r.branch,total:0,sev:{輕度:0,中度:0,重度:0,嚴重:0},people:{},disc:0,disp:0};
+    b.total++;if(b.sev[sv]!=null)b.sev[sv]++;
+    const p=b.people[r.driver]=b.people[r.driver]||{branch:r.branch,driver:r.driver,count:0,max:0,worst:-1,sev:{輕度:0,中度:0,重度:0,嚴重:0},disp:[],disc:[]};
+    p.count++;p.max=Math.max(p.max,num(r.maxSpeed));if(sevN>p.worst)p.worst=sevN;if(p.sev[sv]!=null)p.sev[sv]++;
+    const disp=txt(r.disposal),disc=txt(r.disc);
+    if(disp&&disp!=='-'){p.disp.push(disp);b.disp++;}
+    if(disc&&disc!=='-'){p.disc.push(disc);b.disc++;}
+  });
+  return branches;
+}
+function renderBranchPpl(){
+  const t=$('#bpTable');const ord=['輕度','中度','重度','嚴重'];
+  const branches=bpData();const keys=Object.keys(branches);
+  if(!keys.length){emptyTable(t,'尚無超速統計','匯入超速明細後，這裡會彙總各站所的人數、次數與程度分佈。');setOpts('#bpBranch',[],'全部站所');return;}
+  setOpts('#bpBranch',keys.sort(),'全部站所');
+  const view=$('#bpView').value,brF=$('#bpBranch').value;
+  const sevBadge=(s,n)=>n?'<span class="sev sev-'+s+'" style="margin-right:4px">'+s+' '+n+'</span>':'';
+  bpRows=[];
+  if(view==='branch'){
+    let list=keys.map(k=>branches[k]);if(brF)list=list.filter(b=>b.branch===brF);
+    list.sort((a,b)=>b.total-a.total);
+    const head=['站所','超速人數','超速次數','輕度','中度','重度','嚴重','已記處置','已記懲處'];
+    let html='<thead><tr>'+head.map((h,i)=>'<th class="'+(i>=1?'num':'')+'">'+h+'</th>').join('')+'</tr></thead><tbody>';
+    list.forEach(b=>{const ppl=Object.keys(b.people).length;
+      bpRows.push({站所:b.branch,超速人數:ppl,超速次數:b.total,輕度:b.sev.輕度,中度:b.sev.中度,重度:b.sev.重度,嚴重:b.sev.嚴重,已記處置:b.disp,已記懲處:b.disc});
+      html+='<tr><td class="b">'+b.branch+'</td><td class="num">'+ppl+'</td><td class="num b">'+b.total+'</td>'+
+        '<td class="num" style="color:var(--blue)">'+(b.sev.輕度||'')+'</td>'+
+        '<td class="num" style="color:var(--warn)">'+(b.sev.中度||'')+'</td>'+
+        '<td class="num" style="color:var(--orange)">'+(b.sev.重度||'')+'</td>'+
+        '<td class="num" style="color:var(--bad)">'+(b.sev.嚴重||'')+'</td>'+
+        '<td class="num">'+(b.disp||'')+'</td><td class="num">'+(b.disc||'')+'</td></tr>';});
+    t.innerHTML=html+'</tbody>';
+  }else{
+    let people=[];keys.forEach(k=>{if(brF&&k!==brF)return;Object.values(branches[k].people).forEach(p=>people.push(p));});
+    people.sort((a,b)=>b.worst-a.worst||b.count-a.count||b.max-a.max);
+    const head=['站所','駕駛','超速次數','最高時速','最嚴重程度','程度分佈','處置紀錄','懲處紀錄'];
+    let html='<thead><tr>'+head.map((h,i)=>'<th class="'+(i===2||i===3?'num':'')+'">'+h+'</th>').join('')+'</tr></thead><tbody>';
+    people.forEach(p=>{const worst=p.worst>=0?ord[p.worst]:'';
+      const dist=ord.map(s=>sevBadge(s,p.sev[s])).join('');
+      const uniq=a=>[...new Set(a)];
+      bpRows.push({站所:p.branch,駕駛:p.driver,超速次數:p.count,最高時速:p.max,最嚴重程度:worst,處置紀錄:uniq(p.disp).join('、'),懲處紀錄:uniq(p.disc).join('、')});
+      html+='<tr><td class="b">'+p.branch+'</td><td>'+p.driver+'</td><td class="num b">'+p.count+'</td><td class="num">'+p.max+' km/hr</td>'+
+        '<td>'+(worst?'<span class="sev sev-'+worst+'">'+worst+'</span>':'')+'</td>'+
+        '<td>'+(dist||'—')+'</td>'+
+        '<td>'+(uniq(p.disp).join('、')||'')+'</td><td>'+(uniq(p.disc).join('、')||'')+'</td></tr>';});
+    t.innerHTML=html+'</tbody>';
+  }
+}
+function renderAll(){renderKpis();renderRank();renderTrend();fillDetailFilters();renderDetail();renderSpeed();renderBranchPpl();renderFoot();}
 
 /* ---------- conn / busy ---------- */
 function setConn(state){const p=$('#connPill'),t=$('#connTxt');p.className='pill '+(state==='cloud'?'cloud':state==='err'?'err':'local');t.textContent=state==='cloud'?'雲端已連線':state==='err'?'連線失敗':'本機預覽模式';}
@@ -571,14 +732,21 @@ $('#importBtn').onclick=()=>{if(!busy)$('#fileInput').click();};
 $('#fileInput').onchange=e=>{if(e.target.files.length)handleFiles([...e.target.files]);e.target.value='';};
 $('#refreshBtn').onclick=async()=>{if(busy)return;if(!ONLINE){toast('本機模式','無雲端後台可更新','warn');return;}setBusy(true,'更新中…');try{await loadAll();lastSig=signature();renderAll();toast('已更新','');}catch(e){setConn('err');toast('更新失敗',String(e.message||e),'err');}setBusy(false);};
 $('#clearBtn').onclick=async()=>{if(busy)return;if(!confirm('確定清除所有已匯入的統計與異常資料？此動作無法復原。'))return;setBusy(true,'清除中…');try{if(ONLINE)await gasPost({type:'clear'});DAILY={dept:DEPT_NAME,days:{}};ANOM={records:[]};if(!ONLINE)saveLocal();else await loadAll();}catch(e){toast('清除失敗',String(e.message||e),'err');}setBusy(false);lastSig=signature();renderAll();toast('已清除全部資料','');};
-function gotoTab(name){$$('.tab').forEach(x=>x.classList.toggle('on',x.dataset.tab===name));$$('.panel').forEach(p=>p.classList.toggle('on',p.id==='p-'+name));if(name==='trend')renderTrend();window.scrollTo({top:0,behavior:'smooth'});}
+function gotoTab(name){$$('.tab').forEach(x=>x.classList.toggle('on',x.dataset.tab===name));$$('.panel').forEach(p=>p.classList.toggle('on',p.id==='p-'+name));if(name==='trend')renderTrend();if(name==='branchppl')renderBranchPpl();window.scrollTo({top:0,behavior:'smooth'});}
 $$('.tab').forEach(t=>t.onclick=()=>gotoTab(t.dataset.tab));
 ['#rankDate','#rankSort'].forEach(s=>$(s).onchange=renderRank);
 ['#trendScope','#trendMetric'].forEach(s=>$(s).onchange=renderTrend);
 ['#dfBranch','#dfBehavior','#dfDegree'].forEach(s=>$(s).onchange=renderDetail);
 $('#dfSearch').oninput=renderDetail;
-['#spBranch','#spSev'].forEach(s=>$(s).onchange=renderSpeed);
+['#spBranch','#spSev','#spDate'].forEach(s=>$(s).onchange=renderSpeed);
 $('#spDisc').onchange=renderSpeed;
+$('#spSave').onclick=saveAllEdits;
+window.addEventListener('beforeunload',e=>{if(pendingCount()>0){e.preventDefault();e.returnValue='';}});
+['#bpView','#bpBranch','#bpDate'].forEach(s=>$(s).onchange=renderBranchPpl);
+$('#bpExport').onclick=()=>{if(!bpRows.length){toast('無資料可匯出','','warn');return;}
+  const head=Object.keys(bpRows[0]);
+  const lines=[head.join(',')].concat(bpRows.map(r=>head.map(k=>'"'+String(r[k]==null?'':r[k]).replace(/"/g,'""')+'"').join(',')));
+  const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='站所人員統計.csv';a.click();toast('已匯出 CSV',bpRows.length+' 列');};
 $('#dfExport').onclick=()=>{const rows=filteredAnom();if(!rows.length){toast('無資料可匯出','','warn');return;}const head=['日期','站所','車號','駕駛','行為','等級','最高時速','法定限速','超過km','異常程度','處置','懲處'];const lines=[head.join(',')].concat(rows.map(r=>[r.date,r.branch,r.plate,r.driver,r.behavior,r.level,r.maxSpeed,r.legal,r.over,r.degText,r.disposal,r.disc].map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')));const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='異常明細查詢.csv';a.click();toast('已匯出 CSV',rows.length+' 筆');};
 
 let dragDepth=0;
@@ -605,7 +773,7 @@ $$('#fsbar button').forEach(b=>b.onclick=()=>applyFs(b.dataset.fs));
     await loadAll();setConn('local');
   }
   lastSig=signature();renderAll();
-  if(ONLINE&&AUTO_REFRESH_SEC>0){setInterval(async()=>{if(busy||document.hidden)return;try{await loadAll();const s=signature();if(s!==lastSig){lastSig=s;renderAll();toast('已同步最新資料','');setConn('cloud');}}catch(e){setConn('err');}},AUTO_REFRESH_SEC*1000);}
+  if(ONLINE&&AUTO_REFRESH_SEC>0){setInterval(async()=>{if(busy||document.hidden||pendingCount()>0)return;try{await loadAll();const s=signature();if(s!==lastSig){lastSig=s;renderAll();toast('已同步最新資料','');setConn('cloud');}}catch(e){setConn('err');}},AUTO_REFRESH_SEC*1000);}
 })();
 </script>
 </body>

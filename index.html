@@ -327,12 +327,18 @@ function parseAnom(aoa){
   const deg=[];h.forEach((x,i)=>{if(x==='異常程度')deg.push(i);});
   const col={branch:h.indexOf('分公司'),plate:h.indexOf('車號'),driver:h.indexOf('駕駛'),behavior:h.indexOf('行為'),level:h.indexOf('等級'),
     time:find(x=>x.includes('最高時速時間')),max:find(x=>x.includes('最高時速')&&!x.includes('時間')&&!x.includes('位置')),
-    loc:find(x=>x.includes('位置')),legal:find(x=>x.includes('法定')),over:find(x=>x.includes('超過標準')),
-    dc:deg[0]!=null?deg[0]:-1,dt:deg[1]!=null?deg[1]:-1,disp:find(x=>x.includes('行為處置')),disc:find(x=>x.includes('行政懲處'))};
+    loc:find(x=>x.includes('位置')),legal:find(x=>x.includes('法定')),over:find(x=>x.includes('超過標準')||x.includes('超過')&&x.includes('km')),
+    self:find(x=>x.includes('速限自定義')||(x.includes('速限')&&!x.includes('法定'))||x.includes('限速')&&!x.includes('法定')),
+    dc:deg[0]!=null?deg[0]:-1,dt:deg[1]!=null?deg[1]:-1,disp:find(x=>x.includes('行為處置')||x.includes('處置')),disc:find(x=>x.includes('行政懲處')||x.includes('懲處'))};
   const recs=[];
   for(let i=hi+1;i<aoa.length;i++){const r=aoa[i];const plate=txt(r[col.plate]),driver=txt(r[col.driver]);
     if(!plate||!driver||plate==='車號')continue;
-    recs.push({date:date||'',branch:txt(r[col.branch]),plate,driver,behavior:txt(r[col.behavior]),level:txt(r[col.level]),time:txt(r[col.time]),maxSpeed:txt(r[col.max]),location:txt(r[col.loc]),legal:txt(r[col.legal]),over:num(r[col.over]),degText:txt(r[col.dt]),degCode:txt(r[col.dc]),disposal:txt(r[col.disp]),disc:txt(r[col.disc])});}
+    const maxSpeed=txt(r[col.max]),legal=txt(r[col.legal]),self=col.self>=0?txt(r[col.self]):'';
+    let over=col.over>=0?num(r[col.over]):0;
+    // 沒有「超過km」欄時，用 最高時速 − (速限自定義 或 法定限速) 自動計算
+    const baseLimit=self||legal;
+    if((!over||col.over<0)&&maxSpeed&&baseLimit){const o=num(maxSpeed)-num(baseLimit);over=o>0?o:0;}
+    recs.push({date:date||'',branch:txt(r[col.branch]),plate,driver,behavior:txt(r[col.behavior]),level:txt(r[col.level]),time:txt(r[col.time]),maxSpeed,location:txt(r[col.loc]),legal:legal||self,selfLimit:self,over,degText:txt(r[col.dt]),degCode:txt(r[col.dc]),disposal:txt(r[col.disp]),disc:txt(r[col.disc])});}
   return recs.length?recs:null;
 }
 const anomUniq=x=>[x.date,x.plate,x.driver,x.time,x.location,x.maxSpeed].join('|');
@@ -364,9 +370,9 @@ async function handleFiles(files){
   if(busy)return;
   if(IMPORT_PASSCODE){const p=prompt('請輸入匯入通行碼：');if(p!==IMPORT_PASSCODE){toast('通行碼錯誤','未執行匯入','err');return;}}
   setBusy(true,'解析中…');
-  let dDays=0,dCount=0,aRead=0,aNew=0,bad=0;
+  let dDays=0,dCount=0,aRead=0,aNew=0,aUpd=0,bad=0;
   const dailySnake=[],dateSet=new Set(),anomSnake=[];
-  const seen=new Set(ANOM.records.map(anomUniq));
+  const byUniq={};ANOM.records.forEach(r=>{byUniq[anomUniq(r)]=r;});
   for(const f of files){
     let wb;try{const buf=await f.arrayBuffer();wb=XLSX.read(buf,{type:'array'});}catch(e){bad++;continue;}
     for(const name of wb.SheetNames){
@@ -374,7 +380,14 @@ async function handleFiles(files){
       const d=parseDaily(aoa);
       if(d){DAILY.days[d.date]={branches:d.branches};dDays++;dCount+=d.branches.length;dateSet.add(d.date);d.branches.forEach(b=>dailySnake.push(toDailySnake(b,d.date)));continue;}
       const a=parseAnom(aoa);
-      if(a){aRead+=a.length;a.forEach(x=>{const u=anomUniq(x);if(!seen.has(u)){seen.add(u);ANOM.records.push(x);anomSnake.push(toAnomSnake(x));aNew++;}});}
+      if(a){aRead+=a.length;a.forEach(x=>{const u=anomUniq(x);const ex=byUniq[u];
+        if(ex){ // 更新分類欄位，保留已手動設定的處置/懲處
+          const keepDisp=txt(ex.disposal)&&txt(ex.disposal)!=='-';const keepDisc=txt(ex.disc)&&txt(ex.disc)!=='-';
+          Object.assign(ex,{legal:x.legal,selfLimit:x.selfLimit,over:x.over,maxSpeed:x.maxSpeed,location:x.location,level:x.level,degText:x.degText,degCode:x.degCode});
+          if(!keepDisp)ex.disposal=x.disposal;if(!keepDisc)ex.disc=x.disc;
+          anomSnake.push(toAnomSnake(ex));aUpd++;
+        }else{byUniq[u]=x;ANOM.records.push(x);anomSnake.push(toAnomSnake(x));aNew++;}
+      });}
     }
   }
   try{
@@ -387,7 +400,7 @@ async function handleFiles(files){
   }catch(e){ toast('上傳失敗',String(e.message||e)+'（請檢查 GAS 部署/網址）','err'); setBusy(false); renderAll(); return; }
   setBusy(false);
   if(!dDays&&!aRead){toast('未辨識到有效資料',bad?'檔案讀取失敗':'請確認是站所統計表或異常明細表','warn');}
-  else{const parts=[];if(dDays)parts.push('統計表 '+dDays+' 天／'+dCount+' 站所列');if(aRead)parts.push('異常明細 新增 '+aNew+' 筆（讀取 '+aRead+'）');toast('匯入完成 ✓',parts.join('　·　'));}
+  else{const parts=[];if(dDays)parts.push('統計表 '+dDays+' 天／'+dCount+' 站所列');if(aRead)parts.push('異常明細 新增 '+aNew+'／更新 '+aUpd+' 筆');toast('匯入完成 ✓',parts.join('　·　'));}
   lastSig=signature();renderAll();
 }
 

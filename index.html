@@ -21,6 +21,9 @@
   const DEPT_NAME      = "中南配送部";
   const IMPORT_PASSCODE= "";              // 選填：設定後，匯入前需輸入此通行碼（簡易防呆，非正式權限）
   const AUTO_REFRESH_SEC = 45;            // 每隔幾秒自動向後台抓最新資料
+  // 超速明細可由使用者設定的「行為處置 / 行政懲處」下拉選項（可自行增減；選「其他…」可手動輸入）
+  const DISPOSAL_OPTIONS   = ["改善單","口頭告誡","書面警告","教育訓練","面談輔導"];
+  const DISCIPLINE_OPTIONS = ["警告","申誡","記過","記大過"];
 </script>
 <!-- ============================================================
      ⬆⬆⬆  設定區結束  ⬆⬆⬆
@@ -120,17 +123,22 @@ td.b{font-weight:700}
 .driver .dn{font-weight:700;font-size:calc(13.5px*var(--fs))}
 .dmeta{font-family:var(--mono);font-size:calc(10.5px*var(--fs));color:var(--dim);margin:1px 0 7px}
 .dcount{font-family:var(--mono);font-weight:700;font-size:calc(13px*var(--fs));color:var(--accent);background:rgba(230,0,126,.1);padding:2px 9px;border-radius:20px;white-space:nowrap}
-.inc{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin-top:6px}
+.inc{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:9px 10px;margin-top:6px}
 .inc-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.inc-spd{font-family:var(--mono);font-weight:700;font-size:calc(13px*var(--fs));color:var(--bad)}
-.inc-spd .lim{color:var(--dim);font-weight:500;font-size:calc(11px*var(--fs))}
+.lv{font-size:calc(10.5px*var(--fs));font-weight:700;color:var(--muted);background:rgba(0,0,0,.05);padding:1px 7px;border-radius:5px}
 .inc-time{font-family:var(--mono);font-size:calc(11px*var(--fs));color:var(--muted);margin-left:auto}
-.inc-loc{font-size:calc(11.5px*var(--fs));color:var(--muted);margin-top:4px;line-height:1.4;word-break:break-all}
-.inc-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
-.chip{font-size:calc(11px*var(--fs));font-weight:700;padding:2px 9px;border-radius:6px;white-space:nowrap}
-.chip-disp{background:rgba(47,115,214,.14);color:var(--blue)}
-.chip-disc{background:rgba(224,39,73,.14);color:var(--bad)}
-.mini{font-size:calc(10.5px*var(--fs));font-weight:700;padding:1px 6px;border-radius:5px}
+.inc-stats{display:flex;gap:7px;flex-wrap:wrap;margin-top:6px}
+.inc-stats .st{font-family:var(--mono);font-size:calc(11.5px*var(--fs));color:var(--txt);background:#fff;border:1px solid var(--line);padding:2px 8px;border-radius:6px}
+.inc-stats .st b{color:var(--muted);font-weight:700;font-family:var(--sans);margin-right:3px}
+.inc-stats .st.over{color:var(--bad);border-color:rgba(224,39,73,.3);background:rgba(224,39,73,.06)}
+.inc-stats .st.over b{color:var(--bad)}
+.inc-loc{font-size:calc(11.5px*var(--fs));color:var(--muted);margin-top:5px;line-height:1.4;word-break:break-all}
+.inc-edit{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line2)}
+.inc-edit label{display:inline-flex;align-items:center;gap:5px;font-size:calc(11.5px*var(--fs));font-weight:700;color:var(--muted)}
+.inc-edit select{font-family:var(--sans);font-size:calc(12px*var(--fs));background:#fff;color:var(--txt);border:1px solid var(--line2);border-radius:7px;padding:5px 8px;min-width:auto;cursor:pointer}
+.inc-edit select:hover{border-color:var(--accent)}
+.chkbox{display:inline-flex;align-items:center;gap:6px;font-size:calc(12.5px*var(--fs));color:var(--txt);font-weight:600;cursor:pointer;padding:8px 0}
+.chkbox input{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:calc(11.5px*var(--fs));color:var(--muted);align-items:center;margin-left:auto}
 .legend span{display:inline-flex;align-items:center;gap:5px}
 .dot{width:9px;height:9px;border-radius:3px;display:inline-block}
@@ -228,6 +236,7 @@ td.b{font-weight:700}
     <div class="toolbar">
       <div class="field"><label>站所</label><select id="spBranch"><option value="">全部站所</option></select></div>
       <div class="field"><label>最低程度</label><select id="spSev"><option value="">全部</option><option value="中度">中度以上</option><option value="重度">重度以上</option><option value="嚴重">僅嚴重</option></select></div>
+      <div class="field"><label>&nbsp;</label><label class="chkbox"><input type="checkbox" id="spDisc"> 只看已設定處置／懲處</label></div>
     </div>
     <div id="speedGroups" class="groups"></div>
   </section>
@@ -413,15 +422,25 @@ function renderDetail(){
   if(!rows.length)html+='<tr><td colspan="12" style="text-align:center;color:var(--dim);padding:30px">無符合條件的資料</td></tr>';
   t.innerHTML=html+'</tbody>';
 }
+let speedRows=[];
+function optsHtml(cur,opts){
+  cur=txt(cur);const blank=(!cur||cur==='-');
+  let h='<option value=""'+(blank?' selected':'')+'>—未設定—</option>';
+  opts.forEach(o=>{h+='<option'+(o===cur?' selected':'')+'>'+o+'</option>';});
+  if(cur&&cur!=='-'&&opts.indexOf(cur)<0)h+='<option selected>'+cur+'</option>';
+  h+='<option value="__custom__">其他…</option>';return h;
+}
 function renderSpeed(){
   const box=$('#speedGroups');const ord=['輕度','中度','重度','嚴重'];
+  const onlyDisc=$('#spDisc')&&$('#spDisc').checked;
   const minSev=$('#spSev').value,brF=$('#spBranch').value,mi=minSev?ord.indexOf(minSev):-1;
   let recs=ANOM.records.filter(r=>r.behavior&&r.behavior.includes('超速'));
   if(brF)recs=recs.filter(r=>r.branch===brF);
   if(minSev==='嚴重')recs=recs.filter(r=>r.degText==='嚴重');else if(mi>=0)recs=recs.filter(r=>ord.indexOf(r.degText)>=mi);
-  if(!recs.length){box.innerHTML='<div class="empty"><h3>無超速資料</h3><p>匯入「異常明細表」後，這裡會依站所分組、列出各駕駛的超速明細與處置／懲處備註。</p></div>';return;}
+  if(onlyDisc){const has=v=>{v=txt(v);return v&&v!=='-';};recs=recs.filter(r=>has(r.disposal)||has(r.disc));}
+  if(!recs.length){box.innerHTML='<div class="empty"><h3>無超速資料</h3><p>匯入「異常明細表」後，這裡會依站所分組列出各駕駛的超速明細；可逐筆設定行為處置與行政懲處。</p></div>';return;}
   const shortTime=t=>{if(!t)return '';const m=String(t).match(/(\d{1,2})\/(\d{1,2})\D+(\d{1,2}:\d{2})/);return m?(pad(m[1])+'/'+pad(m[2])+' '+m[3]):String(t);};
-  const note=(v)=>{v=txt(v);return (!v||v==='-')?'':v;};
+  speedRows=[];
   const byBranch={};recs.forEach(r=>{(byBranch[r.branch]=byBranch[r.branch]||[]).push(r);});
   const branches=Object.keys(byBranch).sort((a,b)=>byBranch[b].length-byBranch[a].length);
   box.innerHTML=branches.map(br=>{const list=byBranch[br];const drv={};
@@ -429,22 +448,50 @@ function renderSpeed(){
     const drivers=Object.keys(drv).sort((a,b)=>drv[b].count-drv[a].count);
     const inner=drivers.map(name=>{const d=drv[name];
       const items=d.items.sort((a,b)=>num(b.maxSpeed)-num(a.maxSpeed)).map(it=>{
-        const disp=note(it.disposal),disc=note(it.disc);
-        const chips=(disp?'<span class="chip chip-disp">處置：'+disp+'</span>':'')+(disc?'<span class="chip chip-disc">懲處：'+disc+'</span>':'');
+        const idx=speedRows.push(it)-1;
+        const over=num(it.over);
+        const stats='<span class="st"><b>最高</b> '+(it.maxSpeed||'?')+'</span>'+
+          (it.legal?'<span class="st"><b>法定</b> '+it.legal+'</span>':'')+
+          (over?'<span class="st over"><b>超過</b> +'+over+' km</span>':'');
         return '<div class="inc">'+
           '<div class="inc-top">'+
             (it.degText?'<span class="sev sev-'+it.degText+'">'+it.degText+'</span>':'')+
-            '<span class="inc-spd">'+(it.maxSpeed||'?')+(it.legal?(' <span class="lim">/限'+it.legal+'</span>'):'')+'</span>'+
+            (it.level?'<span class="lv">'+it.level+'</span>':'')+
             '<span class="inc-time">'+shortTime(it.time)+'</span>'+
           '</div>'+
+          '<div class="inc-stats">'+stats+'</div>'+
           (it.location?'<div class="inc-loc">📍 '+it.location+'</div>':'')+
-          (chips?'<div class="inc-chips">'+chips+'</div>':'')+
+          '<div class="inc-edit">'+
+            '<label>處置<select class="esel" data-idx="'+idx+'" data-field="disposal">'+optsHtml(it.disposal,DISPOSAL_OPTIONS)+'</select></label>'+
+            '<label>懲處<select class="esel" data-idx="'+idx+'" data-field="disc">'+optsHtml(it.disc,DISCIPLINE_OPTIONS)+'</select></label>'+
+          '</div>'+
         '</div>';
       }).join('');
       return '<div class="driver"><div class="dhead"><div class="dn">'+name+'</div><span class="dcount">'+d.count+' 次</span></div>'+
         '<div class="dmeta">最高 '+d.max+' km/hr</div>'+items+'</div>';
     }).join('');
     return '<div class="grp"><div class="grp-h"><span class="name">'+br+'</span><span class="cnt">'+list.length+' 次 · '+drivers.length+' 人</span></div>'+inner+'</div>';}).join('');
+  // wire editable selects
+  box.querySelectorAll('select.esel').forEach(sel=>{
+    sel.dataset.prev=sel.value;
+    sel.onchange=async()=>{
+      let val=sel.value;
+      if(val==='__custom__'){const c=prompt('輸入自訂內容：','');if(c==null){sel.value=sel.dataset.prev;return;}val=c.trim();}
+      const rec=speedRows[+sel.dataset.idx];const field=sel.dataset.field;
+      const old=rec[field];rec[field]=val;
+      const okSave=await saveAnomEdit(rec);
+      if(!okSave){rec[field]=old;}
+      renderSpeed();renderDetail();
+    };
+  });
+}
+async function saveAnomEdit(rec){
+  if(ONLINE){
+    try{const resp=await gasPost({type:'update_anom',uniq:anomUniq(rec),disposal:txt(rec.disposal),disc:txt(rec.disc)});
+      if(resp&&resp.ok){toast('已儲存 ✓','處置／懲處已更新至共享後台');return true;}
+      toast('儲存失敗',(resp&&resp.error)||'請確認後台已更新為最新版 Code.gs','err');return false;
+    }catch(e){toast('儲存失敗',String(e.message||e),'err');return false;}
+  }else{saveLocal();toast('已更新（本機）','');return true;}
 }
 function renderFoot(){
   const dates=sortedDates();
@@ -468,6 +515,7 @@ $$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('o
 ['#dfBranch','#dfBehavior','#dfDegree'].forEach(s=>$(s).onchange=renderDetail);
 $('#dfSearch').oninput=renderDetail;
 ['#spBranch','#spSev'].forEach(s=>$(s).onchange=renderSpeed);
+$('#spDisc').onchange=renderSpeed;
 $('#dfExport').onclick=()=>{const rows=filteredAnom();if(!rows.length){toast('無資料可匯出','','warn');return;}const head=['日期','站所','車號','駕駛','行為','等級','最高時速','法定限速','超過km','異常程度','處置','懲處'];const lines=[head.join(',')].concat(rows.map(r=>[r.date,r.branch,r.plate,r.driver,r.behavior,r.level,r.maxSpeed,r.legal,r.over,r.degText,r.disposal,r.disc].map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')));const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='異常明細查詢.csv';a.click();toast('已匯出 CSV',rows.length+' 筆');};
 
 let dragDepth=0;

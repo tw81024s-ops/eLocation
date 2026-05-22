@@ -71,6 +71,12 @@ header.app{display:flex;align-items:flex-end;justify-content:space-between;gap:1
 .kpi.c2::before{background:var(--blue)}.kpi.c3::before{background:var(--bad)}.kpi.c4::before{background:var(--good)}.kpi.c5::before{background:var(--orange)}
 .over-cell{font-weight:700}
 .over-輕度{color:var(--blue)}.over-中度{color:var(--warn)}.over-重度{color:var(--orange)}.over-嚴重{color:var(--bad)}
+.speedtbl th.sortable{cursor:pointer;white-space:nowrap}
+.speedtbl th.sortable:hover{color:var(--accent)}
+.speedtbl td.loc{max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.speedtbl select{font-family:var(--sans);font-size:calc(12px*var(--fs));background:#fff;color:var(--txt);border:1px solid var(--line2);border-radius:7px;padding:4px 6px;min-width:auto;cursor:pointer}
+.speedtbl select:hover{border-color:var(--accent)}
+.speedtbl .sev{white-space:nowrap}
 .kpi.clickable{cursor:pointer}
 .kpi.clickable:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 22px rgba(230,0,126,.16)}
 .kpi.clickable .ex{color:var(--accent);font-weight:700}
@@ -118,6 +124,7 @@ td.b{font-weight:700}
 .empty h3{color:var(--txt);font-size:calc(17px*var(--fs));margin-bottom:8px}
 .empty p{font-size:calc(13.5px*var(--fs));max-width:460px;margin:0 auto 6px}
 .groups{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+.groups>.card{grid-column:1/-1}
 .grp{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 4px 16px rgba(230,0,126,.06)}
 .grp-h{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:var(--panel2);border-bottom:1px solid var(--line)}
 .grp-h .name{font-weight:900;font-size:calc(15px*var(--fs));letter-spacing:.5px}
@@ -484,6 +491,7 @@ function optsHtml(cur,opts){
   if(cur&&cur!=='-'&&opts.indexOf(cur)<0)h+='<option selected>'+cur+'</option>';
   h+='<option value="__custom__">其他…</option>';return h;
 }
+let speedSort={key:'branch',dir:1};
 function renderSpeed(){
   const box=$('#speedGroups');const ord=['輕度','中度','重度','嚴重'];
   const onlyDisc=$('#spDisc')&&$('#spDisc').checked;
@@ -493,41 +501,39 @@ function renderSpeed(){
   if(brF)recs=recs.filter(r=>r.branch===brF);
   recs=recs.filter(sevFilter);
   if(onlyDisc){const has=v=>{v=txt(v);return v&&v!=='-';};recs=recs.filter(r=>has(r.disposal)||has(r.disc));}
-  if(!recs.length){box.innerHTML='<div class="empty"><h3>無超速資料</h3><p>匯入「異常明細表」後，這裡會依站所分組列出各駕駛的超速明細；程度依 Excel 公式自動分類，處置／懲處可逐筆設定。</p></div>';return;}
+  if(!recs.length){box.innerHTML='<div class="empty"><h3>無超速資料</h3><p>匯入「異常明細表」後，這裡會以表格列出每筆超速；程度依 Excel 公式自動分類，處置／懲處可在表格內直接設定。</p></div>';return;}
   const shortTime=t=>{if(!t)return '';const m=String(t).match(/(\d{1,2})\/(\d{1,2})\D+(\d{1,2}:\d{2})/);return m?(pad(m[1])+'/'+pad(m[2])+' '+m[3]):String(t);};
+  const sevRank={正常:0,輕度:1,中度:2,重度:3,嚴重:4};
+  const drvCount={};recs.forEach(r=>{drvCount[r.branch+'|'+r.driver]=(drvCount[r.branch+'|'+r.driver]||0)+1;});
+  // 排序
+  const k=speedSort.key,dir=speedSort.dir;
+  const keyVal=(it)=>{if(k==='sev')return sevRank[sevOf(it).text]||0;if(k==='over')return num(it.over);if(k==='maxSpeed')return num(it.maxSpeed);if(k==='legal')return num(it.legal);if(k==='cnt')return drvCount[it.branch+'|'+it.driver];return txt(it[k]);};
+  recs.sort((a,b)=>{let x=keyVal(a),y=keyVal(b);if(typeof x==='number'&&typeof y==='number')return (x-y)*dir;return String(x).localeCompare(String(y),'zh-Hant')*dir;});
   speedRows=[];
-  const byBranch={};recs.forEach(r=>{(byBranch[r.branch]=byBranch[r.branch]||[]).push(r);});
-  const branches=Object.keys(byBranch).sort((a,b)=>byBranch[b].length-byBranch[a].length);
-  box.innerHTML=branches.map(br=>{const list=byBranch[br];const drv={};
-    list.forEach(r=>{const d=drv[r.driver]=drv[r.driver]||{count:0,max:0,items:[]};d.count++;d.max=Math.max(d.max,num(r.maxSpeed));d.items.push(r);});
-    const drivers=Object.keys(drv).sort((a,b)=>drv[b].count-drv[a].count);
-    const inner=drivers.map(name=>{const d=drv[name];
-      const items=d.items.sort((a,b)=>num(b.maxSpeed)-num(a.maxSpeed)).map(it=>{
-        const idx=speedRows.push(it)-1;
-        const over=num(it.over);const sv=sevOf(it);const sc=sv.text||'未定';
-        const overCls=sv.text?('over-'+sv.text):'';
-        const stats='<span class="st"><b>最高</b> '+(it.maxSpeed||'?')+'</span>'+
-          (it.legal?'<span class="st"><b>法定</b> '+it.legal+'</span>':'')+
-          (over?'<span class="st over '+overCls+'"><b>超過</b> +'+over+' km</span>':'');
-        return '<div class="inc">'+
-          '<div class="inc-top">'+
-            (sv.text?'<span class="sev sev-'+sv.text+'">'+sv.text+(sv.code?'（'+sv.code+'）':'')+'</span>':'')+
-            (it.level?'<span class="lv">系統等級 '+it.level+'</span>':'')+
-            '<span class="inc-time">'+shortTime(it.time)+'</span>'+
-          '</div>'+
-          '<div class="inc-stats">'+stats+'</div>'+
-          (it.location?'<div class="inc-loc">📍 '+it.location+'</div>':'')+
-          '<div class="inc-edit">'+
-            '<label>處置<select class="esel" data-idx="'+idx+'" data-field="disposal">'+optsHtml(effDisposal(it),DISPOSAL_OPTIONS)+'</select></label>'+
-            '<label>懲處<select class="esel" data-idx="'+idx+'" data-field="disc">'+optsHtml(effDisc(it),DISCIPLINE_OPTIONS)+'</select></label>'+
-          '</div>'+
-        '</div>';
-      }).join('');
-      return '<div class="driver"><div class="dhead"><div class="dn">'+name+'</div><span class="dcount">'+d.count+' 次</span></div>'+
-        '<div class="dmeta">最高 '+d.max+' km/hr</div>'+items+'</div>';
-    }).join('');
-    return '<div class="grp"><div class="grp-h"><span class="name">'+br+'</span><span class="cnt">'+list.length+' 次 · '+drivers.length+' 人</span></div>'+inner+'</div>';}).join('');
-  // wire editable selects
+  const cols=[['branch','站所'],['driver','駕駛'],['cnt','本人次數'],['plate','車號'],['time','時間'],['maxSpeed','最高'],['legal','法定'],['over','超過km'],['sev','程度'],['location','地點'],['disposal','處置'],['disc','懲處']];
+  const arrow=key=>speedSort.key===key?(speedSort.dir>0?' ▲':' ▼'):'';
+  let html='<thead><tr>'+cols.map(c=>'<th class="sortable" data-k="'+c[0]+'">'+c[1]+arrow(c[0])+'</th>').join('')+'</tr></thead><tbody>';
+  recs.forEach(it=>{
+    const idx=speedRows.push(it)-1;const sv=sevOf(it);const over=num(it.over);
+    const overCls=sv.text?(' over-cell over-'+sv.text):'';
+    const sevCell=sv.text?'<span class="sev sev-'+sv.text+'">'+sv.text+(sv.code?'（'+sv.code+'）':'')+'</span>':'';
+    html+='<tr>'+
+      '<td class="b">'+it.branch+'</td>'+
+      '<td>'+it.driver+'</td>'+
+      '<td class="num">'+(drvCount[it.branch+'|'+it.driver])+'</td>'+
+      '<td style="font-family:var(--mono)">'+it.plate+'</td>'+
+      '<td style="font-family:var(--mono)">'+shortTime(it.time)+'</td>'+
+      '<td class="num">'+(it.maxSpeed||'')+'</td>'+
+      '<td class="num">'+(it.legal||'')+'</td>'+
+      '<td class="num'+overCls+'">'+(over?('+'+over):'')+'</td>'+
+      '<td>'+sevCell+'</td>'+
+      '<td class="loc" title="'+(it.location||'').replace(/"/g,'')+'">'+(it.location||'')+'</td>'+
+      '<td><select class="esel" data-idx="'+idx+'" data-field="disposal">'+optsHtml(effDisposal(it),DISPOSAL_OPTIONS)+'</select></td>'+
+      '<td><select class="esel" data-idx="'+idx+'" data-field="disc">'+optsHtml(effDisc(it),DISCIPLINE_OPTIONS)+'</select></td>'+
+    '</tr>';
+  });
+  box.innerHTML='<div class="card"><div class="tablewrap"><table class="speedtbl">'+html+'</tbody></table></div></div>';
+  box.querySelectorAll('th.sortable').forEach(th=>th.onclick=()=>{const key=th.dataset.k;if(speedSort.key===key)speedSort.dir*=-1;else{speedSort.key=key;speedSort.dir=1;}renderSpeed();});
   box.querySelectorAll('select.esel').forEach(sel=>{
     sel.dataset.prev=sel.value;
     sel.onchange=async()=>{

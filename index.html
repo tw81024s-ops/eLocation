@@ -21,9 +21,9 @@
   const DEPT_NAME      = "中南配送部";
   const IMPORT_PASSCODE= "";              // 選填：設定後，匯入前需輸入此通行碼（簡易防呆，非正式權限）
   const AUTO_REFRESH_SEC = 45;            // 每隔幾秒自動向後台抓最新資料
-  // 超速明細可由使用者設定的「行為處置 / 行政懲處」下拉選項（可自行增減；選「其他…」可手動輸入）
-  const DISPOSAL_OPTIONS   = ["改善單","口頭告誡","書面警告","教育訓練","面談輔導"];
-  const DISCIPLINE_OPTIONS = ["警告","申誡","記過","記大過"];
+  // 超速明細「行為處置 / 行政懲處」下拉選項（已對齊 Excel 公式用語；可自行增減，選「其他…」可手動輸入）
+  const DISPOSAL_OPTIONS   = ["面談單","改善單","/扣牌","口頭告誡","教育訓練"];
+  const DISCIPLINE_OPTIONS = ["申誡","記過","大過+","警告"];
 </script>
 <!-- ============================================================
      ⬆⬆⬆  設定區結束  ⬆⬆⬆
@@ -69,6 +69,11 @@ header.app{display:flex;align-items:flex-end;justify-content:space-between;gap:1
 .kpi{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px 17px;position:relative;overflow:hidden;box-shadow:0 4px 16px rgba(230,0,126,.06)}
 .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
 .kpi.c2::before{background:var(--blue)}.kpi.c3::before{background:var(--bad)}.kpi.c4::before{background:var(--good)}.kpi.c5::before{background:var(--orange)}
+.over-cell{font-weight:700}
+.over-輕度{color:var(--blue)}.over-中度{color:var(--warn)}.over-重度{color:var(--orange)}.over-嚴重{color:var(--bad)}
+.kpi.clickable{cursor:pointer}
+.kpi.clickable:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 22px rgba(230,0,126,.16)}
+.kpi.clickable .ex{color:var(--accent);font-weight:700}
 .kpi .lbl{color:var(--muted);font-size:calc(11.5px*var(--fs));font-weight:500;letter-spacing:.4px}
 .kpi .val{font-family:var(--mono);font-weight:700;font-size:calc(27px*var(--fs));margin-top:6px;letter-spacing:-.5px;color:var(--accent)}
 .kpi .val small{font-size:calc(13px*var(--fs));color:var(--dim);font-weight:500}
@@ -130,8 +135,15 @@ td.b{font-weight:700}
 .inc-stats{display:flex;gap:7px;flex-wrap:wrap;margin-top:6px}
 .inc-stats .st{font-family:var(--mono);font-size:calc(11.5px*var(--fs));color:var(--txt);background:#fff;border:1px solid var(--line);padding:2px 8px;border-radius:6px}
 .inc-stats .st b{color:var(--muted);font-weight:700;font-family:var(--sans);margin-right:3px}
-.inc-stats .st.over{color:var(--bad);border-color:rgba(224,39,73,.3);background:rgba(224,39,73,.06)}
-.inc-stats .st.over b{color:var(--bad)}
+.inc-stats .st.over{font-weight:700}
+.inc-stats .st.over-輕度{color:var(--blue);border-color:rgba(47,115,214,.35);background:rgba(47,115,214,.08)}
+.inc-stats .st.over-輕度 b{color:var(--blue)}
+.inc-stats .st.over-中度{color:var(--warn);border-color:rgba(232,146,12,.4);background:rgba(232,146,12,.1)}
+.inc-stats .st.over-中度 b{color:var(--warn)}
+.inc-stats .st.over-重度{color:var(--orange);border-color:rgba(240,100,10,.4);background:rgba(240,100,10,.1)}
+.inc-stats .st.over-重度 b{color:var(--orange)}
+.inc-stats .st.over-嚴重{color:#fff;border-color:var(--bad);background:var(--bad)}
+.inc-stats .st.over-嚴重 b{color:#ffe3ef}
 .inc-loc{font-size:calc(11.5px*var(--fs));color:var(--muted);margin-top:5px;line-height:1.4;word-break:break-all}
 .inc-edit{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px dashed var(--line2)}
 .inc-edit label{display:inline-flex;align-items:center;gap:5px;font-size:calc(11.5px*var(--fs));font-weight:700;color:var(--muted)}
@@ -324,6 +336,27 @@ function parseAnom(aoa){
   return recs.length?recs:null;
 }
 const anomUniq=x=>[x.date,x.plate,x.driver,x.time,x.location,x.maxSpeed].join('|');
+/* === Excel「公式」分類：依 法定限速級距 + 超過km 判定異常程度 === */
+const SEV_CODE={正常:'',輕度:'A',中度:'B',重度:'C',嚴重:'D'};
+const SUGGEST_DISP={正常:'',輕度:'',中度:'面談單',重度:'改善單',嚴重:'/扣牌'};
+const SUGGEST_DISC={正常:'',輕度:'',中度:'申誡',重度:'記過',嚴重:'大過+'};
+function classifySpeed(legal,over){
+  const k=num(legal),L=num(over);
+  if(L<=0)return '正常';
+  if(k===40||k===50||k===60)return L<=14?'輕度':L<=24?'中度':L<=34?'重度':'嚴重';
+  if(k===70||k===80||k===90)return L<=10?'輕度':L<=20?'中度':L<=30?'重度':'嚴重';
+  if(k===100||k===110)return L<=10?'輕度':L<=15?'中度':L<=20?'重度':'嚴重';
+  return '';  // 未定義速限 → 用匯入原值
+}
+// 取得一筆超速事件的「程度／代碼／建議處置／建議懲處」（公式優先，無法判定才用匯入值）
+function sevOf(it){
+  const ord=['輕度','中度','重度','嚴重'];
+  let t=classifySpeed(it.legal,it.over);
+  if(!t)t=ord.indexOf(txt(it.degText))>=0?txt(it.degText):'';
+  return {text:t,code:t?(SEV_CODE[t]||txt(it.degCode)):txt(it.degCode)};
+}
+function effDisposal(it){const v=txt(it.disposal);if(v&&v!=='-')return v;const s=sevOf(it).text;return SUGGEST_DISP[s]||'';}
+function effDisc(it){const v=txt(it.disc);if(v&&v!=='-')return v;const s=sevOf(it).text;return SUGGEST_DISC[s]||'';}
 const toDailySnake=(b,date)=>({date,branch:b.branch,grade:b.grade,rank:b.rank,score:b.score,vehicles:b.vehicles,km:b.km,count:b.count,speed_g:b.speedG,speed_r:b.speedR,turn_g:b.turnG,turn_r:b.turnR,decel_g:b.decelG,decel_r:b.decelR,accel_g:b.accelG,accel_r:b.accelR});
 const toAnomSnake=x=>({uniq:anomUniq(x),date:x.date,branch:x.branch,plate:x.plate,driver:x.driver,behavior:x.behavior,level:x.level,time:x.time,max_speed:x.maxSpeed,location:x.location,legal:x.legal,over_km:x.over,deg_text:x.degText,deg_code:x.degCode,disposal:x.disposal,disc:x.disc});
 
@@ -370,12 +403,13 @@ function renderKpis(){
   if(!dates.length&&!ANOM.records.length){k.innerHTML='';return;}
   const latest=dates[dates.length-1];let best='–',worst='–',avgScore='–';
   if(latest){const bs=DAILY.days[latest].branches;const br=[...bs].sort((a,b)=>a.rank-b.rank);best=br[0]?br[0].branch:'–';worst=br[br.length-1]?br[br.length-1].branch:'–';avgScore=r1(avg(bs.map(b=>b.score)));}
-  const cards=[['c1','統計天數',dates.length+'<small> 天</small>',dates.length?dates[0]+' ~ '+latest:''],
-    ['c2','站所數',allBranches().length+'<small> 站</small>',DAILY.dept],
-    ['c3','異常事件',ANOM.records.length+'<small> 筆</small>','明細表累積'],
-    ['c4','最新平均總分',avgScore,latest?('最佳 '+best):''],
-    ['c5','最新待改善',worst,latest||'尚無資料']];
-  k.innerHTML=cards.map(c=>'<div class="kpi '+c[0]+'"><div class="lbl">'+c[1]+'</div><div class="val">'+c[2]+'</div><div class="ex">'+c[3]+'</div></div>').join('');
+  const cards=[['c1','統計天數',dates.length+'<small> 天</small>',dates.length?dates[0]+' ~ '+latest:'',''],
+    ['c2','站所數',allBranches().length+'<small> 站</small>',DAILY.dept,''],
+    ['c3','異常事件',ANOM.records.length+'<small> 筆</small>','點擊查看明細 →','detail'],
+    ['c4','最新平均總分',avgScore,latest?('最佳 '+best):'',''],
+    ['c5','最新待改善',worst,latest||'尚無資料','']];
+  k.innerHTML=cards.map(c=>'<div class="kpi '+c[0]+(c[4]?' clickable':'')+'"'+(c[4]?(' data-goto="'+c[4]+'"'):'')+'><div class="lbl">'+c[1]+'</div><div class="val">'+c[2]+'</div><div class="ex">'+c[3]+'</div></div>').join('');
+  k.querySelectorAll('.kpi.clickable').forEach(el=>el.onclick=()=>gotoTab(el.dataset.goto));
 }
 function emptyInto(sel,t,d){const el=$(sel);if(el)el.innerHTML='<div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 14l4-4 4 4 6-6"/><path d="M3 21h18"/></svg><h3>'+t+'</h3><p>'+d+'</p></div>';}
 function emptyTable(t,title,desc){t.innerHTML='<tbody><tr><td style="text-align:center;padding:56px 20px"><div style="font-size:16px;color:var(--txt);font-weight:700;margin-bottom:8px">'+title+'</div><div style="font-size:13px;color:var(--muted)">'+desc+'</div></td></tr></tbody>';}
@@ -418,7 +452,14 @@ function renderDetail(){
   if(!ANOM.records.length){emptyTable(t,'尚未匯入異常明細','匯入「異常明細表」(逐筆事件，含駕駛、車號、超速地點)即可查詢。');return;}
   const rows=filteredAnom();const head=['日期','站所','車號','駕駛','行為','等級','最高時速','法定','超過km','異常程度','處置','懲處'];
   let html='<thead><tr>'+head.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>';
-  rows.forEach(r=>{html+='<tr><td class="num" style="font-family:var(--mono)">'+r.date+'</td><td class="b">'+r.branch+'</td><td style="font-family:var(--mono)">'+r.plate+'</td><td>'+r.driver+'</td><td>'+r.behavior+'</td><td>'+r.level+'</td><td class="num">'+r.maxSpeed+'</td><td class="num">'+r.legal+'</td><td class="num">'+(r.over||0)+'</td><td>'+(r.degText?'<span class="sev sev-'+r.degText+'">'+r.degText+'</span>':'')+'</td><td>'+(r.disposal||'')+'</td><td>'+(r.disc||'')+'</td></tr>';});
+  rows.forEach(r=>{
+    const isSpd=r.behavior&&r.behavior.includes('超速');
+    const sv=isSpd?sevOf(r):{text:txt(r.degText),code:txt(r.degCode)};
+    const sevCell=sv.text?'<span class="sev sev-'+sv.text+'">'+sv.text+(sv.code?'（'+sv.code+'）':'')+'</span>':(r.degText||'');
+    const disp=isSpd?effDisposal(r):txt(r.disposal);const disc=isSpd?effDisc(r):txt(r.disc);
+    const over=num(r.over);const overCls=isSpd&&sv.text?(' class="num over-cell over-'+sv.text+'"'):' class="num"';
+    html+='<tr><td class="num" style="font-family:var(--mono)">'+r.date+'</td><td class="b">'+r.branch+'</td><td style="font-family:var(--mono)">'+r.plate+'</td><td>'+r.driver+'</td><td>'+r.behavior+'</td><td>'+r.level+'</td><td class="num">'+r.maxSpeed+'</td><td class="num">'+r.legal+'</td><td'+overCls+'>'+(over?('+'+over):0)+'</td><td>'+sevCell+'</td><td>'+(disp||'')+'</td><td>'+(disc||'')+'</td></tr>';
+  });
   if(!rows.length)html+='<tr><td colspan="12" style="text-align:center;color:var(--dim);padding:30px">無符合條件的資料</td></tr>';
   t.innerHTML=html+'</tbody>';
 }
@@ -434,11 +475,12 @@ function renderSpeed(){
   const box=$('#speedGroups');const ord=['輕度','中度','重度','嚴重'];
   const onlyDisc=$('#spDisc')&&$('#spDisc').checked;
   const minSev=$('#spSev').value,brF=$('#spBranch').value,mi=minSev?ord.indexOf(minSev):-1;
+  const sevFilter=it=>{const t=sevOf(it).text;if(minSev==='嚴重')return t==='嚴重';if(mi>=0)return ord.indexOf(t)>=mi;return true;};
   let recs=ANOM.records.filter(r=>r.behavior&&r.behavior.includes('超速'));
   if(brF)recs=recs.filter(r=>r.branch===brF);
-  if(minSev==='嚴重')recs=recs.filter(r=>r.degText==='嚴重');else if(mi>=0)recs=recs.filter(r=>ord.indexOf(r.degText)>=mi);
+  recs=recs.filter(sevFilter);
   if(onlyDisc){const has=v=>{v=txt(v);return v&&v!=='-';};recs=recs.filter(r=>has(r.disposal)||has(r.disc));}
-  if(!recs.length){box.innerHTML='<div class="empty"><h3>無超速資料</h3><p>匯入「異常明細表」後，這裡會依站所分組列出各駕駛的超速明細；可逐筆設定行為處置與行政懲處。</p></div>';return;}
+  if(!recs.length){box.innerHTML='<div class="empty"><h3>無超速資料</h3><p>匯入「異常明細表」後，這裡會依站所分組列出各駕駛的超速明細；程度依 Excel 公式自動分類，處置／懲處可逐筆設定。</p></div>';return;}
   const shortTime=t=>{if(!t)return '';const m=String(t).match(/(\d{1,2})\/(\d{1,2})\D+(\d{1,2}:\d{2})/);return m?(pad(m[1])+'/'+pad(m[2])+' '+m[3]):String(t);};
   speedRows=[];
   const byBranch={};recs.forEach(r=>{(byBranch[r.branch]=byBranch[r.branch]||[]).push(r);});
@@ -449,21 +491,22 @@ function renderSpeed(){
     const inner=drivers.map(name=>{const d=drv[name];
       const items=d.items.sort((a,b)=>num(b.maxSpeed)-num(a.maxSpeed)).map(it=>{
         const idx=speedRows.push(it)-1;
-        const over=num(it.over);
+        const over=num(it.over);const sv=sevOf(it);const sc=sv.text||'未定';
+        const overCls=sv.text?('over-'+sv.text):'';
         const stats='<span class="st"><b>最高</b> '+(it.maxSpeed||'?')+'</span>'+
           (it.legal?'<span class="st"><b>法定</b> '+it.legal+'</span>':'')+
-          (over?'<span class="st over"><b>超過</b> +'+over+' km</span>':'');
+          (over?'<span class="st over '+overCls+'"><b>超過</b> +'+over+' km</span>':'');
         return '<div class="inc">'+
           '<div class="inc-top">'+
-            (it.degText?'<span class="sev sev-'+it.degText+'">'+it.degText+'</span>':'')+
-            (it.level?'<span class="lv">'+it.level+'</span>':'')+
+            (sv.text?'<span class="sev sev-'+sv.text+'">'+sv.text+(sv.code?'（'+sv.code+'）':'')+'</span>':'')+
+            (it.level?'<span class="lv">系統等級 '+it.level+'</span>':'')+
             '<span class="inc-time">'+shortTime(it.time)+'</span>'+
           '</div>'+
           '<div class="inc-stats">'+stats+'</div>'+
           (it.location?'<div class="inc-loc">📍 '+it.location+'</div>':'')+
           '<div class="inc-edit">'+
-            '<label>處置<select class="esel" data-idx="'+idx+'" data-field="disposal">'+optsHtml(it.disposal,DISPOSAL_OPTIONS)+'</select></label>'+
-            '<label>懲處<select class="esel" data-idx="'+idx+'" data-field="disc">'+optsHtml(it.disc,DISCIPLINE_OPTIONS)+'</select></label>'+
+            '<label>處置<select class="esel" data-idx="'+idx+'" data-field="disposal">'+optsHtml(effDisposal(it),DISPOSAL_OPTIONS)+'</select></label>'+
+            '<label>懲處<select class="esel" data-idx="'+idx+'" data-field="disc">'+optsHtml(effDisc(it),DISCIPLINE_OPTIONS)+'</select></label>'+
           '</div>'+
         '</div>';
       }).join('');
@@ -509,7 +552,8 @@ $('#importBtn').onclick=()=>{if(!busy)$('#fileInput').click();};
 $('#fileInput').onchange=e=>{if(e.target.files.length)handleFiles([...e.target.files]);e.target.value='';};
 $('#refreshBtn').onclick=async()=>{if(busy)return;if(!ONLINE){toast('本機模式','無雲端後台可更新','warn');return;}setBusy(true,'更新中…');try{await loadAll();lastSig=signature();renderAll();toast('已更新','');}catch(e){setConn('err');toast('更新失敗',String(e.message||e),'err');}setBusy(false);};
 $('#clearBtn').onclick=async()=>{if(busy)return;if(!confirm('確定清除所有已匯入的統計與異常資料？此動作無法復原。'))return;setBusy(true,'清除中…');try{if(ONLINE)await gasPost({type:'clear'});DAILY={dept:DEPT_NAME,days:{}};ANOM={records:[]};if(!ONLINE)saveLocal();else await loadAll();}catch(e){toast('清除失敗',String(e.message||e),'err');}setBusy(false);lastSig=signature();renderAll();toast('已清除全部資料','');};
-$$('.tab').forEach(t=>t.onclick=()=>{$$('.tab').forEach(x=>x.classList.remove('on'));t.classList.add('on');$$('.panel').forEach(p=>p.classList.remove('on'));$('#p-'+t.dataset.tab).classList.add('on');if(t.dataset.tab==='trend')renderTrend();});
+function gotoTab(name){$$('.tab').forEach(x=>x.classList.toggle('on',x.dataset.tab===name));$$('.panel').forEach(p=>p.classList.toggle('on',p.id==='p-'+name));if(name==='trend')renderTrend();window.scrollTo({top:0,behavior:'smooth'});}
+$$('.tab').forEach(t=>t.onclick=()=>gotoTab(t.dataset.tab));
 ['#rankDate','#rankSort'].forEach(s=>$(s).onchange=renderRank);
 ['#trendScope','#trendMetric'].forEach(s=>$(s).onchange=renderTrend);
 ['#dfBranch','#dfBehavior','#dfDegree'].forEach(s=>$(s).onchange=renderDetail);

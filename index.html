@@ -114,12 +114,22 @@ td.b{font-weight:700}
 .grp-h{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;background:var(--panel2);border-bottom:1px solid var(--line)}
 .grp-h .name{font-weight:900;font-size:calc(15px*var(--fs));letter-spacing:.5px}
 .grp-h .cnt{font-family:var(--mono);font-size:calc(12px*var(--fs));color:var(--accent);font-weight:700}
-.driver{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line)}
+.driver{padding:11px 16px;border-bottom:1px solid var(--line)}
 .driver:last-child{border-bottom:none}
-.driver .dn{font-weight:600;font-size:calc(13px*var(--fs))}
-.driver .meta{font-family:var(--mono);font-size:calc(11px*var(--fs));color:var(--dim);margin-top:2px}
-.driver .right{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
-.dcount{font-family:var(--mono);font-weight:700;font-size:calc(15px*var(--fs));color:var(--accent)}
+.dhead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.driver .dn{font-weight:700;font-size:calc(13.5px*var(--fs))}
+.dmeta{font-family:var(--mono);font-size:calc(10.5px*var(--fs));color:var(--dim);margin:1px 0 7px}
+.dcount{font-family:var(--mono);font-weight:700;font-size:calc(13px*var(--fs));color:var(--accent);background:rgba(230,0,126,.1);padding:2px 9px;border-radius:20px;white-space:nowrap}
+.inc{background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin-top:6px}
+.inc-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.inc-spd{font-family:var(--mono);font-weight:700;font-size:calc(13px*var(--fs));color:var(--bad)}
+.inc-spd .lim{color:var(--dim);font-weight:500;font-size:calc(11px*var(--fs))}
+.inc-time{font-family:var(--mono);font-size:calc(11px*var(--fs));color:var(--muted);margin-left:auto}
+.inc-loc{font-size:calc(11.5px*var(--fs));color:var(--muted);margin-top:4px;line-height:1.4;word-break:break-all}
+.inc-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:5px}
+.chip{font-size:calc(11px*var(--fs));font-weight:700;padding:2px 9px;border-radius:6px;white-space:nowrap}
+.chip-disp{background:rgba(47,115,214,.14);color:var(--blue)}
+.chip-disc{background:rgba(224,39,73,.14);color:var(--bad)}
 .mini{font-size:calc(10.5px*var(--fs));font-weight:700;padding:1px 6px;border-radius:5px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:calc(11.5px*var(--fs));color:var(--muted);align-items:center;margin-left:auto}
 .legend span{display:inline-flex;align-items:center;gap:5px}
@@ -409,13 +419,31 @@ function renderSpeed(){
   let recs=ANOM.records.filter(r=>r.behavior&&r.behavior.includes('超速'));
   if(brF)recs=recs.filter(r=>r.branch===brF);
   if(minSev==='嚴重')recs=recs.filter(r=>r.degText==='嚴重');else if(mi>=0)recs=recs.filter(r=>ord.indexOf(r.degText)>=mi);
-  if(!recs.length){box.innerHTML='<div class="empty"><h3>無超速資料</h3><p>匯入「異常明細表」後，這裡會依站所分組、列出各駕駛的超速次數與最高時速。</p></div>';return;}
+  if(!recs.length){box.innerHTML='<div class="empty"><h3>無超速資料</h3><p>匯入「異常明細表」後，這裡會依站所分組、列出各駕駛的超速明細與處置／懲處備註。</p></div>';return;}
+  const shortTime=t=>{if(!t)return '';const m=String(t).match(/(\d{1,2})\/(\d{1,2})\D+(\d{1,2}:\d{2})/);return m?(pad(m[1])+'/'+pad(m[2])+' '+m[3]):String(t);};
+  const note=(v)=>{v=txt(v);return (!v||v==='-')?'':v;};
   const byBranch={};recs.forEach(r=>{(byBranch[r.branch]=byBranch[r.branch]||[]).push(r);});
   const branches=Object.keys(byBranch).sort((a,b)=>byBranch[b].length-byBranch[a].length);
   box.innerHTML=branches.map(br=>{const list=byBranch[br];const drv={};
-    list.forEach(r=>{const d=drv[r.driver]=drv[r.driver]||{count:0,max:0,sev:{}};d.count++;d.max=Math.max(d.max,num(r.maxSpeed));if(r.degText)d.sev[r.degText]=(d.sev[r.degText]||0)+1;});
+    list.forEach(r=>{const d=drv[r.driver]=drv[r.driver]||{count:0,max:0,items:[]};d.count++;d.max=Math.max(d.max,num(r.maxSpeed));d.items.push(r);});
     const drivers=Object.keys(drv).sort((a,b)=>drv[b].count-drv[a].count);
-    const inner=drivers.map(name=>{const d=drv[name];const tags=ord.filter(s=>d.sev[s]).map(s=>'<span class="mini sev-'+s+'">'+s+' '+d.sev[s]+'</span>').join(' ');return '<div class="driver"><div><div class="dn">'+name+'</div><div class="meta">最高 '+d.max+' km/hr</div></div><div class="right">'+tags+'<span class="dcount">'+d.count+'</span></div></div>';}).join('');
+    const inner=drivers.map(name=>{const d=drv[name];
+      const items=d.items.sort((a,b)=>num(b.maxSpeed)-num(a.maxSpeed)).map(it=>{
+        const disp=note(it.disposal),disc=note(it.disc);
+        const chips=(disp?'<span class="chip chip-disp">處置：'+disp+'</span>':'')+(disc?'<span class="chip chip-disc">懲處：'+disc+'</span>':'');
+        return '<div class="inc">'+
+          '<div class="inc-top">'+
+            (it.degText?'<span class="sev sev-'+it.degText+'">'+it.degText+'</span>':'')+
+            '<span class="inc-spd">'+(it.maxSpeed||'?')+(it.legal?(' <span class="lim">/限'+it.legal+'</span>'):'')+'</span>'+
+            '<span class="inc-time">'+shortTime(it.time)+'</span>'+
+          '</div>'+
+          (it.location?'<div class="inc-loc">📍 '+it.location+'</div>':'')+
+          (chips?'<div class="inc-chips">'+chips+'</div>':'')+
+        '</div>';
+      }).join('');
+      return '<div class="driver"><div class="dhead"><div class="dn">'+name+'</div><span class="dcount">'+d.count+' 次</span></div>'+
+        '<div class="dmeta">最高 '+d.max+' km/hr</div>'+items+'</div>';
+    }).join('');
     return '<div class="grp"><div class="grp-h"><span class="name">'+br+'</span><span class="cnt">'+list.length+' 次 · '+drivers.length+' 人</span></div>'+inner+'</div>';}).join('');
 }
 function renderFoot(){

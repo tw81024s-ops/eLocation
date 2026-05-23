@@ -70,6 +70,16 @@ header.app{display:flex;align-items:flex-end;justify-content:space-between;gap:1
 .kpi::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent)}
 .kpi.c2::before{background:var(--blue)}.kpi.c3::before{background:var(--bad)}.kpi.c4::before{background:var(--good)}.kpi.c5::before{background:var(--orange)}
 .over-cell{font-weight:700}
+.bpsum{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:13px;margin-bottom:16px}
+.bpcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:15px 17px;position:relative;overflow:hidden;box-shadow:0 4px 16px rgba(230,0,126,.06)}
+.bpcard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--accent)}
+.bpcard.c2::before{background:var(--blue)}.bpcard.c3::before{background:var(--bad)}.bpcard.c4::before{background:var(--good)}.bpcard.c5::before{background:var(--orange)}
+.bplbl{color:var(--muted);font-size:calc(11.5px*var(--fs));font-weight:600}
+.bpval{font-family:var(--mono);font-weight:700;font-size:calc(26px*var(--fs));margin-top:5px;color:var(--accent)}
+.bpcard.c2 .bpval{color:var(--blue)}.bpcard.c3 .bpval{color:var(--bad)}.bpcard.c4 .bpval{color:var(--good)}.bpcard.c5 .bpval{color:var(--orange)}
+.bpex{font-size:calc(11px*var(--fs));color:var(--dim);margin-top:3px;font-family:var(--mono)}
+.sevbar{display:flex;height:14px;width:100%;border-radius:7px;overflow:hidden;background:var(--bg2)}
+.sevbar span{transition:width .3s}
 .over-輕度{color:var(--blue)}.over-中度{color:var(--warn)}.over-重度{color:var(--orange)}.over-嚴重{color:var(--bad)}
 .speedtbl th.sortable{cursor:pointer;white-space:nowrap}
 .speedtbl th.sortable:hover{color:var(--accent)}
@@ -87,6 +97,14 @@ tr.bp-grp{cursor:default}
 .subtbl td{padding:6px 9px;border-bottom:1px solid var(--line);white-space:nowrap}
 .subtbl tr:last-child td{border-bottom:none}
 .subtbl td.num{text-align:right;font-family:var(--mono)}
+tr.jump-row{cursor:pointer}
+tr.jump-row:hover{background:#ffe3ef}
+.subtbl td.gobtn{color:var(--accent);font-weight:700;white-space:nowrap;text-align:right}
+.chip-disp{background:rgba(47,115,214,.14);color:var(--blue);font-size:calc(11px*var(--fs));font-weight:700;padding:1px 8px;border-radius:6px}
+.chip-disc{background:rgba(224,39,73,.14);color:var(--bad);font-size:calc(11px*var(--fs));font-weight:700;padding:1px 8px;border-radius:6px}
+.chip-none{color:var(--dim);font-size:calc(11px*var(--fs))}
+tr.spd-row.flash{animation:flashrow 1.1s ease 3}
+@keyframes flashrow{0%,100%{background:transparent}40%{background:rgba(255,180,58,.45)}}
 .speedtbl tr.row-dirty{background:rgba(255,194,75,.16)}
 .speedtbl tr.row-dirty td{border-bottom-color:var(--warn)}
 .speedtbl tr.row-dirty .b::before{content:"●";color:var(--warn);font-size:9px;margin-right:5px;vertical-align:middle}
@@ -230,7 +248,7 @@ td.b{font-weight:700}
       <div class="fsbar" id="fsbar" title="字體大小">
         <button data-fs="1" class="on">標準</button>
         <button data-fs="1.5">放大</button>
-        <button data-fs="2">老花</button>
+        <button data-fs="2.5">老花</button>
       </div>
       <span class="pill" id="connPill"><span class="d"></span><span id="connTxt">啟動中…</span></span>
       <button class="btn" id="refreshBtn" title="重新抓取最新資料"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-2.6-6.4M21 4v5h-5"/></svg>更新</button>
@@ -300,6 +318,7 @@ td.b{font-weight:700}
       <div class="field"><label>站所</label><select id="bpBranch"><option value="">全部站所</option></select></div>
       <div class="field"><label>&nbsp;</label><button class="btn" id="bpExport">匯出 CSV</button></div>
     </div>
+    <div id="bpSummary" class="bpsum"></div>
     <div class="card"><div class="tablewrap"><table id="bpTable"></table></div></div>
   </section>
 
@@ -575,36 +594,66 @@ function renderDetail(){
   if(!ANOM.records.length){emptyTable(t,'尚未匯入異常明細','匯入「異常明細表」(逐筆事件，含駕駛、車號、超速地點)即可查詢。');return;}
   const rows=filteredAnom();
   if(!rows.length){emptyTable(t,'無符合條件的資料','調整上方篩選或搜尋條件試試。');return;}
+  detailRows=[];
   const ord=['輕度','中度','重度','嚴重'];
   // 依站所分組彙總
   const byBranch={};
-  rows.forEach(r=>{const b=byBranch[r.branch]=byBranch[r.branch]||{branch:r.branch,items:[],people:new Set(),sev:{輕度:0,中度:0,重度:0,嚴重:0}};
-    b.items.push(r);b.people.add(r.driver);const sv=(r.behavior&&r.behavior.includes('超速'))?sevOf(r).text:txt(r.degText);if(b.sev[sv]!=null)b.sev[sv]++;});
+  rows.forEach(r=>{const b=byBranch[r.branch]=byBranch[r.branch]||{branch:r.branch,items:[],people:new Set(),sev:{輕度:0,中度:0,重度:0,嚴重:0},handled:0,unhandled:0};
+    b.items.push(r);b.people.add(r.driver);const sv=(r.behavior&&r.behavior.includes('超速'))?sevOf(r).text:txt(r.degText);if(b.sev[sv]!=null)b.sev[sv]++;
+    const isSpd=r.behavior&&r.behavior.includes('超速');
+    const disp=isSpd?effDisposal(r):txt(r.disposal);const disc=isSpd?effDisc(r):txt(r.disc);
+    const done=(disp&&disp!=='-')||(disc&&disc!=='-');if(done)b.handled++;else b.unhandled++;});
   const branches=Object.keys(byBranch).sort((a,b)=>byBranch[b].items.length-byBranch[a].items.length);
-  let html='<thead><tr><th></th><th>站所</th><th class="num">異常筆數</th><th class="num">人數</th><th class="num">輕度</th><th class="num">中度</th><th class="num">重度</th><th class="num">嚴重</th></tr></thead><tbody>';
+  let html='<thead><tr><th></th><th>站所</th><th class="num">異常筆數</th><th class="num">人數</th><th class="num">輕度</th><th class="num">中度</th><th class="num">重度</th><th class="num">嚴重</th><th class="num">已處理</th><th class="num">待處理</th></tr></thead><tbody>';
   branches.forEach(bk=>{const b=byBranch[bk];const open=!!detailExpanded[bk];
     html+='<tr class="grp-row" data-br="'+bk+'"><td class="exp">'+(open?'▼':'▶')+'</td><td class="b">'+bk+'</td>'+
       '<td class="num b">'+fi(b.items.length)+'</td><td class="num">'+fi(b.people.size)+'</td>'+
       '<td class="num" style="color:var(--blue)">'+(b.sev.輕度||'')+'</td>'+
       '<td class="num" style="color:var(--warn)">'+(b.sev.中度||'')+'</td>'+
       '<td class="num" style="color:var(--orange)">'+(b.sev.重度||'')+'</td>'+
-      '<td class="num" style="color:var(--bad)">'+(b.sev.嚴重||'')+'</td></tr>';
+      '<td class="num" style="color:var(--bad)">'+(b.sev.嚴重||'')+'</td>'+
+      '<td class="num" style="color:var(--good)">'+fi(b.handled)+'</td>'+
+      '<td class="num" style="color:'+(b.unhandled?'var(--bad)':'var(--dim)')+';font-weight:'+(b.unhandled?700:400)+'">'+fi(b.unhandled)+'</td></tr>';
     if(open){
-      html+='<tr class="detail-row"><td></td><td colspan="7" style="padding:0 8px 10px"><div class="subwrap"><table class="subtbl"><thead><tr>'+
-        ['日期','車號','駕駛','行為','最高','法定','超過km','程度','處置','懲處'].map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>';
+      html+='<tr class="detail-row"><td></td><td colspan="9" style="padding:0 8px 10px"><div class="subwrap"><table class="subtbl"><thead><tr>'+
+        ['日期','車號','駕駛','行為','最高','法定','超過km','程度','處置','懲處',''].map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>';
       b.items.slice().sort((x,y)=>num(y.over)-num(x.over)).forEach(r=>{
         const isSpd=r.behavior&&r.behavior.includes('超速');const sv=isSpd?sevOf(r):{text:txt(r.degText),code:txt(r.degCode)};
         const sevCell=sv.text?'<span class="sev sev-'+sv.text+'">'+sv.text+(sv.code?'（'+sv.code+'）':'')+'</span>':'';
-        const disp=isSpd?effDisposal(r):txt(r.disposal);const disc=isSpd?effDisc(r):txt(r.disc);
         const over=num(r.over);const oc=isSpd&&sv.text?(' num over-cell over-'+sv.text):' num';
-        html+='<tr><td style="font-family:var(--mono)">'+r.date+'</td><td style="font-family:var(--mono)">'+r.plate+'</td><td>'+r.driver+'</td><td>'+r.behavior+'</td><td class="num">'+(r.maxSpeed||'')+'</td><td class="num">'+(r.legal||'')+'</td><td class="'+oc+'">'+(over?('+'+fi(over)):'')+'</td><td>'+sevCell+'</td><td>'+(disp||'')+'</td><td>'+(disc||'')+'</td></tr>';
+        const u=anomUniq(r);const pend=pendingEdits[u];
+        const dispVal=pend?pend.disposal:(isSpd?effDisposal(r):txt(r.disposal));
+        const discVal=pend?pend.disc:(isSpd?effDisc(r):txt(r.disc));
+        const dchip=v=>{v=txt(v);return v?'<span class="chip-disp">'+v+'</span>':'<span class="chip-none">未設定</span>';};
+        const cchip=v=>{v=txt(v);return v?'<span class="chip-disc">'+v+'</span>':'<span class="chip-none">未設定</span>';};
+        html+='<tr class="jump-row" data-u="'+encodeURIComponent(u)+'"><td style="font-family:var(--mono)">'+r.date+'</td><td style="font-family:var(--mono)">'+r.plate+'</td><td>'+r.driver+'</td><td>'+r.behavior+'</td><td class="num">'+(r.maxSpeed||'')+'</td><td class="num">'+(r.legal||'')+'</td><td class="'+oc+'">'+(over?('+'+fi(over)):'')+'</td><td>'+sevCell+'</td>'+
+          '<td>'+dchip(dispVal)+'</td><td>'+cchip(discVal)+'</td>'+
+          '<td class="gobtn">設定 →</td></tr>';
       });
       html+='</tbody></table></div></td></tr>';
     }
   });
   t.innerHTML=html+'</tbody>';
   t.querySelectorAll('tr.grp-row').forEach(tr=>tr.onclick=()=>{const bk=tr.dataset.br;detailExpanded[bk]=!detailExpanded[bk];renderDetail();});
+  t.querySelectorAll('tr.jump-row').forEach(tr=>tr.onclick=()=>{jumpToSpeed(decodeURIComponent(tr.dataset.u));});
 }
+let detailRows=[];
+function updateDetailSaveBtn(){}
+// 跳到「超速人名分類」頁並高亮指定那一筆
+function jumpToSpeed(uniq){
+  // 清掉可能限制顯示的篩選，確保該筆會出現
+  if($('#spDate'))$('#spDate').value='';
+  if($('#spBranch'))$('#spBranch').value='';
+  if($('#spSev'))$('#spSev').value='';
+  if($('#spDisc'))$('#spDisc').checked=false;
+  speedHighlight=uniq;
+  gotoTab('speed');
+  setTimeout(()=>{
+    const row=document.querySelector('tr[data-u="'+CSS.escape(encodeURIComponent(uniq))+'"].spd-row');
+    if(row){row.scrollIntoView({behavior:'smooth',block:'center'});row.classList.add('flash');setTimeout(()=>row.classList.remove('flash'),3200);}
+  },120);
+}
+let speedHighlight=null;
 let speedRows=[];
 function optsHtml(cur,opts){
   cur=txt(cur);const blank=(!cur||cur==='-');
@@ -643,7 +692,7 @@ function renderSpeed(){
     const sevCell=sv.text?'<span class="sev sev-'+sv.text+'">'+sv.text+(sv.code?'（'+sv.code+'）':'')+'</span>':'';
     const u=anomUniq(it);const pend=pendingEdits[u];
     const dispVal=pend?pend.disposal:effDisposal(it);const discVal=pend?pend.disc:effDisc(it);
-    html+='<tr class="'+(pend?'row-dirty':'')+'">'+
+    html+='<tr class="spd-row '+(pend?'row-dirty':'')+'" data-u="'+encodeURIComponent(u)+'">'+
       '<td style="font-family:var(--mono)">'+(it.date||'')+'</td>'+
       '<td class="b">'+it.branch+'</td>'+
       '<td>'+it.driver+'</td>'+
@@ -695,7 +744,7 @@ async function saveAllEdits(){
   setBusy(false);
   if(fail){toast('部分儲存失敗','成功 '+ok+'／失敗 '+fail+'（請確認後台為最新版 Code.gs）','err');}
   else{toast('已儲存 ✓',ok+' 筆處置／懲處已更新');}
-  lastSig=signature();renderSpeed();renderDetail();updateSaveBtn();
+  lastSig=signature();renderSpeed();renderDetail();updateSaveBtn();updateDetailSaveBtn();
 }
 function renderFoot(){
   const dates=sortedDates();
@@ -730,6 +779,19 @@ function renderBranchPpl(){
   const branches=bpData();const keys=Object.keys(branches);
   if(!keys.length){emptyTable(t,'尚無超速統計','匯入超速明細後，這裡會彙總各站所的人數、次數與程度分佈。');setOpts('#bpBranch',[],'全部站所');return;}
   setOpts('#bpBranch',keys.sort(),'全部站所');
+  // ---- 摘要卡片 ----
+  const allB=Object.values(branches);
+  const totalEvents=allB.reduce((a,b)=>a+b.total,0);
+  const totalUnhandled=allB.reduce((a,b)=>a+b.unhandled,0);
+  const totalPeople=new Set(); allB.forEach(b=>Object.keys(b.people).forEach(p=>totalPeople.add(b.branch+'|'+p)));
+  const worst=allB.slice().sort((a,b)=>(b.sev.嚴重*100+b.sev.重度*10+b.total)-(a.sev.嚴重*100+a.sev.重度*10+a.total))[0];
+  const sumCards=[
+    {lbl:'超速事件',val:fi(totalEvents),ex:'累積總筆數',cls:'c1'},
+    {lbl:'涉及駕駛',val:fi(totalPeople.size),ex:keys.length+' 個站所',cls:'c2'},
+    {lbl:'待處理',val:fi(totalUnhandled),ex:totalUnhandled?'尚未設定處置/懲處':'已全部處理',cls:totalUnhandled?'c3':'c4'},
+    {lbl:'最需關注站所',val:worst?worst.branch:'–',ex:worst?('重度+嚴重 '+(worst.sev.重度+worst.sev.嚴重)+' 件'):'',cls:'c5'},
+  ];
+  $('#bpSummary').innerHTML=sumCards.map(c=>'<div class="bpcard '+c.cls+'"><div class="bplbl">'+c.lbl+'</div><div class="bpval">'+c.val+'</div><div class="bpex">'+c.ex+'</div></div>').join('');
   const view=$('#bpView').value,brF=$('#bpBranch').value;
   const sevBadge=(s,n)=>n?'<span class="sev sev-'+s+'" style="margin-right:4px">'+s+' '+n+'</span>':'';
   bpRows=[];
@@ -740,11 +802,14 @@ function renderBranchPpl(){
     let list=keys.map(k=>branches[k]);if(brF)list=list.filter(b=>b.branch===brF);
     const kv=(b,k)=>{if(k==='branch')return b.branch;if(k==='people')return Object.keys(b.people).length;if(k==='total')return b.total;if(k==='unhandled')return b.unhandled;if(k==='handled')return b.handled;return b.sev[k]||0;};
     list.sort((a,b)=>{const x=kv(a,sortState.key),y=kv(b,sortState.key);if(typeof x==='number')return (x-y)*sortState.dir;return String(x).localeCompare(String(y),'zh-Hant')*sortState.dir;});
-    const cols=[['branch','站所'],['people','超速人數'],['total','超速次數'],['輕度','輕度'],['中度','中度'],['重度','重度'],['嚴重','嚴重'],['handled','已處理'],['unhandled','待處理']];
-    let html='<thead><tr>'+cols.map((c,i)=>'<th class="sortable '+(i>=1?'num':'')+'" data-k="'+c[0]+'">'+c[1]+arrow(c[0])+'</th>').join('')+'</tr></thead><tbody>';
+    const cols=[['branch','站所'],['people','超速人數'],['total','超速次數'],['dist','程度分佈'],['輕度','輕度'],['中度','中度'],['重度','重度'],['嚴重','嚴重'],['handled','已處理'],['unhandled','待處理']];
+    let html='<thead><tr>'+cols.map((c,i)=>{const noSort=c[0]==='dist';return '<th class="'+(noSort?'':'sortable ')+(['people','total','輕度','中度','重度','嚴重','handled','unhandled'].includes(c[0])?'num':'')+'" '+(noSort?'':'data-k="'+c[0]+'"')+'>'+c[1]+(noSort?'':arrow(c[0]))+'</th>';}).join('')+'</tr></thead><tbody>';
     list.forEach(b=>{const ppl=Object.keys(b.people).length;
       bpRows.push({站所:b.branch,超速人數:ppl,超速次數:b.total,輕度:b.sev.輕度,中度:b.sev.中度,重度:b.sev.重度,嚴重:b.sev.嚴重,已處理:b.handled,待處理:b.unhandled});
+      const tot=b.total||1;const seg=(n,col)=>n?'<span style="display:inline-block;height:100%;width:'+(n/tot*100)+'%;background:'+col+'"></span>':'';
+      const bar='<div class="sevbar">'+seg(b.sev.輕度,'var(--blue)')+seg(b.sev.中度,'var(--warn)')+seg(b.sev.重度,'var(--orange)')+seg(b.sev.嚴重,'var(--bad)')+'</div>';
       html+='<tr class="bp-grp" data-br="'+b.branch+'"><td class="b">'+b.branch+'</td><td class="num">'+fi(ppl)+'</td><td class="num b">'+fi(b.total)+'</td>'+
+        '<td style="min-width:120px">'+bar+'</td>'+
         '<td class="num" style="color:var(--blue)">'+(b.sev.輕度||'')+'</td>'+
         '<td class="num" style="color:var(--warn)">'+(b.sev.中度||'')+'</td>'+
         '<td class="num" style="color:var(--orange)">'+(b.sev.重度||'')+'</td>'+

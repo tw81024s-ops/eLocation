@@ -666,7 +666,7 @@ function jumpToSpeed(uniq){
 }
 let speedHighlight=null;
 // 首頁摘要卡片 → 浮動視窗列出對應明細（每筆可點跳到超速頁設定）
-function openCardModal(card,br){
+function openCardModal(card,br,cell){
   const dF=$('#bpDate')?$('#bpDate').value:'';
   let recs=ANOM.records.filter(r=>r.behavior&&r.behavior.includes('超速'));
   if(dF)recs=recs.filter(r=>r.date===dF);
@@ -684,6 +684,14 @@ function openCardModal(card,br){
   }
   else if(card==='unhandled'){title='待處理事件';list=recs.filter(r=>!isHandled(r));}
   else if(card==='worst'){title='最需關注站所：'+br;list=recs.filter(r=>r.branch===br);}
+  else if(card==='cell'){
+    list=recs.filter(r=>r.branch===br);
+    const sevList=['輕度','中度','重度','嚴重'];
+    if(cell==='all')title=br+'：全部超速';
+    else if(cell==='待處理'){title=br+'：待處理';list=list.filter(r=>!isHandled(r));}
+    else if(cell==='未歸類'){title=br+'：未歸類（程度無法判定）';list=list.filter(r=>!sevList.includes(sevOf(r).text));}
+    else {title=br+'：'+cell;list=list.filter(r=>sevOf(r).text===cell);}
+  }
   // 明細清單（可點跳轉）
   const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   list=list.slice().sort((a,b)=>num(b.over)-num(a.over));
@@ -850,17 +858,20 @@ function renderBranchPpl(){
       bpRows.push({站所:b.branch,超速人數:ppl,超速次數:b.total,輕度:b.sev.輕度,中度:b.sev.中度,重度:b.sev.重度,嚴重:b.sev.嚴重,未歸類:b.uncl,已處理:b.handled,待處理:b.unhandled});
       const tot=b.total||1;const seg=(n,col)=>n?'<span style="display:inline-block;height:100%;width:'+(n/tot*100)+'%;background:'+col+'"></span>':'';
       const bar='<div class="sevbar">'+seg(b.sev.輕度,'var(--blue)')+seg(b.sev.中度,'var(--warn)')+seg(b.sev.重度,'var(--orange)')+seg(b.sev.嚴重,'var(--bad)')+seg(b.uncl,'var(--dim)')+'</div>';
-      html+='<tr class="bp-grp" data-br="'+b.branch+'"><td class="b">'+b.branch+'</td><td class="num">'+fi(ppl)+'</td><td class="num b">'+fi(b.total)+'</td>'+
+      const dcell=(val,kind,col,bold)=>{const n=Number(val)||0;if(!n)return '<td class="num" style="color:var(--dim)">'+(val||'')+'</td>';return '<td class="num cellclick" data-br="'+b.branch+'" data-cell="'+kind+'" style="color:'+col+';font-weight:'+(bold?700:600)+';cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px">'+fi(n)+'</td>';};
+      html+='<tr class="bp-grp" data-br="'+b.branch+'"><td class="b">'+b.branch+'</td><td class="num">'+fi(ppl)+'</td>'+
+        dcell(b.total,'all','var(--ink)',true)+
         '<td style="min-width:120px">'+bar+'</td>'+
-        '<td class="num" style="color:var(--blue)">'+(b.sev.輕度||'')+'</td>'+
-        '<td class="num" style="color:var(--warn)">'+(b.sev.中度||'')+'</td>'+
-        '<td class="num" style="color:var(--orange)">'+(b.sev.重度||'')+'</td>'+
-        '<td class="num" style="color:var(--bad)">'+(b.sev.嚴重||'')+'</td>'+
-        '<td class="num" style="color:var(--dim)">'+(b.uncl||'')+'</td>'+
+        dcell(b.sev.輕度,'輕度','var(--blue)')+
+        dcell(b.sev.中度,'中度','var(--warn)')+
+        dcell(b.sev.重度,'重度','var(--orange)')+
+        dcell(b.sev.嚴重,'嚴重','var(--bad)')+
+        dcell(b.uncl,'未歸類','var(--muted)')+
         '<td class="num" style="color:var(--good)">'+fi(b.handled)+'</td>'+
-        '<td class="num" style="color:'+(b.unhandled?'var(--bad)':'var(--dim)')+';font-weight:'+(b.unhandled?700:400)+'">'+fi(b.unhandled)+'</td></tr>';});
+        dcell(b.unhandled,'待處理','var(--bad)',true)+'</tr>';});
     t.innerHTML=html+'</tbody>';
     wireSort();
+    t.querySelectorAll('td.cellclick').forEach(td=>td.onclick=e=>{e.stopPropagation();openCardModal('cell',td.dataset.br,td.dataset.cell);});
   }else{
     let people=[];keys.forEach(k=>{if(brF&&k!==brF)return;Object.values(branches[k].people).forEach(p=>people.push(p));});
     const kv=(p,k)=>{if(k==='branch')return p.branch;if(k==='driver')return p.driver;if(k==='count')return p.count;if(k==='max')return p.max;if(k==='worst')return p.worst;return 0;};

@@ -671,53 +671,124 @@ function weightTableHTML(b){
 function gaugeCardsHTML(b,big){return '<div class="gauges">'+RANK_METRICS.map(m=>
   '<div class="gauge-card"><div class="gt">'+m[2]+' '+m[1]+'</div>'+gaugeSVG(metScore(b,m[0]),metRate(b,m[0]),big)+'</div>').join('')+'</div>';}
 
-let rankSel=null; // 目前點開的站所
+/* === 組織階層：課 → 組 → 站 === */
+const ORG=[
+ ['北一課','北一北組',['Nt3','NS5','Nt16','Nt19']],
+ ['北一課','北一南組',['Nt21','NS18']],
+ ['北二課','北二北組',['NS2','Nt17']],
+ ['北二課','北二南組',['NS10','Nt13','NS15']],
+ ['北三課','桃竹一組',['NS6','TS1','TS3']],
+ ['北三課','桃竹二組',['TS5','Tt6','Tt8','TS11']],
+ ['中課','中彰組',['CS12']],
+ ['中課','台中組',['CS3','CS4']],
+ ['南一課','南一北組',['St5','St6']],
+ ['南一課','南一南組',['SS3','St4','SS7','St8']],
+ ['南二課','南二北組',['Kt2']],
+ ['南二課','南二南組',['KS1','KS3']],
+];
+const BR2GRP={},BR2CRS={};ORG.forEach(([c,g,bs])=>bs.forEach(b=>{BR2GRP[b]=g;BR2CRS[b]=c;}));
+const courseOf=b=>BR2CRS[b]||'未分類';
+const groupOf=b=>BR2GRP[b]||'未分類';
+const COURSE_ORDER=[...new Set(ORG.map(o=>o[0]))];
+const GROUP_ORDER=ORG.map(o=>o[1]);
+function scoreToGrade(s){return s>=90?'A':s>=80?'B':s>=70?'C':s>=60?'D':s>0?'E':'';}
+function aggBranches(bs){
+  const cAvg=k=>r1(avg(bs.map(b=>b[k])));
+  const sAvg=key=>Math.round(avg(bs.map(b=>metScore(b,key))));
+  const o={score:cAvg('score'),speedR:cAvg('speedR'),turnR:cAvg('turnR'),decelR:cAvg('decelR'),accelR:cAvg('accelR'),
+    vehicles:sum(bs.map(b=>b.vehicles)),km:sum(bs.map(b=>b.km)),count:sum(bs.map(b=>b.count))};
+  o.speedG=scoreToGrade(sAvg('speed'));o.turnG=scoreToGrade(sAvg('turn'));o.decelG=scoreToGrade(sAvg('decel'));o.accelG=scoreToGrade(sAvg('accel'));
+  o.grade=scoreToGrade(o.score);return o;
+}
+let rankSel={course:null,group:null,branch:null};
+function rankCrumb(day){
+  const parts=[['公司',{course:null,group:null,branch:null}]];
+  if(rankSel.course)parts.push([rankSel.course,{course:rankSel.course,group:null,branch:null}]);
+  if(rankSel.group)parts.push([rankSel.group,{course:rankSel.course,group:rankSel.group,branch:null}]);
+  if(rankSel.branch)parts.push([rankSel.branch,{course:rankSel.course,group:rankSel.group,branch:rankSel.branch}]);
+  const links=parts.map((p,i)=>i===parts.length-1?('<span style="color:var(--txt);font-weight:800">'+p[0]+'</span>'):('<a class="crumb" data-i="'+i+'" style="color:var(--accent);cursor:pointer;font-weight:700">'+p[0]+'</a>')).join(' <span style="color:var(--dim)">›</span> ');
+  return {html:'<div class="backbar"><span style="font-size:calc(13.5px*var(--fs))">'+links+'</span><span style="color:var(--muted);font-size:calc(12px*var(--fs));margin-left:auto">'+day+'</span></div>',targets:parts.map(p=>p[1])};
+}
+function wireCrumb(box,targets){box.querySelectorAll('a.crumb').forEach(a=>a.onclick=()=>{rankSel=targets[+a.dataset.i];renderRank();});}
+function nodeCardHTML(name,agg,brSet,extra){
+  const il=IDLE.length?idleAgg(r=>brSet.has(r[0])):null;
+  let mini='<div class="minirow">';RANK_METRICS.forEach(m=>mini+='<div class="mg">'+gaugeSVG(metScore(agg,m[0]),null,false)+'<div class="lbl">'+m[1]+'</div></div>');mini+='</div>';
+  return '<div class="scard" data-key="'+name+'">'+(extra.rank?('<div class="rk">'+extra.rank+'</div>'):'')+
+    '<div class="scard-h"><div class="gb" style="background:'+gradeColor(agg.grade)+'">'+(txt(agg.grade)||'–')+'</div>'+
+    '<div><div class="st">'+name+'</div><div class="sc">'+f1(agg.score)+'<small>分</small></div></div></div>'+mini+
+    '<div class="scard-f">'+(extra.sub?('<div>'+extra.sub+'</div>'):'')+'<div>車輛<b>'+fi(agg.vehicles)+'</b></div><div>里程<b>'+fi(agg.km)+'</b></div>'+
+    '<div>異常<b>'+fi(agg.count)+'</b></div>'+(il?('<div class="il">怠速<b>'+il.total+'</b></div>'):'')+'</div>'+
+    '<div class="opencue">'+extra.cue+'</div></div>';
+}
 function renderRank(){
   refreshIdle();
   const dates=sortedDates();const sel=$("#rankDate");const prev=sel.value;
   sel.innerHTML=dates.map(d=>'<option>'+d+'</option>').join('');
   sel.value=dates.includes(prev)?prev:(dates[dates.length-1]||'');
   const box=$('#rankView');
-  if(!dates.length){rankSel=null;box.innerHTML='<div class="card"><div style="text-align:center;padding:56px 20px"><div style="font-size:16px;color:var(--txt);font-weight:700;margin-bottom:8px">尚未匯入統計資料</div><div style="font-size:13px;color:var(--muted)">點「匯入 Excel」載入站所統計表，分頁以日期命名也會自動辨識。</div></div></div>';return;}
+  if(!dates.length){rankSel={course:null,group:null,branch:null};box.innerHTML='<div class="card"><div style="text-align:center;padding:56px 20px"><div style="font-size:16px;color:var(--txt);font-weight:700;margin-bottom:8px">尚未匯入統計資料</div><div style="font-size:13px;color:var(--muted)">點「匯入 Excel」載入站所統計表，分頁以日期命名也會自動辨識。</div></div></div>';return;}
   const day=sel.value;const branches=DAILY.days[day].branches;
-  if(rankSel&&branches.some(b=>b.branch===rankSel))return renderRankStation(day,rankSel);
-  rankSel=null;
-  let bs=[...branches];const baseSort=$('#rankSort').value;
-  if(baseSort==='score')bs.sort((a,b)=>a.score-b.score);else if(baseSort==='count')bs.sort((a,b)=>b.count-a.count);else bs.sort((a,b)=>(a.rank||999)-(b.rank||999));
-  // 公司整體
-  const cAvg=k=>r1(avg(bs.map(b=>b[k])));
-  const comp={grade:'',score:cAvg('score'),speedG:'',turnG:'',decel:'',accelG:'',
-    speedR:cAvg('speedR'),turnR:cAvg('turnR'),decelR:cAvg('decelR'),accelR:cAvg('accelR')};
-  // 由各項平均分數回推等級（示意）
-  const sAvg=key=>Math.round(avg(bs.map(b=>metScore(b,key))));
-  comp.speedG=scoreToGrade(sAvg('speed'));comp.turnG=scoreToGrade(sAvg('turn'));comp.decelG=scoreToGrade(sAvg('decel'));comp.accelG=scoreToGrade(sAvg('accel'));
-  comp.grade=scoreToGrade(comp.score);
-  const cIdle=IDLE.length?idleAgg(null):null;
-  let h='<div class="scorecard"><div class="sc-top"><div>'+
-    '<div class="sc-ttl">公司整體安全評等 · '+bs.length+' 站'+(cIdle?(' · 怠速 '+cIdle.total+' 件'):'')+'（'+day+'）</div>'+
-    '<div class="gradewrap"><div class="big" style="background:'+gradeColor(comp.grade)+'">'+(comp.grade||'–')+'</div>'+
-    '<div class="tot">平均總分<b>'+f1(comp.score)+'<small>分</small></b></div></div>'+weightTableHTML(comp)+'</div>'+
-    '<div><div class="sc-ttl">公司整體安全指數</div>'+gaugeCardsHTML(comp,true)+'</div></div>';
-  h+='<div class="sc-grid">';
-  bs.forEach(b=>{const il=IDLE.length?idleAgg(r=>r[0]===b.branch):null;
-    let mini='<div class="minirow">';RANK_METRICS.forEach(m=>mini+='<div class="mg">'+gaugeSVG(metScore(b,m[0]),null,false)+'<div class="lbl">'+m[1]+'</div></div>');mini+='</div>';
-    h+='<div class="scard" data-br="'+b.branch+'"><div class="rk">'+(b.rank||'')+'</div>'+
-      '<div class="scard-h"><div class="gb" style="background:'+gradeColor(b.grade)+'">'+(txt(b.grade)||'–')+'</div>'+
-      '<div><div class="st">'+b.branch+'</div><div class="sc">'+f1(b.score)+'<small>分</small></div></div></div>'+mini+
-      '<div class="scard-f"><div>車輛<b>'+fi(b.vehicles)+'</b></div><div>里程<b>'+fi(b.km)+' KM</b></div>'+
-      '<div>異常<b>'+fi(b.count)+'</b></div>'+(il?('<div class="il">怠速<b>'+il.total+'</b></div>'):'')+'</div>'+
-      '<div class="opencue">點擊查看個人評比 →</div></div>';});
-  h+='</div>';box.innerHTML=h;
-  box.querySelectorAll('.scard').forEach(el=>el.onclick=()=>{rankSel=el.dataset.br;renderRankStation(day,rankSel);});
+  const byBr={};branches.forEach(b=>byBr[b.branch]=b);
+  // 站層 → 個人評比
+  if(rankSel.branch){if(byBr[rankSel.branch])return renderRankStation(day,rankSel.branch);rankSel.branch=null;}
+  // 組層 → 站
+  if(rankSel.course&&rankSel.group){
+    const bs=branches.filter(b=>courseOf(b.branch)===rankSel.course&&groupOf(b.branch)===rankSel.group);
+    const nodes=bs.map(b=>({name:b.branch,agg:b,brSet:new Set([b.branch]),isBranch:true}));
+    return renderRankNodes(box,day,'組 — '+rankSel.group,nodes,'站');
+  }
+  // 課層 → 組
+  if(rankSel.course){
+    const inCourse=branches.filter(b=>courseOf(b.branch)===rankSel.course);
+    const gset=[...new Set(inCourse.map(b=>groupOf(b.branch)))];
+    const grps=GROUP_ORDER.filter(g=>gset.includes(g)).concat(gset.filter(g=>!GROUP_ORDER.includes(g)));
+    const nodes=grps.map(g=>{const bs=inCourse.filter(b=>groupOf(b.branch)===g);return{name:g,agg:aggBranches(bs),brSet:new Set(bs.map(b=>b.branch)),count:bs.length};});
+    return renderRankNodes(box,day,'課 — '+rankSel.course,nodes,'組');
+  }
+  // 公司層 → 課
+  const cset=[...new Set(branches.map(b=>courseOf(b.branch)))];
+  const crs=COURSE_ORDER.filter(c=>cset.includes(c)).concat(cset.filter(c=>!COURSE_ORDER.includes(c)));
+  const nodes=crs.map(c=>{const bs=branches.filter(b=>courseOf(b.branch)===c);return{name:c,agg:aggBranches(bs),brSet:new Set(bs.map(b=>b.branch)),count:bs.length};});
+  return renderRankNodes(box,day,'公司整體',nodes,'課');
 }
-function scoreToGrade(s){return s>=90?'A':s>=80?'B':s>=70?'C':s>=60?'D':s>0?'E':'';}
-function renderRankStation(day,branch){
-  const b=DAILY.days[day].branches.find(x=>x.branch===branch);if(!b){rankSel=null;return renderRank();}
-  const box=$('#rankView');const il=IDLE.length?idleAgg(r=>r[0]===branch):null;
-  let h='<div class="backbar"><button class="btn" id="rankBack">← 返回站所排行</button>'+
-    '<span style="color:var(--muted);font-size:calc(13px*var(--fs))">'+branch+'　'+day+(il?('　·　怠速 '+il.total+' 件（重度 '+il.severe+'）'):'')+'</span></div>';
+function renderRankNodes(box,day,title,nodes,childLabel){
+  const baseSort=$('#rankSort').value;
+  if(baseSort==='score')nodes.sort((a,b)=>a.agg.score-b.agg.score);
+  else if(baseSort==='count')nodes.sort((a,b)=>b.agg.count-a.agg.count);
+  else nodes.sort((a,b)=>childLabel==='站'?((a.agg.rank||999)-(b.agg.rank||999)):(b.agg.score-a.agg.score));
+  const allBs=[];nodes.forEach(n=>n.brSet.forEach(x=>{if(byBrName(day,x))allBs.push(byBrName(day,x));}));
+  const agg=aggBranches(allBs);
+  const il=IDLE.length?idleAgg(r=>allBs.some(b=>b.branch===r[0])):null;
+  const {html:crumb,targets}=rankCrumb(day);
+  let h=crumb;
   h+='<div class="scorecard"><div class="sc-top"><div>'+
-    '<div class="sc-ttl">安全評等 — '+branch+'</div>'+
+    '<div class="sc-ttl">'+title+'安全評等 · '+nodes.length+' '+childLabel+(il?(' · 怠速 '+il.total+' 件'):'')+'</div>'+
+    '<div class="gradewrap"><div class="big" style="background:'+gradeColor(agg.grade)+'">'+(agg.grade||'–')+'</div>'+
+    '<div class="tot">'+(childLabel==='站'?'平均總分':'平均總分')+'<b>'+f1(agg.score)+'<small>分</small></b></div></div>'+weightTableHTML(agg)+'</div>'+
+    '<div><div class="sc-ttl">安全指數</div>'+gaugeCardsHTML(agg,true)+'</div></div>';
+  const cue=childLabel==='課'?'展開各組 →':childLabel==='組'?'展開各站 →':'查看個人評比 →';
+  h+='<div class="sc-grid">';
+  nodes.forEach(n=>{const extra={cue,sub:n.isBranch?'':((n.count||n.brSet.size)+' 站'),rank:n.isBranch?n.agg.rank:0};
+    h+=nodeCardHTML(n.name,n.agg,n.brSet,extra);});
+  h+='</div>';box.innerHTML=h;
+  wireCrumb(box,targets);
+  box.querySelectorAll('.scard').forEach(el=>el.onclick=()=>{const key=el.dataset.key;
+    if(childLabel==='課')rankSel={course:key,group:null,branch:null};
+    else if(childLabel==='組')rankSel={course:rankSel.course,group:key,branch:null};
+    else rankSel={course:rankSel.course,group:rankSel.group,branch:key};
+    renderRank();});
+}
+function byBrName(day,name){return DAILY.days[day]?DAILY.days[day].branches.find(b=>b.branch===name):null;}
+function renderRankStation(day,branch){
+  const b=DAILY.days[day].branches.find(x=>x.branch===branch);if(!b){rankSel={course:null,group:null,branch:null};return renderRank();}
+  if(!rankSel.course)rankSel.course=courseOf(branch);
+  if(!rankSel.group)rankSel.group=groupOf(branch);
+  rankSel.branch=branch;
+  const box=$('#rankView');const il=IDLE.length?idleAgg(r=>r[0]===branch):null;
+  const {html:crumb,targets}=rankCrumb(day);
+  let h=crumb;
+  h+='<div class="scorecard"><div class="sc-top"><div>'+
+    '<div class="sc-ttl">站所安全評等 — '+branch+'　<span style="color:var(--dim)">'+courseOf(branch)+' / '+groupOf(branch)+'</span>'+(il?('　·　怠速 '+il.total+' 件（重度 '+il.severe+'）'):'')+'</div>'+
     '<div class="gradewrap"><div class="big" style="background:'+gradeColor(b.grade)+'">'+(txt(b.grade)||'–')+'</div>'+
     '<div class="tot">總分<b>'+f1(b.score)+'<small>分</small></b></div></div>'+weightTableHTML(b)+'</div>'+
     '<div><div class="sc-ttl">安全指數</div>'+gaugeCardsHTML(b,true)+'</div></div></div>';
@@ -745,7 +816,7 @@ function renderRankStation(day,branch){
         '</div></div>';});
     h+='</div>';}
   box.innerHTML=h;
-  $('#rankBack').onclick=()=>{rankSel=null;renderRank();};
+  wireCrumb(box,targets);
 }
 function sevColor(s){return {輕度:'var(--blue)',中度:'var(--warn)',重度:'var(--orange)',嚴重:'var(--bad)'}[s]||'var(--dim)';}
 

@@ -393,7 +393,6 @@ td.b{font-weight:700}
   <section class="panel" id="p-idle">
     <div class="toolbar">
       <button class="btn primary" id="idleImportBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0-12l-4 4m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>匯入怠速 Excel</button>
-      <button class="btn ghost danger" id="idleClearBtn">清除怠速</button>
       <button class="btn" id="idleExport">匯出 CSV</button>
       <div class="legend">
         <span><span class="dot" style="background:var(--t-light)"></span>輕度 5~10分</span>
@@ -528,44 +527,46 @@ async function handleFiles(files){
   const dailySnake=[],dateSet=new Set(),anomSnake=[];
   const byUniq={};ANOM.records.forEach(r=>{byUniq[anomUniq(r)]=r;});
   // 統計：站所新增/更新；超速新增/更新/重複略過
-  const rep={dDates:new Set(),dAdd:0,dUpd:[],aNew:0,aUpd:0,aDup:[],aUpdList:[]};
+  const rep={dDates:new Set(),dAdd:0,dUpd:[],aNew:0,aUpd:0,aDup:[],aUpdList:[],iNew:0,iUpd:0,iDup:0};
   const seenInThisImport={};
-  let idleBuf=[],idleDate='',idleSheets=0;
+  let idleSheets=0;
   for(const f of files){
     let wb;try{const buf=await f.arrayBuffer();wb=XLSX.read(buf,{type:'array'});}catch(e){bad++;continue;}
     for(const name of wb.SheetNames){
       const aoa=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:false,defval:''});
-      const idle=parseIdleAOA(aoa);          // 自動辨識「怠速明細」並轉到怠速模組
-      if(idle){idleBuf=idleBuf.concat(idle.rows);if(idle.date)idleDate=idle.date;idleSheets++;continue;}
-      const d=parseDaily(aoa);
-      if(d){
-        rep.dDates.add(d.date);
-        const day=DAILY.days[d.date]=DAILY.days[d.date]||{branches:[]};
-        d.branches.forEach(b=>{
-          const i=day.branches.findIndex(x=>x.branch===b.branch);
-          if(i>=0){if(JSON.stringify(day.branches[i])!==JSON.stringify(b)){day.branches[i]=b;rep.dUpd.push(d.date+' '+b.branch);}}
-          else{day.branches.push(b);rep.dAdd++;}
-          dailySnake.push(toDailySnake(b,d.date));
-        });
-        dateSet.add(d.date);continue;
+      const idle=parseIdleAOA(aoa);          // 自動辨識「怠速明細」→ 轉成異常(行為=怠速)，沿用雲端共用
+      let a=null;
+      if(idle){idleSheets++;a=idle.rows.map(r=>idleRowToAnom(r,idle.date));}
+      else{
+        const d=parseDaily(aoa);
+        if(d){
+          rep.dDates.add(d.date);
+          const day=DAILY.days[d.date]=DAILY.days[d.date]||{branches:[]};
+          d.branches.forEach(b=>{
+            const i=day.branches.findIndex(x=>x.branch===b.branch);
+            if(i>=0){if(JSON.stringify(day.branches[i])!==JSON.stringify(b)){day.branches[i]=b;rep.dUpd.push(d.date+' '+b.branch);}}
+            else{day.branches.push(b);rep.dAdd++;}
+            dailySnake.push(toDailySnake(b,d.date));
+          });
+          dateSet.add(d.date);continue;
+        }
+        a=parseAnom(aoa);
       }
-      const a=parseAnom(aoa);
-      if(a){a.forEach(x=>{const u=anomUniq(x);
-        if(seenInThisImport[u]){rep.aDup.push(x);return;}        // 同次匯入內重複
+      if(a){a.forEach(x=>{const isIdle=x.behavior==='怠速';const u=anomUniq(x);
+        if(seenInThisImport[u]){isIdle?rep.iDup++:rep.aDup.push(x);return;}        // 同次匯入內重複
         seenInThisImport[u]=1;
         const ex=byUniq[u];
         if(ex){
           const same=txt(ex.maxSpeed)===txt(x.maxSpeed)&&txt(ex.legal)===txt(x.legal)&&num(ex.over)===num(x.over)&&txt(ex.location)===txt(x.location)&&txt(ex.degText)===txt(x.degText);
-          if(same){rep.aDup.push(x);return;}                    // 已存在且內容相同 → 重複略過
+          if(same){isIdle?rep.iDup++:rep.aDup.push(x);return;}                    // 已存在且內容相同 → 重複略過
           const keepDisp=txt(ex.disposal)&&txt(ex.disposal)!=='-';const keepDisc=txt(ex.disc)&&txt(ex.disc)!=='-';
           Object.assign(ex,{legal:x.legal,selfLimit:x.selfLimit,over:x.over,maxSpeed:x.maxSpeed,location:x.location,level:x.level,degText:x.degText,degCode:x.degCode});
           if(!keepDisp)ex.disposal=x.disposal;if(!keepDisc)ex.disc=x.disc;
-          anomSnake.push(toAnomSnake(ex));rep.aUpd++;rep.aUpdList.push(x);
-        }else{byUniq[u]=x;ANOM.records.push(x);anomSnake.push(toAnomSnake(x));rep.aNew++;}
+          anomSnake.push(toAnomSnake(ex));if(isIdle)rep.iUpd++;else{rep.aUpd++;rep.aUpdList.push(x);}
+        }else{byUniq[u]=x;ANOM.records.push(x);anomSnake.push(toAnomSnake(x));if(isIdle)rep.iNew++;else rep.aNew++;}
       });}
     }
   }
-  if(idleSheets){mergeIdle(idleBuf,idleDate);renderIdle();}
   try{
     if(ONLINE){
       setBusy(true,'上傳中…');
@@ -576,8 +577,9 @@ async function handleFiles(files){
   }catch(e){ toast('上傳失敗',String(e.message||e)+'（請檢查 GAS 部署/網址）','err'); setBusy(false); renderAll(); return; }
   setBusy(false);
   lastSig=signature();renderAll();
-  if(idleSheets&&!rep.dDates.size&&!rep.aNew&&!rep.aUpd&&!rep.aDup.length){toast('已匯入怠速資料 ✓','辨識為怠速明細，已歸入「怠速查看」；目前累計 '+IDLE.length+' 筆');return;}
-  if(idleSheets)toast('另含怠速明細 ✓','已歸入「怠速查看」，累計 '+IDLE.length+' 筆');
+  const idleMsg=idleSheets?('怠速 新增 '+rep.iNew+' 筆'+(rep.iUpd?('／更新 '+rep.iUpd):'')+(rep.iDup?('／重複略過 '+rep.iDup):'')+'（已上雲端共用）'):'';
+  if(idleSheets&&!rep.dDates.size&&!rep.aNew&&!rep.aUpd&&!rep.aDup.length){toast('已匯入怠速資料 ✓',idleMsg);return;}
+  if(idleSheets)toast('另含怠速明細 ✓',idleMsg);
   showImportSummary(rep,bad);
 }
 function showImportSummary(rep,bad){
@@ -624,11 +626,14 @@ function renderKpis(){
   if(!dates.length&&!ANOM.records.length){k.innerHTML='';return;}
   const latest=dates[dates.length-1];let best='–',worst='–',avgScore='–';
   if(latest){const bs=DAILY.days[latest].branches;const br=[...bs].sort((a,b)=>a.rank-b.rank);best=br[0]?br[0].branch:'–';worst=br[br.length-1]?br[br.length-1].branch:'–';avgScore=r1(avg(bs.map(b=>b.score)));}
+  const anomN=ANOM.records.filter(r=>r.behavior!=='怠速').length;
+  const idleN=ANOM.records.filter(r=>r.behavior==='怠速').length;
   const cards=[['c1','統計天數',dates.length+'<small> 天</small>',dates.length?dates[0]+' ~ '+latest:'',''],
     ['c2','站所數',allBranches().length+'<small> 站</small>',DAILY.dept,''],
-    ['c3','異常事件',ANOM.records.length+'<small> 筆</small>','點擊查看明細 →','detail'],
+    ['c3','異常事件',anomN+'<small> 筆</small>','點擊查看明細 →','detail'],
     ['c4','最新平均總分',avgScore,latest?('最佳 '+best):'',''],
     ['c5','最新待改善',worst,latest||'尚無資料','']];
+  if(idleN)cards.push(['c3','怠速事件',idleN+'<small> 筆</small>','點擊查看 →','idle']);
   k.innerHTML=cards.map(c=>'<div class="kpi '+c[0]+(c[4]?' clickable':'')+'"'+(c[4]?(' data-goto="'+c[4]+'"'):'')+'><div class="lbl">'+c[1]+'</div><div class="val">'+c[2]+'</div><div class="ex">'+c[3]+'</div></div>').join('');
   k.querySelectorAll('.kpi.clickable').forEach(el=>el.onclick=()=>gotoTab(el.dataset.goto));
 }
@@ -668,7 +673,8 @@ function gaugeCardsHTML(b,big){return '<div class="gauges">'+RANK_METRICS.map(m=
 
 let rankSel=null; // 目前點開的站所
 function renderRank(){
-  const dates=sortedDates();const sel=$('#rankDate');const prev=sel.value;
+  refreshIdle();
+  const dates=sortedDates();const sel=$("#rankDate");const prev=sel.value;
   sel.innerHTML=dates.map(d=>'<option>'+d+'</option>').join('');
   sel.value=dates.includes(prev)?prev:(dates[dates.length-1]||'');
   const box=$('#rankView');
@@ -743,14 +749,15 @@ function renderRankStation(day,branch){
 }
 function sevColor(s){return {輕度:'var(--blue)',中度:'var(--warn)',重度:'var(--orange)',嚴重:'var(--bad)'}[s]||'var(--dim)';}
 
-/* ===== 怠速查看（新增；資料由使用者自行匯入） ===== */
-let IDLE=[]; // 每筆 [分公司, 車號, 駕駛, 分鐘, 結束時間, 位置]
+/* ===== 怠速查看（資料隨「異常」上雲端共用，行為標記為「怠速」） ===== */
+let IDLE=[]; // 由 ANOM 推導：每筆 [分公司, 車號, 駕駛, 分鐘, 結束時間, 位置]
 let IDLE_DATE='';
 let idleSel={branch:null,plate:null};
+// 從共用的異常資料抽出怠速，讓所有開啟者看到同一份
+function refreshIdle(){const ir=ANOM.records.filter(r=>txt(r.behavior)==='怠速');IDLE=ir.map(r=>[txt(r.branch),txt(r.plate),txt(r.driver),num(r.over),txt(r.time),txt(r.location)]);const ds=[...new Set(ir.map(r=>txt(r.date)).filter(Boolean))].sort();IDLE_DATE=ds[ds.length-1]||'';}
 const IDLE_TIERS=[['sub5','未達標','3~5分','var(--t-sub5)'],['light','輕度','5~10分','var(--t-light)'],['mod','中度','10~15分','var(--t-mod)'],['severe','重度','15分以上','var(--t-severe)']];
 const idleTier=m=>m<5?'sub5':m<10?'light':m<15?'mod':'severe';
 function idleAgg(fn){const a={sub5:0,light:0,mod:0,severe:0,total:0,sumMin:0,maxMin:0};IDLE.forEach(r=>{if(fn&&!fn(r))return;a[idleTier(r[3])]++;a.total++;a.sumMin+=r[3];if(r[3]>a.maxMin)a.maxMin=r[3];});return a;}
-function saveIdle(){try{localStorage.setItem('fleet_idle_v1',JSON.stringify({IDLE,IDLE_DATE}));}catch(e){}}
 function idleDurMin(s){s=String(s||'');const h=/(\d+)時/.exec(s),m=/(\d+)分/.exec(s),sec=/(\d+)秒/.exec(s);return Math.round(((h?+h[1]*60:0)+(m?+m[1]:0)+(sec?+sec[1]/60:0))*10)/10;}
 function bandsHTML(a){return '<div class="bands">'+IDLE_TIERS.map(t=>'<div class="band" style="--bc:'+t[3]+'"><span class="bn">'+a[t[0]]+'</span><div class="bt">'+t[1]+'</div><div class="bd">'+t[2]+'</div></div>').join('')+'</div>';}
 function idleStack(a){const t=a.total||1;return '<div class="stack">'+['sub5','light','mod','severe'].map(k=>a[k]?('<i style="width:'+(a[k]/t*100).toFixed(1)+'%;background:'+({sub5:'var(--t-sub5)',light:'var(--t-light)',mod:'var(--t-mod)',severe:'var(--t-severe)'}[k])+'"></i>'):'').join('')+'</div>';}
@@ -758,11 +765,12 @@ const idleTierC={sub5:'var(--t-sub5)',light:'var(--t-light)',mod:'var(--t-mod)',
 const idleTierName={sub5:'未達標',light:'輕度',mod:'中度',severe:'重度'};
 function renderIdle(){
   const box=$('#idleView');if(!box)return;
-  $('#idleClearBtn').style.display=$('#idleExport').style.display=IDLE.length?'':'none';
+  refreshIdle();
+  $('#idleExport').style.display=IDLE.length?'':'none';
   if(!IDLE.length){idleSel={branch:null,plate:null};
     box.innerHTML='<div class="card"><div style="text-align:center;padding:54px 24px">'+
       '<div style="font-size:16px;color:var(--txt);font-weight:700;margin-bottom:8px">尚未匯入怠速資料</div>'+
-      '<div style="font-size:13px;color:var(--muted);line-height:1.7">點上方「匯入怠速 Excel」載入怠速明細（需含「分公司／車號／駕駛／持續時間」欄位）。<br>分級：5~10分＝輕度、10~15分＝中度、15分以上＝重度（3~5分列為未達標）。可一次匯入「依車輛」「依駕駛」兩份，系統自動去重。</div></div></div>';return;}
+      '<div style="font-size:13px;color:var(--muted);line-height:1.7">點上方「匯入怠速 Excel」載入怠速明細（需含「分公司／車號／駕駛／持續時間」欄位）。匯入後會跟超速一樣<b>上傳到雲端</b>，其他人開啟也看得到。<br>分級：5~10分＝輕度、10~15分＝中度、15分以上＝重度（3~5分列為未達標）。可一次匯入「依車輛」「依駕駛」兩份，系統自動去重。</div></div></div>';return;}
   if(idleSel.branch&&idleSel.plate)return renderIdleDriver();
   if(idleSel.branch)return renderIdleStation();
   // 總覽
@@ -815,32 +823,22 @@ function parseIdleAOA(aoa){
   const hi=aoa.findIndex(r=>r&&r.some(c=>txt(c)==='分公司')&&r.some(c=>txt(c).includes('持續')));
   if(hi<0)return null;
   const hdr=aoa[hi].map(txt),ci=n=>hdr.indexOf(n),cf=fn=>{for(let i=0;i<hdr.length;i++)if(fn(hdr[i]))return i;return -1;};
-  const iB=ci('分公司'),iP=ci('車號'),iD=ci('駕駛'),iDur=cf(x=>x.includes('持續')),iE=cf(x=>x.includes('迄')),iL=cf(x=>x.includes('位置'));
+  const iB=ci('分公司'),iP=ci('車號'),iD=ci('駕駛'),iDur=cf(x=>x.includes('持續')),iE=cf(x=>x.includes('迄')),iS=cf(x=>x.includes('起')),iL=cf(x=>x.includes('位置'));
   const title=aoa.slice(0,hi).map(r=>r.join('')).join(' ');const md=/(\d{4}\/\d{1,2}\/\d{1,2})/.exec(title);
   const date=md?md[1].replace(/\//g,'-'):'';
   const rows=[];
   for(let i=hi+1;i<aoa.length;i++){const r=aoa[i];if(!r||!txt(r[iB]))continue;
-    rows.push([txt(r[iB]),txt(r[iP]),txt(r[iD]),idleDurMin(r[iDur]),txt(r[iE]),txt(r[iL])]);}
+    rows.push([txt(r[iB]),txt(r[iP]),txt(r[iD]),idleDurMin(r[iDur]),txt(r[iE]),txt(r[iL]),txt(r[iS])]);}
   return rows.length?{rows,date}:null;
 }
-function mergeIdle(rows,date){
-  const all=IDLE.concat(rows);const seen=new Set();
-  IDLE=all.filter(r=>{const k=r[1]+'|'+r[4]+'|'+r[3];if(seen.has(k))return false;seen.add(k);return true;});
-  if(date)IDLE_DATE=date;saveIdle();
+const idleTierNameOf=m=>({sub5:'未達標',light:'輕度',mod:'中度',severe:'重度'}[idleTier(m)]);
+// 把一筆怠速轉成「異常」記錄（行為=怠速），即可沿用現有雲端上傳/去重/共用
+function idleRowToAnom(row,date){
+  return {date:date||'',branch:row[0],plate:row[1],driver:row[2],behavior:'怠速',level:idleTierNameOf(row[3]),
+    time:row[4]||row[6]||'',maxSpeed:'',location:row[5]||'',legal:'',selfLimit:'',over:row[3],
+    degText:idleTierNameOf(row[3]),degCode:'',disposal:'',disc:''};
 }
-async function handleIdleFiles(files){
-  let buf=[],date='',ok=0,bad=0;
-  for(const f of files){try{
-    const ab=await f.arrayBuffer();const wb=XLSX.read(ab,{type:'array'});let got=false;
-    for(const nm of wb.SheetNames){const aoa=XLSX.utils.sheet_to_json(wb.Sheets[nm],{header:1,raw:false,defval:''});
-      const p=parseIdleAOA(aoa);if(p){buf=buf.concat(p.rows);if(p.date)date=p.date;got=true;}}
-    got?ok++:bad++;
-  }catch(e){bad++;console.error(e);}}
-  if(!buf.length){toast('未辨識到怠速資料','請確認檔案含「分公司／持續時間」欄位','warn');return;}
-  mergeIdle(buf,date);idleSel={branch:null,plate:null};
-  renderIdle();renderRank();
-  toast('已匯入怠速資料 ✓','目前累計 '+IDLE.length+' 筆'+(bad?'（'+bad+' 檔未辨識）':''));
-}
+async function handleIdleFiles(files){ return handleFiles(files); }   // 統一走主匯入（含雲端共用）
 function renderTrend(){
   const dates=sortedDates();const scope=$('#trendScope');const prev=scope.value;
   scope.innerHTML='<option value="__ALL__">全部站所(平均/合計)</option>'+allBranches().map(b=>'<option>'+b+'</option>').join('');
@@ -856,14 +854,14 @@ function renderTrend(){
 function setOpts(sel,arr,allLabel){const el=$(sel);const prev=el.value;el.innerHTML='<option value="">'+(allLabel||'全部')+'</option>'+arr.map(x=>'<option>'+x+'</option>').join('');if(arr.includes(prev))el.value=prev;}
 function fillDetailFilters(){
   const br=new Set(),be=new Set(),de=new Set();
-  ANOM.records.forEach(r=>{if(r.branch)br.add(r.branch);if(r.behavior)be.add(r.behavior);if(r.degText)de.add(r.degText);});
+  ANOM.records.forEach(r=>{if(r.behavior==='怠速')return;if(r.branch)br.add(r.branch);if(r.behavior)be.add(r.behavior);if(r.degText)de.add(r.degText);});
   setOpts('#dfBranch',[...br].sort());setOpts('#dfBehavior',[...be].sort());
   const ord=['輕度','中度','重度','嚴重'];setOpts('#dfDegree',[...de].sort((a,b)=>ord.indexOf(a)-ord.indexOf(b)));
   setOpts('#spBranch',[...br].sort(),'全部站所');
   const dates=[...new Set(ANOM.records.filter(r=>r.behavior&&r.behavior.includes('超速')).map(r=>r.date).filter(Boolean))].sort().reverse();
   setOpts('#spDate',dates,'全部（累積）');setOpts('#bpDate',dates,'全部（累積）');
 }
-function filteredAnom(){const b=$('#dfBranch').value,be=$('#dfBehavior').value,de=$('#dfDegree').value,q=$('#dfSearch').value.trim();return ANOM.records.filter(r=>(!b||r.branch===b)&&(!be||r.behavior===be)&&(!de||r.degText===de)&&(!q||(r.driver+r.plate+r.location).includes(q)));}
+function filteredAnom(){const b=$('#dfBranch').value,be=$('#dfBehavior').value,de=$('#dfDegree').value,q=$('#dfSearch').value.trim();return ANOM.records.filter(r=>r.behavior!=='怠速'&&(!b||r.branch===b)&&(!be||r.behavior===be)&&(!de||r.degText===de)&&(!q||(r.driver+r.plate+r.location).includes(q)));}
 const detailExpanded={};
 function renderDetail(){
   const t=$('#detailTable');
@@ -1089,7 +1087,8 @@ function bpData(){
 }
 let bpSort={branch:{key:'total',dir:-1},person:{key:'worst',dir:-1}};
 function renderBranchPpl(){
-  const t=$('#bpTable');const ord=['輕度','中度','重度','嚴重'];
+  refreshIdle();
+  const t=$("#bpTable");const ord=['輕度','中度','重度','嚴重'];
   const branches=bpData();const keys=Object.keys(branches);
   if(!keys.length){emptyTable(t,'尚無超速統計','匯入超速明細後，這裡會彙總各站所的人數、次數與程度分佈。');setOpts('#bpBranch',[],'全部站所');return;}
   setOpts('#bpBranch',keys.sort(),'全部站所');
@@ -1160,7 +1159,7 @@ function renderBranchPpl(){
     wireSort();
   }
 }
-function renderAll(){renderKpis();renderRank();renderTrend();fillDetailFilters();renderDetail();renderSpeed();renderBranchPpl();renderIdle();renderFoot();}
+function renderAll(){refreshIdle();renderKpis();renderRank();renderTrend();fillDetailFilters();renderDetail();renderSpeed();renderBranchPpl();renderIdle();renderFoot();}
 
 /* ---------- conn / busy ---------- */
 function setConn(state){const p=$('#connPill'),t=$('#connTxt');p.className='pill '+(state==='cloud'?'cloud':state==='err'?'err':'local');t.textContent=state==='cloud'?'雲端已連線':state==='err'?'連線失敗':'本機預覽模式';}
@@ -1174,10 +1173,9 @@ $('#clearBtn').onclick=async()=>{if(busy)return;if(!confirm('確定清除所有�
 function gotoTab(name){$$('.tab').forEach(x=>x.classList.toggle('on',x.dataset.tab===name));$$('.panel').forEach(p=>p.classList.toggle('on',p.id==='p-'+name));if(name==='trend')renderTrend();if(name==='branchppl')renderBranchPpl();if(name==='idle')renderIdle();window.scrollTo({top:0,behavior:'smooth'});}
 $$('.tab').forEach(t=>t.onclick=()=>gotoTab(t.dataset.tab));
 /* 怠速匯入 / 清除 / 匯出 事件 */
-$('#idleImportBtn').onclick=()=>$('#idleFileInput').click();
-$('#idleFileInput').onchange=e=>{if(e.target.files.length)handleIdleFiles([...e.target.files]);e.target.value='';};
-$('#idleClearBtn').onclick=()=>{if(!IDLE.length)return;if(!confirm('確定清除已匯入的怠速資料？'))return;IDLE=[];IDLE_DATE='';idleSel={branch:null,plate:null};saveIdle();renderIdle();renderRank();toast('已清除怠速資料','');};
-$('#idleExport').onclick=()=>{if(!IDLE.length){toast('無資料可匯出','','warn');return;}
+$('#idleImportBtn').onclick=()=>{if(!busy)$('#idleFileInput').click();};
+$('#idleFileInput').onchange=e=>{if(e.target.files.length)handleFiles([...e.target.files]);e.target.value='';};
+$('#idleExport').onclick=()=>{refreshIdle();if(!IDLE.length){toast('無資料可匯出','','warn');return;}
   const head=['分公司','車號','駕駛','持續分鐘','分級','結束時間','怠速位置'];
   const lines=[head.join(',')].concat(IDLE.map(r=>[r[0],r[1],r[2],f1(r[3]),idleTierName[idleTier(r[3])],r[4],r[5]].map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')));
   const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='怠速明細.csv';a.click();toast('已匯出 CSV',IDLE.length+' 筆');};
@@ -1214,7 +1212,6 @@ $$('#fsbar button').forEach(b=>b.onclick=()=>applyFs(b.dataset.fs));
 
 /* ---------- init + auto refresh ---------- */
 (async()=>{
-  try{const ri=localStorage.getItem('fleet_idle_v1');if(ri){const o=JSON.parse(ri);IDLE=(o&&o.IDLE)||[];IDLE_DATE=(o&&o.IDLE_DATE)||'';}}catch(e){}
   if(ONLINE){
     try{await loadAll();setConn('cloud');}catch(e){setConn('err');toast('無法連線後台',String(e.message||e)+'（請檢查 GAS_URL 與部署權限）','err');}
   }else{

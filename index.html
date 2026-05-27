@@ -160,6 +160,17 @@ td.b{font-weight:700}
 .sev-中度{background:rgba(232,146,12,.18);color:var(--warn)}
 .sev-重度{background:rgba(240,100,10,.18);color:var(--orange)}
 .sev-嚴重{background:rgba(224,39,73,.18);color:var(--bad)}
+.rulebox{background:var(--panel);border:1px solid var(--line);border-radius:14px;margin-bottom:12px;overflow:hidden}
+.rulebox>summary{cursor:pointer;list-style:none;padding:11px 16px;font-weight:800;color:var(--accent);font-size:calc(13.5px*var(--fs));background:var(--panel2);user-select:none}
+.rulebox>summary::-webkit-details-marker{display:none}
+.rulebox>summary::before{content:"▸ ";color:var(--accent2)}
+.rulebox[open]>summary::before{content:"▾ "}
+.rulebox .rulewrap{padding:10px 14px 14px;overflow-x:auto}
+.ruletbl{border-collapse:collapse;width:100%;font-size:calc(12.5px*var(--fs))}
+.ruletbl th,.ruletbl td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+.ruletbl th{color:var(--muted);font-weight:700;background:var(--panel2)}
+.ruletbl td.num,.ruletbl th.num{text-align:right;font-family:var(--mono)}
+.ruletbl tbody tr:last-child td{border-bottom:none}
 .chartbox{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;height:430px;position:relative;box-shadow:0 4px 16px rgba(230,0,126,.06)}
 .empty{text-align:center;padding:60px 20px;color:var(--muted)}
 .empty svg{width:56px;height:56px;opacity:.4;margin-bottom:14px}
@@ -328,11 +339,11 @@ td.b{font-weight:700}
   <div class="kpis" id="kpis"></div>
 
   <div class="tabs">
-    <div class="tab on" data-tab="branchppl">站所人員統計</div>
+    <div class="tab on" data-tab="branchppl">站所異常統計</div>
     <div class="tab" data-tab="rank">站所排行榜</div>
     <div class="tab" data-tab="trend">趨勢分析</div>
     <div class="tab" data-tab="detail">異常明細查詢</div>
-    <div class="tab" data-tab="speed">超速人名分類</div>
+    <div class="tab" data-tab="speed">超速名單分類</div>
     <div class="tab" data-tab="idle">怠速查看</div>
   </div>
 
@@ -376,6 +387,20 @@ td.b{font-weight:700}
       <div class="field"><label>&nbsp;</label><label class="chkbox"><input type="checkbox" id="spDisc"> 只看已設定處置／懲處</label></div>
       <div class="field" style="margin-left:auto"><label>&nbsp;</label><button class="btn primary" id="spSave" disabled>儲存變更</button></div>
     </div>
+    <details class="rulebox" open>
+      <summary>超速懲處罰則對照（參考；系統不再自動帶入，請依此自行判定）</summary>
+      <div class="rulewrap">
+        <table class="ruletbl">
+          <thead><tr><th>程度</th><th>行為處置</th><th>行政懲處</th><th class="num">限速 40/50/60 超過</th><th class="num">限速 70/80/90 超過</th><th class="num">限速 100/110 超過</th></tr></thead>
+          <tbody>
+            <tr><td><span class="sev sev-輕度">輕度（A）</span></td><td>提醒注意</td><td>—</td><td class="num">≤ 14</td><td class="num">≤ 10</td><td class="num">≤ 10</td></tr>
+            <tr><td><span class="sev sev-中度">中度（B）</span></td><td>面談單</td><td>申誡</td><td class="num">15 ~ 24</td><td class="num">11 ~ 20</td><td class="num">11 ~ 15</td></tr>
+            <tr><td><span class="sev sev-重度">重度（C）</span></td><td>改善單</td><td>記過</td><td class="num">25 ~ 34</td><td class="num">21 ~ 30</td><td class="num">16 ~ 20</td></tr>
+            <tr><td><span class="sev sev-嚴重">嚴重（D）</span></td><td>/扣牌</td><td>大過+</td><td class="num">≥ 35</td><td class="num">≥ 31</td><td class="num">≥ 21</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
     <div id="speedGroups" class="groups"></div>
   </section>
 
@@ -395,9 +420,9 @@ td.b{font-weight:700}
       <button class="btn primary" id="idleImportBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0-12l-4 4m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>匯入怠速 Excel</button>
       <button class="btn" id="idleExport">匯出 CSV</button>
       <div class="legend">
-        <span><span class="dot" style="background:var(--t-light)"></span>輕度 5~10分</span>
-        <span><span class="dot" style="background:var(--t-mod)"></span>中度 10~15分</span>
-        <span><span class="dot" style="background:var(--t-severe)"></span>重度 15分以上</span>
+        <span><span class="dot" style="background:var(--t-light)"></span>輕度(A) ≤1時30分</span>
+        <span><span class="dot" style="background:var(--t-mod)"></span>中度(B) 1時31分~2時24分</span>
+        <span><span class="dot" style="background:var(--t-severe)"></span>重度(C) ≥2時25分</span>
       </div>
     </div>
     <div id="idleView" class="rankview"></div>
@@ -514,8 +539,8 @@ function sevOf(it){
   if(!t)t=ord.indexOf(txt(it.degText))>=0?txt(it.degText):'';
   return {text:t,code:t?(SEV_CODE[t]||txt(it.degCode)):txt(it.degCode)};
 }
-function effDisposal(it){const v=txt(it.disposal);if(v&&v!=='-')return v;const s=sevOf(it).text;return SUGGEST_DISP[s]||'';}
-function effDisc(it){const v=txt(it.disc);if(v&&v!=='-')return v;const s=sevOf(it).text;return SUGGEST_DISC[s]||'';}
+function effDisposal(it){const v=txt(it.disposal);return (v&&v!=='-')?v:'';}
+function effDisc(it){const v=txt(it.disc);return (v&&v!=='-')?v:'';}
 const toDailySnake=(b,date)=>({date,branch:b.branch,grade:b.grade,rank:b.rank,score:b.score,vehicles:b.vehicles,km:b.km,count:b.count,speed_g:b.speedG,speed_r:b.speedR,turn_g:b.turnG,turn_r:b.turnR,decel_g:b.decelG,decel_r:b.decelR,accel_g:b.accelG,accel_r:b.accelR});
 const toAnomSnake=x=>({uniq:anomUniq(x),date:x.date,branch:x.branch,plate:x.plate,driver:x.driver,behavior:x.behavior,level:x.level,time:x.time,max_speed:x.maxSpeed,location:x.location,legal:x.legal,over_km:x.over,deg_text:x.degText,deg_code:x.degCode,disposal:x.disposal,disc:x.disc});
 
@@ -788,7 +813,7 @@ function renderRankStation(day,branch){
   const {html:crumb,targets}=rankCrumb(day);
   let h=crumb;
   h+='<div class="scorecard"><div class="sc-top"><div>'+
-    '<div class="sc-ttl">站所安全評等 — '+branch+'　<span style="color:var(--dim)">'+courseOf(branch)+' / '+groupOf(branch)+'</span>'+(il?('　·　怠速 '+il.total+' 件（重度 '+il.severe+'）'):'')+'</div>'+
+    '<div class="sc-ttl">站所安全評等 — '+branch+'　<span style="color:var(--dim)">'+courseOf(branch)+' / '+groupOf(branch)+'</span>'+(il?('　·　怠速 '+il.total+' 件（重度 '+il.C+' 人）'):'')+'</div>'+
     '<div class="gradewrap"><div class="big" style="background:'+gradeColor(b.grade)+'">'+(txt(b.grade)||'–')+'</div>'+
     '<div class="tot">總分<b>'+f1(b.score)+'<small>分</small></b></div></div>'+weightTableHTML(b)+'</div>'+
     '<div><div class="sc-ttl">安全指數</div>'+gaugeCardsHTML(b,true)+'</div></div></div>';
@@ -800,7 +825,7 @@ function renderRankStation(day,branch){
     p.total++;const bh=r.behavior||'其他';p.beh[bh]=(p.beh[bh]||0)+1;p.max=Math.max(p.max,num(r.maxSpeed));
     const sv=(bh.includes('超速'))?sevOf(r).text:txt(r.degText);const si=ord.indexOf(sv);if(si>p.worst)p.worst=si;});
   // 併入怠速（依車號＋駕駛）
-  if(IDLE.length)Object.values(ppl).forEach(p=>{p.idle=idleAgg(r=>r[0]===branch&&(r[1]===p.plate||r[2]===p.driver));});
+  if(IDLE.length)Object.values(ppl).forEach(p=>{const ia=idleAgg(r=>r[0]===branch&&r[1]===p.plate&&r[2]===p.driver);if(ia.events)ia.tier=idleTierByMin(ia.sumMin);p.idle=ia;});
   const list=Object.values(ppl).sort((a,b)=>b.total-a.total);
   h+='<div class="sc-ttl" style="margin:4px 2px 12px;font-size:calc(15px*var(--fs));color:var(--txt);font-weight:800">個人評比（'+list.length+' 位駕駛）</div>';
   if(!list.length){h+='<div class="card"><div style="text-align:center;padding:40px;color:var(--muted)">此站所目前沒有對應的異常明細資料。匯入「異常明細表」後即可顯示每位駕駛的評比。</div></div>';}
@@ -812,7 +837,7 @@ function renderRankStation(day,branch){
         '<div class="ct">'+p.total+'<small>異常筆數</small></div></div>'+
         '<div class="chips">'+chips+(other?('<span class="chip">其他 <b>'+other+'</b></span>'):'')+(worst?('<span class="itag" style="background:'+sevColor(worst)+'">最重 '+worst+'</span>'):'')+'</div>'+
         '<div class="df"><div>最高時速<b>'+(p.max||'–')+'</b></div>'+
-        (p.idle?('<div>怠速<b style="color:var(--t-mod)">'+p.idle.total+' 件</b></div><div>重度<b style="color:var(--t-severe)">'+p.idle.severe+'</b></div><div>最長<b>'+f1(p.idle.maxMin)+' 分</b></div>'):'<div>怠速<b style="color:var(--dim)">未匯入</b></div>')+
+        (p.idle&&p.idle.events?('<div>怠速<b>'+p.idle.events+' 件</b></div><div>累計<b style="color:'+p.idle.tier.color+'">'+idleFmt(p.idle.sumMin)+'</b></div><div>程度<b style="color:'+p.idle.tier.color+'">'+p.idle.tier.name+'（'+p.idle.tier.code+'）</b></div>'):'<div>怠速<b style="color:var(--dim)">未匯入</b></div>')+
         '</div></div>';});
     h+='</div>';}
   box.innerHTML=h;
@@ -826,14 +851,28 @@ let IDLE_DATE='';
 let idleSel={branch:null,plate:null};
 // 從共用的異常資料抽出怠速，讓所有開啟者看到同一份
 function refreshIdle(){const ir=ANOM.records.filter(r=>txt(r.behavior)==='怠速');IDLE=ir.map(r=>[txt(r.branch),txt(r.plate),txt(r.driver),num(r.over),txt(r.time),txt(r.location)]);const ds=[...new Set(ir.map(r=>txt(r.date)).filter(Boolean))].sort();IDLE_DATE=ds[ds.length-1]||'';}
-const IDLE_TIERS=[['sub5','未達標','3~5分','var(--t-sub5)'],['light','輕度','5~10分','var(--t-light)'],['mod','中度','10~15分','var(--t-mod)'],['severe','重度','15分以上','var(--t-severe)']];
-const idleTier=m=>m<5?'sub5':m<10?'light':m<15?'mod':'severe';
-function idleAgg(fn){const a={sub5:0,light:0,mod:0,severe:0,total:0,sumMin:0,maxMin:0};IDLE.forEach(r=>{if(fn&&!fn(r))return;a[idleTier(r[3])]++;a.total++;a.sumMin+=r[3];if(r[3]>a.maxMin)a.maxMin=r[3];});return a;}
+// 怠速分級：依「每位駕駛累計怠速時數」分 A/B/C（單位：分鐘；90=1時30分、145=2時25分）
+const IDLE_RULE=[
+  {code:'A',name:'輕度',color:'var(--t-light)',range:'≤ 1時30分',disp:'提醒注意',disc:'—',rule:'—'},
+  {code:'B',name:'中度',color:'var(--t-mod)',range:'1時31分 ~ 2時24分',disp:'面談單',disc:'申誡',rule:'第四十五條第三項'},
+  {code:'C',name:'重度',color:'var(--t-severe)',range:'≥ 2時25分',disp:'改善單',disc:'記過',rule:'第四十六條第一項'}
+];
+function idleTierByMin(min){return min<=90?IDLE_RULE[0]:(min<145?IDLE_RULE[1]:IDLE_RULE[2]);}
+function idleFmt(min){min=Math.round(min);return min<60?(min+' 分'):(Math.floor(min/60)+' 時 '+(min%60)+' 分');}
 function idleDurMin(s){s=String(s||'');const h=/(\d+)時/.exec(s),m=/(\d+)分/.exec(s),sec=/(\d+)秒/.exec(s);return Math.round(((h?+h[1]*60:0)+(m?+m[1]:0)+(sec?+sec[1]/60:0))*10)/10;}
-function bandsHTML(a){return '<div class="bands">'+IDLE_TIERS.map(t=>'<div class="band" style="--bc:'+t[3]+'"><span class="bn">'+a[t[0]]+'</span><div class="bt">'+t[1]+'</div><div class="bd">'+t[2]+'</div></div>').join('')+'</div>';}
-function idleStack(a){const t=a.total||1;return '<div class="stack">'+['sub5','light','mod','severe'].map(k=>a[k]?('<i style="width:'+(a[k]/t*100).toFixed(1)+'%;background:'+({sub5:'var(--t-sub5)',light:'var(--t-light)',mod:'var(--t-mod)',severe:'var(--t-severe)'}[k])+'"></i>'):'').join('')+'</div>';}
-const idleTierC={sub5:'var(--t-sub5)',light:'var(--t-light)',mod:'var(--t-mod)',severe:'var(--t-severe)'};
-const idleTierName={sub5:'未達標',light:'輕度',mod:'中度',severe:'重度'};
+// 依駕駛(站所+車號+駕駛)累計，回傳人數/累計分鐘/事件數，並依累計時數歸 A/B/C
+function idleAgg(fn){
+  const g={};let events=0,sumMin=0,maxMin=0;
+  IDLE.forEach(r=>{if(fn&&!fn(r))return;const k=r[0]+'|'+r[1]+'|'+r[2];
+    const o=g[k]=g[k]||{branch:r[0],plate:r[1],driver:r[2],min:0,events:0,maxMin:0};
+    o.min+=r[3];o.events++;if(r[3]>o.maxMin)o.maxMin=r[3];
+    events++;sumMin+=r[3];if(r[3]>maxMin)maxMin=r[3];});
+  const persons=Object.values(g);let A=0,B=0,C=0;
+  persons.forEach(o=>{o.tier=idleTierByMin(o.min);if(o.tier.code==='A')A++;else if(o.tier.code==='B')B++;else C++;});
+  return {total:events,events,sumMin,maxMin,people:persons.length,persons,A,B,C,tier:persons.length===1?persons[0].tier:null};
+}
+function bandsHTML(a){return '<div class="bands">'+IDLE_RULE.map(t=>{const n=t.code==='A'?a.A:t.code==='B'?a.B:a.C;return '<div class="band" style="--bc:'+t.color+'"><span class="bn">'+n+'</span><div class="bt">'+t.name+'（'+t.code+'）</div><div class="bd">'+t.range+'</div></div>';}).join('')+'</div>';}
+function idleStack(a){const t=(a.A+a.B+a.C)||1;return '<div class="stack">'+IDLE_RULE.map(r=>{const n=r.code==='A'?a.A:r.code==='B'?a.B:a.C;return n?('<i style="width:'+(n/t*100).toFixed(1)+'%;background:'+r.color+'"></i>'):'';}).join('')+'</div>';}
 function renderIdle(){
   const box=$('#idleView');if(!box)return;
   refreshIdle();
@@ -841,20 +880,21 @@ function renderIdle(){
   if(!IDLE.length){idleSel={branch:null,plate:null};
     box.innerHTML='<div class="card"><div style="text-align:center;padding:54px 24px">'+
       '<div style="font-size:16px;color:var(--txt);font-weight:700;margin-bottom:8px">尚未匯入怠速資料</div>'+
-      '<div style="font-size:13px;color:var(--muted);line-height:1.7">點上方「匯入怠速 Excel」載入怠速明細（需含「分公司／車號／駕駛／持續時間」欄位）。匯入後會跟超速一樣<b>上傳到雲端</b>，其他人開啟也看得到。<br>分級：5~10分＝輕度、10~15分＝中度、15分以上＝重度（3~5分列為未達標）。可一次匯入「依車輛」「依駕駛」兩份，系統自動去重。</div></div></div>';return;}
+      '<div style="font-size:13px;color:var(--muted);line-height:1.7">點上方「匯入怠速 Excel」載入怠速明細（需含「分公司／車號／駕駛／持續時間」欄位）。匯入後會跟超速一樣<b>上傳到雲端</b>，其他人開啟也看得到。<br>分級依<b>每位駕駛累計怠速時數</b>：輕度（A）≤ 1時30分、中度（B）1時31分~2時24分、重度（C）≥ 2時25分。可一次匯入「依車輛」「依駕駛」兩份，系統自動去重。</div></div></div>';return;}
   if(idleSel.branch&&idleSel.plate)return renderIdleDriver();
   if(idleSel.branch)return renderIdleStation();
   // 總覽
-  let h='<div style="font-size:calc(13px*var(--fs));color:var(--muted);font-weight:700;margin-bottom:10px">怠速總覽　'+(IDLE_DATE?('資料日期 '+IDLE_DATE+'　'):'')+'共 '+IDLE.length+' 筆（怠速3分鐘以上）</div>';
-  h+=bandsHTML(idleAgg(null));
-  // 站所排行
-  const brs={};IDLE.forEach(r=>{(brs[r[0]]=brs[r[0]]||[]).push(r);});
-  const rows=Object.keys(brs).map(b=>({branch:b,a:idleAgg(r=>r[0]===b)})).sort((x,y)=>y.a.total-x.a.total||y.a.severe-x.a.severe);
-  h+='<div class="sc-ttl" style="margin:6px 2px 10px;font-size:calc(15px*var(--fs));color:var(--txt);font-weight:800">站所怠速排行（點擊站所看駕駛明細）</div>';
-  h+='<div class="card"><div class="tablewrap"><table><thead><tr><th>#</th><th>站所</th><th class="num">總件數</th><th class="num">輕度</th><th class="num">中度</th><th class="num">重度</th><th>嚴重度分布</th></tr></thead><tbody>';
+  const all=idleAgg(null);
+  let h='<div style="font-size:calc(13px*var(--fs));color:var(--muted);font-weight:700;margin-bottom:10px">怠速總覽　'+(IDLE_DATE?('資料日期 '+IDLE_DATE+'　'):'')+'共 '+all.events+' 筆事件 · '+all.people+' 位駕駛（分級採每人累計怠速時數）</div>';
+  h+=bandsHTML(all);
+  // 站所排行（依累計時數 / 重度人數）
+  const brs={};IDLE.forEach(r=>{brs[r[0]]=1;});
+  const rows=Object.keys(brs).map(b=>({branch:b,a:idleAgg(r=>r[0]===b)})).sort((x,y)=>y.a.C-x.a.C||y.a.sumMin-x.a.sumMin);
+  h+='<div class="sc-ttl" style="margin:6px 2px 10px;font-size:calc(15px*var(--fs));color:var(--txt);font-weight:800">站所怠速排行（點擊站所看駕駛累計）</div>';
+  h+='<div class="card"><div class="tablewrap"><table><thead><tr><th>#</th><th>站所</th><th class="num">駕駛數</th><th class="num">累計時數</th><th class="num">事件</th><th class="num">輕度</th><th class="num">中度</th><th class="num">重度</th><th>分布(人數)</th></tr></thead><tbody>';
   rows.forEach((o,i)=>{h+='<tr class="idle-br" data-br="'+o.branch+'" style="cursor:pointer"><td class="num">'+(i+1)+'</td><td class="b">'+o.branch+'</td>'+
-    '<td class="num b">'+o.a.total+'</td><td class="num" style="color:var(--t-light)">'+o.a.light+'</td>'+
-    '<td class="num" style="color:var(--t-mod)">'+o.a.mod+'</td><td class="num" style="color:var(--t-severe)">'+(o.a.severe||'')+'</td>'+
+    '<td class="num b">'+o.a.people+'</td><td class="num" style="font-family:var(--mono)">'+idleFmt(o.a.sumMin)+'</td><td class="num">'+o.a.events+'</td>'+
+    '<td class="num" style="color:var(--t-light)">'+(o.a.A||'')+'</td><td class="num" style="color:var(--t-mod)">'+(o.a.B||'')+'</td><td class="num" style="color:var(--t-severe)">'+(o.a.C||'')+'</td>'+
     '<td style="min-width:120px">'+idleStack(o.a)+'</td></tr>';});
   h+='</tbody></table></div></div>';box.innerHTML=h;
   box.querySelectorAll('tr.idle-br').forEach(el=>el.onclick=()=>{idleSel={branch:el.dataset.br,plate:null};renderIdle();});
@@ -862,16 +902,16 @@ function renderIdle(){
 function renderIdleStation(){
   const box=$('#idleView');const br=idleSel.branch;const a=idleAgg(r=>r[0]===br);
   let h='<div class="backbar"><button class="btn" id="idleBack">← 返回怠速總覽</button>'+
-    '<span style="color:var(--muted);font-size:calc(13px*var(--fs))">'+br+'　怠速 '+a.total+' 件，總時長約 '+Math.round(a.sumMin)+' 分鐘</span></div>';
+    '<span style="color:var(--muted);font-size:calc(13px*var(--fs))">'+br+'　'+a.people+' 位駕駛 · 累計 '+idleFmt(a.sumMin)+' · '+a.events+' 件</span></div>';
   h+=bandsHTML(a);
-  const dr={};IDLE.forEach(r=>{if(r[0]!==br)return;const k=r[1]+'|'+r[2];(dr[k]=dr[k]||{plate:r[1],driver:r[2]});});
-  const rows=Object.values(dr).map(d=>({...d,a:idleAgg(r=>r[0]===br&&r[1]===d.plate&&r[2]===d.driver)})).sort((x,y)=>y.a.total-x.a.total);
-  h+='<div class="sc-ttl" style="margin:6px 2px 10px;font-size:calc(15px*var(--fs));color:var(--txt);font-weight:800">駕駛怠速明細（點擊駕駛看每筆記錄）</div>';
-  h+='<div class="card"><div class="tablewrap"><table><thead><tr><th>#</th><th>駕駛</th><th>車號</th><th class="num">總件數</th><th class="num">輕度</th><th class="num">中度</th><th class="num">重度</th><th class="num">最長(分)</th></tr></thead><tbody>';
-  rows.forEach((d,i)=>{h+='<tr class="idle-dr" data-pl="'+d.plate+'" data-dv="'+d.driver+'" style="cursor:pointer"><td class="num">'+(i+1)+'</td><td class="b">'+d.driver+'</td><td style="font-family:var(--mono)">'+d.plate+'</td>'+
-    '<td class="num b">'+d.a.total+'</td><td class="num" style="color:var(--t-light)">'+(d.a.light||'')+'</td>'+
-    '<td class="num" style="color:var(--t-mod)">'+(d.a.mod||'')+'</td><td class="num" style="color:var(--t-severe)">'+(d.a.severe||'')+'</td>'+
-    '<td class="num">'+f1(d.a.maxMin)+'</td></tr>';});
+  const rows=a.persons.slice().sort((x,y)=>y.min-x.min);
+  h+='<div class="sc-ttl" style="margin:6px 2px 10px;font-size:calc(15px*var(--fs));color:var(--txt);font-weight:800">駕駛累計怠速（點擊駕駛看每筆記錄）</div>';
+  h+='<div class="card"><div class="tablewrap"><table><thead><tr><th>#</th><th>駕駛</th><th>車號</th><th class="num">累計時數</th><th>程度</th><th class="num">事件</th><th class="num">最長(分)</th><th>建議處置</th><th>建議懲處</th></tr></thead><tbody>';
+  rows.forEach((d,i)=>{const t=d.tier;h+='<tr class="idle-dr" data-pl="'+d.plate+'" data-dv="'+d.driver+'" style="cursor:pointer"><td class="num">'+(i+1)+'</td><td class="b">'+d.driver+'</td><td style="font-family:var(--mono)">'+d.plate+'</td>'+
+    '<td class="num b" style="font-family:var(--mono)">'+idleFmt(d.min)+'</td>'+
+    '<td><span class="itag" style="background:'+t.color+'">'+t.name+'（'+t.code+'）</span></td>'+
+    '<td class="num">'+d.events+'</td><td class="num">'+f1(d.maxMin)+'</td>'+
+    '<td>'+t.disp+'</td><td>'+t.disc+'</td></tr>';});
   h+='</tbody></table></div></div>';box.innerHTML=h;
   $('#idleBack').onclick=()=>{idleSel={branch:null,plate:null};renderIdle();};
   box.querySelectorAll('tr.idle-dr').forEach(el=>el.onclick=()=>{idleSel={branch:br,plate:el.dataset.pl,driver:el.dataset.dv};renderIdle();});
@@ -880,12 +920,19 @@ function renderIdleDriver(){
   const box=$('#idleView');const br=idleSel.branch,pl=idleSel.plate,dv=idleSel.driver;
   const recs=IDLE.filter(r=>r[0]===br&&r[1]===pl&&(dv?r[2]===dv:true)).slice().sort((a,b)=>b[3]-a[3]);
   const a=idleAgg(r=>r[0]===br&&r[1]===pl&&(dv?r[2]===dv:true));
+  const t=idleTierByMin(a.sumMin);
   let h='<div class="backbar"><button class="btn" id="idleBack2">← 返回 '+br+'</button>'+
-    '<span style="color:var(--muted);font-size:calc(13px*var(--fs))">'+(dv||'')+'（'+pl+'）　怠速 '+a.total+' 件</span></div>';
-  h+=bandsHTML(a);
-  h+='<div class="card"><div class="tablewrap"><table><thead><tr><th>#</th><th>結束時間</th><th class="num">持續(分)</th><th>分級</th><th>怠速位置</th></tr></thead><tbody>';
-  recs.forEach((r,i)=>{const t=idleTier(r[3]);h+='<tr><td class="num">'+(i+1)+'</td><td style="font-family:var(--mono)">'+(r[4]||'')+'</td>'+
-    '<td class="num b">'+f1(r[3])+'</td><td><span class="itag" style="background:'+idleTierC[t]+'">'+idleTierName[t]+'</span></td>'+
+    '<span style="color:var(--muted);font-size:calc(13px*var(--fs))">'+(dv||'')+'（'+pl+'）</span></div>';
+  // 累計卡（另外顯示累計）
+  h+='<div class="card" style="padding:16px 18px;margin-bottom:12px"><div style="display:flex;flex-wrap:wrap;gap:24px;align-items:center">'+
+    '<div><div style="font-size:calc(12px*var(--fs));color:var(--muted)">累計怠速時數</div><div style="font-size:calc(26px*var(--fs));font-weight:800;font-family:var(--mono);color:'+t.color+'">'+idleFmt(a.sumMin)+'</div></div>'+
+    '<div><div style="font-size:calc(12px*var(--fs));color:var(--muted)">分級</div><div style="margin-top:4px"><span class="itag" style="background:'+t.color+';font-size:calc(13px*var(--fs))">'+t.name+'（'+t.code+'）</span></div></div>'+
+    '<div><div style="font-size:calc(12px*var(--fs));color:var(--muted)">事件數</div><div style="font-size:calc(22px*var(--fs));font-weight:700">'+a.events+'</div></div>'+
+    '<div style="border-left:1px solid var(--line);padding-left:24px"><div style="font-size:calc(12px*var(--fs));color:var(--muted)">建議處置 ／ 懲處</div><div style="font-weight:700;font-size:calc(15px*var(--fs))">'+t.disp+'　／　'+t.disc+'</div><div style="font-size:calc(11px*var(--fs));color:var(--dim)">工作規則：'+t.rule+'</div></div>'+
+    '</div></div>';
+  h+='<div class="card"><div class="tablewrap"><table><thead><tr><th>#</th><th>結束時間</th><th class="num">持續(分)</th><th>怠速位置</th></tr></thead><tbody>';
+  recs.forEach((r,i)=>{h+='<tr><td class="num">'+(i+1)+'</td><td style="font-family:var(--mono)">'+(r[4]||'')+'</td>'+
+    '<td class="num b">'+f1(r[3])+'</td>'+
     '<td style="color:var(--muted)">'+(r[5]||'')+'</td></tr>';});
   h+='</tbody></table></div></div>';box.innerHTML=h;
   $('#idleBack2').onclick=()=>{idleSel={branch:br,plate:null};renderIdle();};
@@ -902,12 +949,12 @@ function parseIdleAOA(aoa){
     rows.push([txt(r[iB]),txt(r[iP]),txt(r[iD]),idleDurMin(r[iDur]),txt(r[iE]),txt(r[iL]),txt(r[iS])]);}
   return rows.length?{rows,date}:null;
 }
-const idleTierNameOf=m=>({sub5:'未達標',light:'輕度',mod:'中度',severe:'重度'}[idleTier(m)]);
 // 把一筆怠速轉成「異常」記錄（行為=怠速），即可沿用現有雲端上傳/去重/共用
+// 註：怠速分級改為「每位駕駛累計時數」，故單筆不再帶程度，程度於畫面端依累計重算
 function idleRowToAnom(row,date){
-  return {date:date||'',branch:row[0],plate:row[1],driver:row[2],behavior:'怠速',level:idleTierNameOf(row[3]),
+  return {date:date||'',branch:row[0],plate:row[1],driver:row[2],behavior:'怠速',level:'',
     time:row[4]||row[6]||'',maxSpeed:'',location:row[5]||'',legal:'',selfLimit:'',over:row[3],
-    degText:idleTierNameOf(row[3]),degCode:'',disposal:'',disc:''};
+    degText:'',degCode:'',disposal:'',disc:''};
 }
 async function handleIdleFiles(files){ return handleFiles(files); }   // 統一走主匯入（含雲端共用）
 function renderTrend(){
@@ -984,7 +1031,7 @@ function renderDetail(){
 }
 let detailRows=[];
 function updateDetailSaveBtn(){}
-// 跳到「超速人名分類」頁並高亮指定那一筆
+// 跳到「超速名單分類」頁並高亮指定那一筆
 function jumpToSpeed(uniq){
   // 清掉可能限制顯示的篩選，確保該筆會出現
   if($('#spDate'))$('#spDate').value='';
@@ -1135,7 +1182,7 @@ function renderFoot(){
   const mode=ONLINE?'資料儲存於 Google 試算表（後台），所有開啟者看到同一份累積資料。':'目前為本機預覽模式：資料只存在你的瀏覽器，不會與他人共享。請依 README 設定 GAS_URL 開啟共享。';
   $('#footnote').innerHTML=mode+(dates.length?('　目前涵蓋 '+dates.length+' 天（'+dates[0]+' ~ '+dates[dates.length-1]+'）'):'')+'<br>每日匯入新的一天統計表即可持續累積；同一天重複匯入會以最新內容覆蓋，異常明細自動去重。';
 }
-// ---------- 站所人員統計（超速）----------
+// ---------- 站所異常統計（超速）----------
 let bpRows=[];
 function bpData(){
   const ord=['輕度','中度','重度','嚴重'];
@@ -1175,7 +1222,7 @@ function renderBranchPpl(){
     {lbl:'待處理',val:fi(totalUnhandled),ex:(totalUnhandled?'尚未設定處置/懲處':'已全部處理')+' · 點擊查看',cls:totalUnhandled?'c3':'c4',card:'unhandled'},
     {lbl:'最需關注站所',val:worst?worst.branch:'–',ex:(worst?('重度+嚴重 '+(worst.sev.重度+worst.sev.嚴重)+' 件'):'')+' · 點擊查看',cls:'c5',card:'worst',br:worst?worst.branch:''},
   ];
-  if(IDLE.length){const ia=idleAgg(null);sumCards.push({lbl:'怠速事件',val:fi(ia.total),ex:'中度 '+ia.mod+' / 重度 '+ia.severe+' · 看明細',cls:'c3',card:'idletab'});}
+  if(IDLE.length){const ia=idleAgg(null);sumCards.push({lbl:'怠速事件',val:fi(ia.total),ex:'中度 '+ia.B+' 人 / 重度 '+ia.C+' 人 · 看明細',cls:'c3',card:'idletab'});}
   $('#bpSummary').innerHTML=sumCards.map(c=>'<div class="bpcard clickable '+c.cls+'" data-card="'+c.card+'"'+(c.br?(' data-br="'+c.br+'"'):'')+'><div class="bplbl">'+c.lbl+'</div><div class="bpval">'+c.val+'</div><div class="bpex">'+c.ex+'</div></div>').join('');
   $('#bpSummary').querySelectorAll('.bpcard.clickable').forEach(el=>el.onclick=()=>{if(el.dataset.card==='idletab'){idleSel={branch:null,plate:null};gotoTab('idle');return;}openCardModal(el.dataset.card,el.dataset.br||'');});
   const view=$('#bpView').value,brF=$('#bpBranch').value;
@@ -1195,7 +1242,7 @@ function renderBranchPpl(){
       const tot=b.total||1;const seg=(n,col)=>n?'<span style="display:inline-block;height:100%;width:'+(n/tot*100)+'%;background:'+col+'"></span>':'';
       const bar='<div class="sevbar">'+seg(b.sev.輕度,'var(--blue)')+seg(b.sev.中度,'var(--warn)')+seg(b.sev.重度,'var(--orange)')+seg(b.sev.嚴重,'var(--bad)')+seg(b.uncl,'var(--dim)')+'</div>';
       const dcell=(val,kind,col,bold)=>{const n=Number(val)||0;if(!n)return '<td class="num" style="color:var(--dim)">'+(val||'')+'</td>';return '<td class="num cellclick" data-br="'+b.branch+'" data-cell="'+kind+'" style="color:'+col+';font-weight:'+(bold?700:600)+';cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px">'+fi(n)+'</td>';};
-      const idleCell=bIdle?('<td class="num idlejump" data-br="'+b.branch+'" title="點擊看怠速明細" style="color:var(--t-mod);font-weight:700;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px">'+(bIdle.total||'')+(bIdle.severe?(' <span style="color:var(--t-severe);font-size:.82em">(重'+bIdle.severe+')</span>'):'')+'</td>'):'<td class="num" style="color:var(--dim)">尚未匯入</td>';
+      const idleCell=bIdle?('<td class="num idlejump" data-br="'+b.branch+'" title="點擊看怠速明細" style="color:var(--t-mod);font-weight:700;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px">'+(bIdle.total||'')+(bIdle.C?(' <span style="color:var(--t-severe);font-size:.82em">(重'+bIdle.C+'人)</span>'):'')+'</td>'):'<td class="num" style="color:var(--dim)">尚未匯入</td>';
       html+='<tr class="bp-grp" data-br="'+b.branch+'"><td class="b">'+b.branch+'</td><td class="num">'+fi(ppl)+'</td>'+
         dcell(b.total,'all','var(--ink)',true)+
         idleCell+
@@ -1221,7 +1268,7 @@ function renderBranchPpl(){
     people.forEach(p=>{const worst=p.worst>=0?ord[p.worst]:'';const dist=ord.map(s=>sevBadge(s,p.sev[s])).join('');
       const pIdle=IDLE.length?idleAgg(r=>r[0]===p.branch&&r[2]===p.driver):null;
       bpRows.push({站所:p.branch,駕駛:p.driver,超速次數:p.count,怠速:pIdle?pIdle.total:'',最高時速:p.max,最嚴重程度:worst,處置紀錄:uniq(p.disp).join('、'),懲處紀錄:uniq(p.disc).join('、')});
-      const idleTd=pIdle?('<td class="num" style="color:'+(pIdle.total?'var(--t-mod)':'var(--dim)')+';font-weight:'+(pIdle.total?700:400)+'">'+(pIdle.total||'')+(pIdle.severe?(' <span style="color:var(--t-severe);font-size:.82em">(重'+pIdle.severe+')</span>'):'')+'</td>'):'<td class="num" style="color:var(--dim)">–</td>';
+      const idleTd=pIdle?('<td class="num" style="color:'+(pIdle.total?'var(--t-mod)':'var(--dim)')+';font-weight:'+(pIdle.total?700:400)+'">'+(pIdle.total||'')+(pIdle.C?(' <span style="color:var(--t-severe);font-size:.82em">(重'+pIdle.C+'人)</span>'):'')+'</td>'):'<td class="num" style="color:var(--dim)">–</td>';
       html+='<tr><td class="b">'+p.branch+'</td><td>'+p.driver+'</td><td class="num b">'+fi(p.count)+'</td>'+idleTd+'<td class="num">'+fi(p.max)+' km/hr</td>'+
         '<td>'+(worst?'<span class="sev sev-'+worst+'">'+worst+'</span>':'')+'</td>'+
         '<td>'+(dist||'—')+'</td>'+
@@ -1247,8 +1294,11 @@ $$('.tab').forEach(t=>t.onclick=()=>gotoTab(t.dataset.tab));
 $('#idleImportBtn').onclick=()=>{if(!busy)$('#idleFileInput').click();};
 $('#idleFileInput').onchange=e=>{if(e.target.files.length)handleFiles([...e.target.files]);e.target.value='';};
 $('#idleExport').onclick=()=>{refreshIdle();if(!IDLE.length){toast('無資料可匯出','','warn');return;}
-  const head=['分公司','車號','駕駛','持續分鐘','分級','結束時間','怠速位置'];
-  const lines=[head.join(',')].concat(IDLE.map(r=>[r[0],r[1],r[2],f1(r[3]),idleTierName[idleTier(r[3])],r[4],r[5]].map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')));
+  // 先算每位駕駛(站所+車號+駕駛)的累計分鐘，再據以分級
+  const sum={};IDLE.forEach(r=>{const k=r[0]+'|'+r[1]+'|'+r[2];sum[k]=(sum[k]||0)+r[3];});
+  const head=['分公司','車號','駕駛','本筆持續分鐘','累計分鐘','累計分級','結束時間','怠速位置'];
+  const lines=[head.join(',')].concat(IDLE.map(r=>{const k=r[0]+'|'+r[1]+'|'+r[2];const t=idleTierByMin(sum[k]);
+    return [r[0],r[1],r[2],f1(r[3]),Math.round(sum[k]),t.name+'（'+t.code+'）',r[4],r[5]].map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',');}));
   const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='怠速明細.csv';a.click();toast('已匯出 CSV',IDLE.length+' 筆');};
 ['#rankDate','#rankSort'].forEach(s=>$(s).onchange=()=>{rankSort={key:'__base__',dir:1};renderRank();});
 ['#trendScope','#trendMetric'].forEach(s=>$(s).onchange=renderTrend);
@@ -1262,7 +1312,7 @@ window.addEventListener('beforeunload',e=>{if(pendingCount()>0){e.preventDefault
 $('#bpExport').onclick=()=>{if(!bpRows.length){toast('無資料可匯出','','warn');return;}
   const head=Object.keys(bpRows[0]);
   const lines=[head.join(',')].concat(bpRows.map(r=>head.map(k=>'"'+String(r[k]==null?'':r[k]).replace(/"/g,'""')+'"').join(',')));
-  const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='站所人員統計.csv';a.click();toast('已匯出 CSV',bpRows.length+' 列');};
+  const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='站所異常統計.csv';a.click();toast('已匯出 CSV',bpRows.length+' 列');};
 $('#dfExport').onclick=()=>{const rows=filteredAnom();if(!rows.length){toast('無資料可匯出','','warn');return;}const head=['日期','站所','車號','駕駛','行為','等級','最高時速','法定限速','超過km','異常程度','處置','懲處'];const lines=[head.join(',')].concat(rows.map(r=>[r.date,r.branch,r.plate,r.driver,r.behavior,r.level,r.maxSpeed,r.legal,r.over,r.degText,r.disposal,r.disc].map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(',')));const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='異常明細查詢.csv';a.click();toast('已匯出 CSV',rows.length+' 筆');};
 
 let dragDepth=0;

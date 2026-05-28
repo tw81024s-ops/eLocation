@@ -882,7 +882,7 @@ function showPersonDetail(branch,plate,driver){
   // 怠速每筆
   if(idleRows.length){
     body+='<div class="sc-ttl" style="margin:14px 2px 8px;font-size:calc(14px*var(--fs));font-weight:800">怠速明細（'+idleRows.length+' 筆）</div>';
-    body+='<div class="mlist"><table class="mtbl"><thead><tr><th>#</th><th>結束時間</th><th class="num">持續(分)</th><th>怠速位置</th></tr></thead><tbody>';
+    body+='<div class="mlist"><table class="mtbl"><thead><tr><th>#</th><th>結束時間</th><th class="num">怠速時長(分)</th><th>怠速位置</th></tr></thead><tbody>';
     idleRows.forEach((r,i)=>{body+='<tr><td class="num">'+(i+1)+'</td><td style="font-family:var(--mono)">'+esc(r[4])+'</td><td class="num b">'+f1(r[3])+'</td><td style="color:var(--muted)">'+esc(r[5])+'</td></tr>';});
     body+='</tbody></table></div>';
   }
@@ -993,7 +993,7 @@ function renderIdleDriver(){
     '<div><div style="font-size:calc(12px*var(--fs));color:var(--muted)">事件數</div><div style="font-size:calc(22px*var(--fs));font-weight:700">'+a.events+'</div></div>'+
     '<div style="border-left:1px solid var(--line);padding-left:24px"><div style="font-size:calc(12px*var(--fs));color:var(--muted)">建議處置 ／ 懲處</div><div style="font-weight:700;font-size:calc(15px*var(--fs))">'+t.disp+'　／　'+t.disc+'</div><div style="font-size:calc(11px*var(--fs));color:var(--dim)">工作規則：'+t.rule+'</div></div>'+
     '</div></div>';
-  h+='<div class="card"><div class="tablewrap"><table><thead><tr><th>#</th><th>結束時間</th><th class="num">持續(分)</th><th>怠速位置</th></tr></thead><tbody>';
+  h+='<div class="card"><div class="tablewrap"><table><thead><tr><th>#</th><th>結束時間</th><th class="num">怠速時長(分)</th><th>怠速位置</th></tr></thead><tbody>';
   recs.forEach((r,i)=>{h+='<tr><td class="num">'+(i+1)+'</td><td style="font-family:var(--mono)">'+(r[4]||'')+'</td>'+
     '<td class="num b">'+f1(r[3])+'</td>'+
     '<td style="color:var(--muted)">'+(r[5]||'')+'</td></tr>';});

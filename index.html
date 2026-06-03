@@ -111,6 +111,14 @@ tr.bp-grp{cursor:default}
 tr.jump-row{cursor:pointer}
 tr.jump-row:hover{background:#ffe3ef}
 .subtbl td.gobtn{color:var(--accent);font-weight:700;white-space:nowrap;text-align:right}
+.subtbl th.sortable{cursor:pointer;user-select:none}
+.subtbl th.sortable:hover{color:var(--accent)}
+.subfilter{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:9px 11px;background:rgba(230,0,126,.04);border-bottom:1px solid var(--line);font-size:calc(12px*var(--fs))}
+.subfilter .subf-lbl{color:var(--muted);font-weight:800}
+.subfilter label{display:flex;align-items:center;gap:6px;color:var(--muted);font-weight:600}
+.subfilter select{padding:4px 8px;border-radius:7px;border:1px solid var(--line);background:var(--panel);color:var(--txt);font-size:calc(12px*var(--fs))}
+.subfilter .subfReset{padding:3px 10px;font-size:calc(11.5px*var(--fs))}
+.subfilter .subf-count{margin-left:auto;color:var(--muted);font-weight:700}
 .chip-disp{background:rgba(47,115,214,.14);color:var(--blue);font-size:calc(11px*var(--fs));font-weight:700;padding:1px 8px;border-radius:6px}
 .chip-disc{background:rgba(224,39,73,.14);color:var(--bad);font-size:calc(11px*var(--fs));font-weight:700;padding:1px 8px;border-radius:6px}
 .chip-none{color:var(--dim);font-size:calc(11px*var(--fs))}
@@ -1044,6 +1052,8 @@ function fillDetailFilters(){
 }
 function filteredAnom(){const b=$('#dfBranch').value,be=$('#dfBehavior').value,de=$('#dfDegree').value,q=$('#dfSearch').value.trim();return ANOM.records.filter(r=>r.behavior!=='怠速'&&(!b||r.branch===b)&&(!be||r.behavior===be)&&(!de||r.degText===de)&&(!q||(r.driver+r.plate+r.location).includes(q)));}
 const detailExpanded={};
+let detailSubSort={key:'over',dir:-1};
+let detailSubFilter={sev:'',status:''};
 function renderDetail(){
   const t=$('#detailTable');
   if(!ANOM.records.length){emptyTable(t,'尚未匯入異常明細','匯入「異常明細表」(逐筆事件，含駕駛、車號、超速地點)即可查詢。');return;}
@@ -1070,9 +1080,46 @@ function renderDetail(){
       '<td class="num" style="color:var(--good)">'+fi(b.handled)+'</td>'+
       '<td class="num" style="color:'+(b.unhandled?'var(--bad)':'var(--dim)')+';font-weight:'+(b.unhandled?700:400)+'">'+fi(b.unhandled)+'</td></tr>';
     if(open){
-      html+='<tr class="detail-row"><td></td><td colspan="9" style="padding:0 8px 10px"><div class="subwrap"><table class="subtbl"><thead><tr>'+
-        ['日期','車號','駕駛','行為','最高','法定','超過km','程度','處置','懲處',''].map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>';
-      b.items.slice().sort((x,y)=>num(y.over)-num(x.over)).forEach(r=>{
+      const sa=detailSubSort,sf=detailSubFilter;const ord4={'輕度':0,'中度':1,'重度':2,'嚴重':3};
+      // 篩選列
+      const sevOpts=['','輕度','中度','重度','嚴重'].map(v=>'<option value="'+v+'"'+(sf.sev===v?' selected':'')+'>'+(v||'全部')+'</option>').join('');
+      const stOpts=[['','全部'],['pending','待處理'],['done','已處理']].map(o=>'<option value="'+o[0]+'"'+(sf.status===o[0]?' selected':'')+'>'+o[1]+'</option>').join('');
+      // 套用篩選
+      const filtered=b.items.filter(r=>{
+        if(sf.sev){const s=(r.behavior&&r.behavior.includes('超速'))?sevOf(r).text:txt(r.degText);if(s!==sf.sev)return false;}
+        if(sf.status){const disp=txt(r.disposal),disc=txt(r.disc);const done=(disp&&disp!=='-')||(disc&&disc!=='-');if(sf.status==='done'&&!done)return false;if(sf.status==='pending'&&done)return false;}
+        return true;
+      });
+      const filtMark=(sf.sev||sf.status)?(' · 篩選後 '+filtered.length+' / '+b.items.length+' 筆'):'';
+      // 表頭（可排序）
+      const headCell=(label,key)=>{if(!key)return '<th>'+label+'</th>';const ar=sa.key===key?(sa.dir>0?' ▲':' ▼'):'';return '<th class="sortable" data-k="'+key+'">'+label+ar+'</th>';};
+      const heads=[['日期','date'],['車號','plate'],['駕駛','driver'],['行為','behavior'],['最高','maxSpeed'],['法定','legal'],['超過km','over'],['程度','sev'],['處置','disposal'],['懲處','disc'],['',null]];
+      // 排序
+      const sortKey=sa.key,dir=sa.dir;
+      const sevText=r=>(r.behavior&&r.behavior.includes('超速'))?sevOf(r).text:txt(r.degText);
+      const sorted=filtered.slice().sort((x,y)=>{
+        if(sortKey==='date')return txt(x.date).localeCompare(txt(y.date))*dir;
+        if(sortKey==='plate')return txt(x.plate).localeCompare(txt(y.plate))*dir;
+        if(sortKey==='driver')return txt(x.driver).localeCompare(txt(y.driver),'zh-Hant')*dir;
+        if(sortKey==='behavior')return txt(x.behavior).localeCompare(txt(y.behavior),'zh-Hant')*dir;
+        if(sortKey==='maxSpeed')return (num(x.maxSpeed)-num(y.maxSpeed))*dir;
+        if(sortKey==='legal')return (num(x.legal)-num(y.legal))*dir;
+        if(sortKey==='disposal')return txt(x.disposal).localeCompare(txt(y.disposal),'zh-Hant')*dir;
+        if(sortKey==='disc')return txt(x.disc).localeCompare(txt(y.disc),'zh-Hant')*dir;
+        if(sortKey==='sev'){let xv=ord4[sevText(x)],yv=ord4[sevText(y)];if(xv==null)xv=-1;if(yv==null)yv=-1;return (xv-yv)*dir||(num(y.over)-num(x.over));}
+        return (num(x.over)-num(y.over))*dir; // over
+      });
+      html+='<tr class="detail-row"><td></td><td colspan="9" style="padding:0 8px 10px"><div class="subwrap">'+
+        '<div class="subfilter">'+
+          '<span class="subf-lbl">篩選</span>'+
+          '<label>處置狀態 <select class="subfStatus">'+stOpts+'</select></label>'+
+          '<label>程度 <select class="subfSev">'+sevOpts+'</select></label>'+
+          ((sf.sev||sf.status)?'<button class="btn subfReset" type="button">清除篩選</button>':'')+
+          '<span class="subf-count">共 '+b.items.length+' 筆'+filtMark+'</span>'+
+        '</div>'+
+        '<table class="subtbl"><thead><tr>'+heads.map(h=>headCell(h[0],h[1])).join('')+'</tr></thead><tbody>';
+      if(!sorted.length){html+='<tr><td colspan="11" style="text-align:center;color:var(--muted);padding:18px">此篩選條件下沒有資料。</td></tr>';}
+      sorted.forEach(r=>{
         const isSpd=r.behavior&&r.behavior.includes('超速');const sv=isSpd?sevOf(r):{text:txt(r.degText),code:txt(r.degCode)};
         const sevCell=sv.text?'<span class="sev sev-'+sv.text+'">'+sv.text+(sv.code?'（'+sv.code+'）':'')+'</span>':'';
         const over=num(r.over);const oc=isSpd&&sv.text?(' num over-cell over-'+sv.text):' num';
@@ -1091,6 +1138,13 @@ function renderDetail(){
   t.innerHTML=html+'</tbody>';
   t.querySelectorAll('tr.grp-row').forEach(tr=>tr.onclick=()=>{const bk=tr.dataset.br;detailExpanded[bk]=!detailExpanded[bk];renderDetail();});
   t.querySelectorAll('tr.jump-row').forEach(tr=>tr.onclick=()=>{jumpToSpeed(decodeURIComponent(tr.dataset.u));});
+  // 子表排序 / 篩選
+  t.querySelectorAll('tr.detail-row').forEach(dr=>dr.onclick=e=>e.stopPropagation()); // 避免點到子區塊空白時誤觸收合
+  t.querySelectorAll('.subtbl th.sortable').forEach(th=>th.onclick=e=>{e.stopPropagation();const k=th.dataset.k;if(detailSubSort.key===k)detailSubSort.dir*=-1;else{detailSubSort.key=k;detailSubSort.dir=(k==='over'||k==='maxSpeed'||k==='sev')?-1:1;}renderDetail();});
+  t.querySelectorAll('.subfilter select.subfStatus').forEach(s=>{s.onclick=e=>e.stopPropagation();s.onchange=e=>{e.stopPropagation();detailSubFilter.status=s.value;renderDetail();};});
+  t.querySelectorAll('.subfilter select.subfSev').forEach(s=>{s.onclick=e=>e.stopPropagation();s.onchange=e=>{e.stopPropagation();detailSubFilter.sev=s.value;renderDetail();};});
+  t.querySelectorAll('.subfilter .subfReset').forEach(b=>b.onclick=e=>{e.stopPropagation();detailSubFilter={sev:'',status:''};renderDetail();});
+  t.querySelectorAll('.subfilter label').forEach(l=>l.onclick=e=>e.stopPropagation()); // 點 label 不收合
 }
 let detailRows=[];
 function updateDetailSaveBtn(){}

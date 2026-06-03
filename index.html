@@ -290,6 +290,12 @@ td.b{font-weight:700}
 .sc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
 .scard{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 6px 18px rgba(230,0,126,.07);cursor:pointer;transition:.16s;position:relative;overflow:hidden}
 .scard:hover{transform:translateY(-3px);box-shadow:0 14px 32px rgba(230,0,126,.16);border-color:var(--line2)}
+.scard.severe-bg{background:linear-gradient(180deg,#ffd1e3 0%,#ffbbd0 100%);border-color:var(--bad);box-shadow:0 6px 18px rgba(224,39,73,.18)}
+.scard.severe-bg:hover{box-shadow:0 14px 32px rgba(224,39,73,.28);border-color:var(--bad)}
+.scard.severe-bg .rk{color:rgba(224,39,73,.35)}
+.dcard.severe-bg{background:linear-gradient(180deg,#ffd1e3 0%,#ffbbd0 100%);border-color:var(--bad);box-shadow:0 6px 18px rgba(224,39,73,.16)}
+.dcard.severe-bg.clickable:hover{box-shadow:0 10px 24px rgba(224,39,73,.28);border-color:var(--bad)}
+.sev-flag{display:inline-block;background:var(--bad);color:#fff;font-size:calc(10.5px*var(--fs));font-weight:800;padding:1px 7px;border-radius:6px;margin-left:6px;letter-spacing:.5px}
 .scard .rk{position:absolute;top:4px;right:14px;font-family:var(--mono);font-weight:800;font-size:calc(40px*var(--fs));color:#ffdcec;line-height:1}
 .scard-h{display:flex;align-items:center;gap:13px;margin-bottom:10px}
 .scard-h .gb{width:calc(56px*var(--fs));height:calc(56px*var(--fs));border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-family:var(--mono);font-weight:800;font-size:calc(27px*var(--fs))}
@@ -746,18 +752,33 @@ function rankCrumb(day){
   return {html:'<div class="backbar"><span style="font-size:calc(13.5px*var(--fs))">'+links+'</span><span style="color:var(--muted);font-size:calc(12px*var(--fs));margin-left:auto">'+day+'</span></div>',targets:parts.map(p=>p[1])};
 }
 function wireCrumb(box,targets){box.querySelectorAll('a.crumb').forEach(a=>a.onclick=()=>{rankSel=targets[+a.dataset.i];renderRank();});}
+// 嚴重超速快取：每次渲染前重建。SEVERE_BR=站名集合；SEVERE_PER=站|車|駕駛 集合
+let SEVERE_BR=new Set(),SEVERE_PER=new Set(),SEVERE_BR_CNT={},SEVERE_PER_CNT={};
+function rebuildSevereCache(){
+  SEVERE_BR=new Set();SEVERE_PER=new Set();SEVERE_BR_CNT={};SEVERE_PER_CNT={};
+  ANOM.records.forEach(r=>{
+    if(!r.behavior||!r.behavior.includes('超速'))return;
+    if(sevOf(r).text!=='嚴重')return;
+    const br=txt(r.branch),pk=br+'|'+txt(r.plate)+'|'+txt(r.driver);
+    SEVERE_BR.add(br);SEVERE_PER.add(pk);
+    SEVERE_BR_CNT[br]=(SEVERE_BR_CNT[br]||0)+1;
+    SEVERE_PER_CNT[pk]=(SEVERE_PER_CNT[pk]||0)+1;
+  });
+}
 function nodeCardHTML(name,agg,brSet,extra){
   const il=IDLE.length?idleAgg(r=>brSet.has(r[0])):null;
+  // 嚴重超速旗標
+  let sevN=0;brSet.forEach(b=>{sevN+=(SEVERE_BR_CNT[b]||0);});const isSev=sevN>0;
   let mini='<div class="minirow">';RANK_METRICS.forEach(m=>mini+='<div class="mg">'+gaugeSVG(metScore(agg,m[0]),null,false)+'<div class="lbl">'+m[1]+'</div></div>');mini+='</div>';
-  return '<div class="scard" data-key="'+name+'">'+(extra.rank?('<div class="rk">'+extra.rank+'</div>'):'')+
+  return '<div class="scard'+(isSev?' severe-bg':'')+'" data-key="'+name+'">'+(extra.rank?('<div class="rk">'+extra.rank+'</div>'):'')+
     '<div class="scard-h"><div class="gb" style="background:'+gradeColor(agg.grade)+'">'+(txt(agg.grade)||'–')+'</div>'+
-    '<div><div class="st">'+name+'</div><div class="sc">'+f1(agg.score)+'<small>分</small></div></div></div>'+mini+
+    '<div><div class="st">'+name+(isSev?('<span class="sev-flag" title="此範圍含嚴重(D)超速 '+sevN+' 件">⚠ 嚴重 '+sevN+'</span>'):'')+'</div><div class="sc">'+f1(agg.score)+'<small>分</small></div></div></div>'+mini+
     '<div class="scard-f">'+(extra.sub?('<div>'+extra.sub+'</div>'):'')+'<div>車輛<b>'+fi(agg.vehicles)+'</b></div><div>里程<b>'+fi(agg.km)+'</b></div>'+
     '<div>異常<b>'+fi(agg.count)+'</b></div>'+(il?('<div class="il">怠速<b>'+il.total+'</b></div>'):'')+'</div>'+
     '<div class="opencue">'+extra.cue+'</div></div>';
 }
 function renderRank(){
-  refreshIdle();
+  refreshIdle();rebuildSevereCache();
   const dates=sortedDates();const sel=$("#rankDate");const prev=sel.value;
   sel.innerHTML=dates.map(d=>'<option>'+d+'</option>').join('');
   sel.value=dates.includes(prev)?prev:(dates[dates.length-1]||'');
@@ -816,6 +837,7 @@ function renderRankNodes(box,day,title,nodes,childLabel){
 }
 function byBrName(day,name){return DAILY.days[day]?DAILY.days[day].branches.find(b=>b.branch===name):null;}
 function renderRankStation(day,branch){
+  rebuildSevereCache();
   const b=DAILY.days[day].branches.find(x=>x.branch===branch);if(!b){rankSel={course:null,group:null,branch:null};return renderRank();}
   if(!rankSel.course)rankSel.course=courseOf(branch);
   if(!rankSel.group)rankSel.group=groupOf(branch);
@@ -844,7 +866,8 @@ function renderRankStation(day,branch){
     list.forEach(p=>{const worst=p.worst>=0?ord[p.worst]:'';
       const chips=RANK_METRICS.map(m=>{const c=Object.keys(p.beh).filter(k=>k.includes(m[1])).reduce((a,k)=>a+p.beh[k],0);return c?('<span class="chip">'+m[1]+' <b>'+c+'</b></span>'):'';}).join('');
       const other=Object.entries(p.beh).filter(([k])=>!RANK_METRICS.some(m=>k.includes(m[1]))).reduce((a,[,v])=>a+v,0);
-      h+='<div class="dcard clickable" data-pl="'+esc2(p.plate)+'" data-dv="'+esc2(p.driver)+'" data-br="'+esc2(branch)+'" title="點擊看個人明細"><div class="dh"><div><div class="nm">'+p.driver+'</div><div class="pl">'+p.plate+'</div></div>'+
+      const pk=branch+'|'+p.plate+'|'+p.driver;const sevN=SEVERE_PER_CNT[pk]||0;const isSev=sevN>0;
+      h+='<div class="dcard clickable'+(isSev?' severe-bg':'')+'" data-pl="'+esc2(p.plate)+'" data-dv="'+esc2(p.driver)+'" data-br="'+esc2(branch)+'" title="點擊看個人明細"><div class="dh"><div><div class="nm">'+p.driver+(isSev?('<span class="sev-flag" title="本駕駛含嚴重(D)超速 '+sevN+' 件">⚠ 嚴重 '+sevN+'</span>'):'')+'</div><div class="pl">'+p.plate+'</div></div>'+
         '<div class="ct">'+p.total+'<small>異常筆數</small></div></div>'+
         '<div class="chips">'+chips+(other?('<span class="chip">其他 <b>'+other+'</b></span>'):'')+(worst?('<span class="itag" style="background:'+sevColor(worst)+'">最重 '+worst+'</span>'):'')+'</div>'+
         '<div class="df"><div>最高時速<b>'+(p.max||'–')+'</b></div>'+

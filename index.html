@@ -367,6 +367,7 @@ td.b{font-weight:700}
     <div class="toolbar">
       <div class="field"><label>資料日期</label><select id="rankDate"></select></div>
       <div class="field"><label>排序</label><select id="rankSort"><option value="rank">依排名</option><option value="score">依總分(低→高)</option><option value="count">依異常次數(高→低)</option></select></div>
+      <button class="btn primary" id="pptGen" type="button" style="margin-left:auto">📊 產出週報 PPT</button>
       <div class="legend"><span><span class="dot" style="background:var(--good)"></span>A/B 良好</span><span><span class="dot" style="background:var(--warn)"></span>C/D 注意</span><span><span class="dot" style="background:var(--bad)"></span>E+ 危險</span></div>
     </div>
     <div id="rankView" class="rankview"></div>
@@ -759,6 +760,9 @@ function rebuildSevereCache(){
   ANOM.records.forEach(r=>{
     if(!r.behavior||!r.behavior.includes('超速'))return;
     if(sevOf(r).text!=='嚴重')return;
+    // 已設定處置或懲處 → 視為已處理，不計入粉紅警示
+    const dp=txt(r.disposal),dc=txt(r.disc);
+    if((dp&&dp!=='-')||(dc&&dc!=='-'))return;
     const br=txt(r.branch),pk=br+'|'+txt(r.plate)+'|'+txt(r.driver);
     SEVERE_BR.add(br);SEVERE_PER.add(pk);
     SEVERE_BR_CNT[br]=(SEVERE_BR_CNT[br]||0)+1;
@@ -772,7 +776,7 @@ function nodeCardHTML(name,agg,brSet,extra){
   let mini='<div class="minirow">';RANK_METRICS.forEach(m=>mini+='<div class="mg">'+gaugeSVG(metScore(agg,m[0]),null,false)+'<div class="lbl">'+m[1]+'</div></div>');mini+='</div>';
   return '<div class="scard'+(isSev?' severe-bg':'')+'" data-key="'+name+'">'+(extra.rank?('<div class="rk">'+extra.rank+'</div>'):'')+
     '<div class="scard-h"><div class="gb" style="background:'+gradeColor(agg.grade)+'">'+(txt(agg.grade)||'–')+'</div>'+
-    '<div><div class="st">'+name+(isSev?('<span class="sev-flag" title="此範圍含嚴重(D)超速 '+sevN+' 件">⚠ 嚴重 '+sevN+'</span>'):'')+'</div><div class="sc">'+f1(agg.score)+'<small>分</small></div></div></div>'+mini+
+    '<div><div class="st">'+name+(isSev?('<span class="sev-flag" title="此範圍含未處理的嚴重(D)超速 '+sevN+' 件；設定處置或懲處後會自動恢復白底">⚠ 嚴重未處理 '+sevN+'</span>'):'')+'</div><div class="sc">'+f1(agg.score)+'<small>分</small></div></div></div>'+mini+
     '<div class="scard-f">'+(extra.sub?('<div>'+extra.sub+'</div>'):'')+'<div>車輛<b>'+fi(agg.vehicles)+'</b></div><div>里程<b>'+fi(agg.km)+'</b></div>'+
     '<div>異常<b>'+fi(agg.count)+'</b></div>'+(il?('<div class="il">怠速<b>'+il.total+'</b></div>'):'')+'</div>'+
     '<div class="opencue">'+extra.cue+'</div></div>';
@@ -867,7 +871,7 @@ function renderRankStation(day,branch){
       const chips=RANK_METRICS.map(m=>{const c=Object.keys(p.beh).filter(k=>k.includes(m[1])).reduce((a,k)=>a+p.beh[k],0);return c?('<span class="chip">'+m[1]+' <b>'+c+'</b></span>'):'';}).join('');
       const other=Object.entries(p.beh).filter(([k])=>!RANK_METRICS.some(m=>k.includes(m[1]))).reduce((a,[,v])=>a+v,0);
       const pk=branch+'|'+p.plate+'|'+p.driver;const sevN=SEVERE_PER_CNT[pk]||0;const isSev=sevN>0;
-      h+='<div class="dcard clickable'+(isSev?' severe-bg':'')+'" data-pl="'+esc2(p.plate)+'" data-dv="'+esc2(p.driver)+'" data-br="'+esc2(branch)+'" title="點擊看個人明細"><div class="dh"><div><div class="nm">'+p.driver+(isSev?('<span class="sev-flag" title="本駕駛含嚴重(D)超速 '+sevN+' 件">⚠ 嚴重 '+sevN+'</span>'):'')+'</div><div class="pl">'+p.plate+'</div></div>'+
+      h+='<div class="dcard clickable'+(isSev?' severe-bg':'')+'" data-pl="'+esc2(p.plate)+'" data-dv="'+esc2(p.driver)+'" data-br="'+esc2(branch)+'" title="點擊看個人明細"><div class="dh"><div><div class="nm">'+p.driver+(isSev?('<span class="sev-flag" title="本駕駛含未處理的嚴重(D)超速 '+sevN+' 件；設定處置或懲處後會自動恢復白底">⚠ 嚴重未處理 '+sevN+'</span>'):'')+'</div><div class="pl">'+p.plate+'</div></div>'+
         '<div class="ct">'+p.total+'<small>異常筆數</small></div></div>'+
         '<div class="chips">'+chips+(other?('<span class="chip">其他 <b>'+other+'</b></span>'):'')+(worst?('<span class="itag" style="background:'+sevColor(worst)+'">最重 '+worst+'</span>'):'')+'</div>'+
         '<div class="df"><div>最高時速<b>'+(p.max||'–')+'</b></div>'+
@@ -1471,6 +1475,357 @@ function applyFs(v){
 }
 $$('#fsbar button').forEach(b=>b.onclick=()=>applyFs(b.dataset.fs));
 (function(){let v='1';try{v=localStorage.getItem('fleet_fs')||'1';}catch(e){}applyFs(v);})();
+
+/* ===== 週報 PPT 產出 ===== */
+let _pptxLoading=null;
+function loadPptxgenjs(){
+  if(window.PptxGenJS)return Promise.resolve();
+  if(_pptxLoading)return _pptxLoading;
+  _pptxLoading=new Promise((resolve,reject)=>{
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js';
+    s.onload=()=>resolve();
+    s.onerror=()=>{_pptxLoading=null;reject(new Error('PPT 函式庫載入失敗，請檢查網路連線後重試。'));};
+    document.head.appendChild(s);
+  });
+  return _pptxLoading;
+}
+function addDays(d,n){const x=new Date(d+'T00:00:00');x.setDate(x.getDate()+n);const y=x.getFullYear(),m=pad(x.getMonth()+1),dd=pad(x.getDate());return y+'-'+m+'-'+dd;}
+function daysBetween(a,b){return Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/86400000)+1;}
+function fmtDate(s){return s?String(s).replace(/-/g,'/'):'';}
+function inRange(d,a,b){d=txt(d);return d>=a&&d<=b;}
+// 取週彙整原料
+function weekRaw(start,end){
+  const anoms=ANOM.records.filter(r=>inRange(r.date,start,end)&&r.behavior!=='怠速');
+  const idles=ANOM.records.filter(r=>inRange(r.date,start,end)&&r.behavior==='怠速');
+  const branchDays=[];Object.keys(DAILY.days).forEach(d=>{if(d>=start&&d<=end)DAILY.days[d].branches.forEach(b=>branchDays.push(b));});
+  const sevD=anoms.filter(r=>(r.behavior||'').includes('超速')&&sevOf(r).text==='嚴重');
+  const pending=anoms.filter(r=>{const dp=txt(r.disposal),dc=txt(r.disc);return !((dp&&dp!=='-')||(dc&&dc!=='-'));});
+  const idleSumByDr={};idles.forEach(r=>{const k=txt(r.branch)+'|'+txt(r.plate)+'|'+txt(r.driver);idleSumByDr[k]=(idleSumByDr[k]||0)+num(r.over);});
+  const idleC=Object.keys(idleSumByDr).filter(k=>idleSumByDr[k]>=145).map(k=>{const p=k.split('|');return {branch:p[0],plate:p[1],driver:p[2],min:idleSumByDr[k],tier:idleTierByMin(idleSumByDr[k])};});
+  return {anoms,idles,branchDays,sevD,pending,idleSumByDr,idleC};
+}
+function weekScoreAgg(branchDays){if(!branchDays.length)return null;return aggBranches(branchDays);}
+// 課別週彙整
+function aggByCourse(wk){
+  const map={};
+  wk.branchDays.forEach(b=>{const c=courseOf(b.branch);const m=map[c]=map[c]||{name:c,branchDays:[],branches:new Set(),groups:new Set()};m.branchDays.push(b);m.branches.add(b.branch);m.groups.add(groupOf(b.branch));});
+  const sevByBr={};wk.sevD.forEach(r=>{sevByBr[r.branch]=(sevByBr[r.branch]||0)+1;});
+  return Object.values(map).map(c=>{
+    const agg=aggBranches(c.branchDays);
+    const sevN=[...c.branches].reduce((a,b)=>a+(sevByBr[b]||0),0);
+    const idleEvents=wk.idles.filter(r=>c.branches.has(r.branch)).length;
+    const idleCN=wk.idleC.filter(p=>c.branches.has(p.branch)).length;
+    const anomCount=wk.anoms.filter(r=>c.branches.has(r.branch)).length;
+    return {name:c.name,agg,branchCount:c.branches.size,groupCount:c.groups.size,anomCount,sevN,idleEvents,idleCN};
+  }).sort((a,b)=>b.agg.score-a.agg.score);
+}
+// 組別（某課內）
+function aggByGroup(wk,courseName){
+  const map={};
+  wk.branchDays.filter(b=>courseOf(b.branch)===courseName).forEach(b=>{const g=groupOf(b.branch);const m=map[g]=map[g]||{name:g,branchDays:[],branches:new Set()};m.branchDays.push(b);m.branches.add(b.branch);});
+  const sevByBr={};wk.sevD.forEach(r=>{sevByBr[r.branch]=(sevByBr[r.branch]||0)+1;});
+  return Object.values(map).map(g=>{
+    const agg=aggBranches(g.branchDays);
+    const sevN=[...g.branches].reduce((a,b)=>a+(sevByBr[b]||0),0);
+    const idleEvents=wk.idles.filter(r=>g.branches.has(r.branch)).length;
+    const idleCN=wk.idleC.filter(p=>g.branches.has(p.branch)).length;
+    const anomCount=wk.anoms.filter(r=>g.branches.has(r.branch)).length;
+    return {name:g.name,agg,branchCount:g.branches.size,anomCount,sevN,idleEvents,idleCN};
+  }).sort((a,b)=>b.agg.score-a.agg.score);
+}
+// 站別 TOP（依嚴重件數）
+function topStationsBySev(wk,n){
+  const byBr={};
+  wk.sevD.forEach(r=>{byBr[r.branch]=(byBr[r.branch]||0)+1;});
+  const arr=Object.keys(byBr).map(b=>({branch:b,course:courseOf(b),group:groupOf(b),sevN:byBr[b],
+    anomN:wk.anoms.filter(r=>r.branch===b).length,
+    idleEvents:wk.idles.filter(r=>r.branch===b).length}));
+  return arr.sort((a,b)=>b.sevN-a.sevN||b.anomN-a.anomN).slice(0,n||5);
+}
+// 駕駛 TOP（依異常筆數）
+function topDrivers(wk,n){
+  const byKey={};
+  wk.anoms.forEach(r=>{const k=txt(r.branch)+'|'+txt(r.plate)+'|'+txt(r.driver);const o=byKey[k]=byKey[k]||{branch:r.branch,plate:r.plate,driver:r.driver,anomN:0,sevN:0,maxSpeed:0};o.anomN++;if((r.behavior||'').includes('超速')&&sevOf(r).text==='嚴重')o.sevN++;o.maxSpeed=Math.max(o.maxSpeed,num(r.maxSpeed));});
+  Object.keys(byKey).forEach(k=>{byKey[k].idleMin=wk.idleSumByDr[k]||0;byKey[k].course=courseOf(byKey[k].branch);byKey[k].group=groupOf(byKey[k].branch);});
+  return Object.values(byKey).sort((a,b)=>b.anomN-a.anomN||b.sevN-a.sevN).slice(0,n||10);
+}
+// 比較工具：↑↓ delta
+function deltaTag(thisV,lastV,unit,inverse){
+  // inverse=true 表示「越低越好」(異常/嚴重/待處理)
+  if(lastV==null||isNaN(lastV))return '';
+  const diff=thisV-lastV;if(diff===0)return '（與上週持平）';
+  const goodDir=inverse?(diff<0):(diff>0);
+  const arrow=diff>0?'▲':'▼';
+  const sign=diff>0?'+':'';
+  return '（上週 '+(unit==='f1'?f1(lastV):fi(lastV))+'，'+arrow+sign+(unit==='f1'?f1(diff):fi(diff))+(goodDir?' 改善':' 退步')+'）';
+}
+// pptxgenjs 簡報組裝
+async function generateWeeklyPPT(start,end){
+  await loadPptxgenjs();
+  const PptxGenJS=window.PptxGenJS;
+  const wk=weekRaw(start,end);
+  // 上週同等長度區間
+  const len=daysBetween(start,end);
+  const lastEnd=addDays(start,-1);const lastStart=addDays(lastEnd,-(len-1));
+  const lwk=weekRaw(lastStart,lastEnd);
+  const ov=weekScoreAgg(wk.branchDays);
+  const lov=weekScoreAgg(lwk.branchDays);
+  const hasPrior=(lwk.branchDays.length+lwk.anoms.length+lwk.idles.length)>0;
+  const dt=(thisV,lastV,unit,inverse)=>hasPrior?deltaTag(thisV,lastV,unit,inverse):'（無上週資料可比較）';
+  const courses=aggByCourse(wk);
+  const sevStations=topStationsBySev(wk,5);
+  const topDr=topDrivers(wk,10);
+
+  const pptx=new PptxGenJS();
+  pptx.layout='LAYOUT_WIDE'; // 13.333 x 7.5
+  pptx.title='富昇物流 駕駛行為週報 '+fmtDate(start)+'~'+fmtDate(end);
+
+  // 共用顏色
+  const C={pink:'E6007E',pink2:'FF4FA3',pinkBg:'FFE3EF',pinkBg2:'FFD1E3',dark:'2B1622',mute:'7F5B6E',
+    good:'47B65A',warn:'F0A500',orange:'F0640A',bad:'E02749',lineGray:'F0C5D8',headBg:'F8E2EE'};
+  // 共用樣式
+  const addTitle=(s,t,sub)=>{
+    s.addShape('rect',{x:0,y:0,w:13.333,h:0.9,fill:{color:C.pink}});
+    s.addText(t,{x:0.45,y:0.12,w:12.5,h:0.55,fontSize:24,fontFace:'微軟正黑體',bold:true,color:'FFFFFF'});
+    if(sub)s.addText(sub,{x:0.45,y:0.55,w:12.5,h:0.35,fontSize:11.5,fontFace:'微軟正黑體',color:'FFE3EF'});
+  };
+  const dateLabel=fmtDate(start)+' ~ '+fmtDate(end)+'（共 '+daysBetween(start,end)+' 天）';
+
+  // === Slide 1: 封面 ===
+  {const s=pptx.addSlide();
+    s.background={color:C.pinkBg};
+    s.addShape('rect',{x:0,y:3.0,w:13.333,h:1.5,fill:{color:C.pink}});
+    s.addText('富昇物流 中南配送部',{x:0.5,y:0.7,w:12.3,h:0.7,fontSize:30,fontFace:'微軟正黑體',bold:true,color:C.pink});
+    s.addText('駕駛行為安全週報',{x:0.5,y:1.4,w:12.3,h:0.6,fontSize:22,fontFace:'微軟正黑體',color:C.dark});
+    s.addText(dateLabel,{x:0.5,y:3.3,w:12.3,h:0.9,fontSize:28,fontFace:'微軟正黑體',bold:true,color:'FFFFFF',align:'center'});
+    s.addText('Fleet Safety Console · 製表日期 '+fmtDate(new Date().toISOString().slice(0,10)),{x:0.5,y:6.8,w:12.3,h:0.4,fontSize:11,fontFace:'微軟正黑體',color:C.mute,align:'center'});}
+
+  // === Slide 2: 本週重點摘要（KPI + 與上週比較） ===
+  {const s=pptx.addSlide();addTitle(s,'本週重點摘要',dateLabel);
+    const kpis=[
+      {lbl:'平均總分',v:ov?f1(ov.score):'–',d:(ov&&lov&&hasPrior)?deltaTag(ov.score,lov.score,'f1',false):(hasPrior?'':'（無上週資料可比較）')},
+      {lbl:'異常總筆數',v:fi(wk.anoms.length),d:dt(wk.anoms.length,lwk.anoms.length,'fi',true)},
+      {lbl:'嚴重(D)筆數',v:fi(wk.sevD.length),d:dt(wk.sevD.length,lwk.sevD.length,'fi',true),hi:wk.sevD.length>0},
+      {lbl:'待處理筆數',v:fi(wk.pending.length),d:dt(wk.pending.length,lwk.pending.length,'fi',true)},
+      {lbl:'怠速重度(C) 人',v:fi(wk.idleC.length),d:dt(wk.idleC.length,lwk.idleC.length,'fi',true),hi:wk.idleC.length>0},
+      {lbl:'怠速事件',v:fi(wk.idles.length),d:dt(wk.idles.length,lwk.idles.length,'fi',true)}
+    ];
+    const cw=4.1,ch=1.55,gx=0.4,gy=0.3,px=0.45,py=1.25;
+    kpis.forEach((k,i)=>{const col=i%3,row=Math.floor(i/3);const x=px+col*(cw+gx),y=py+row*(ch+gy);
+      s.addShape('roundRect',{x,y,w:cw,h:ch,rectRadius:0.12,fill:{color:k.hi?'FFD1E3':'FFFFFF'},line:{color:k.hi?C.bad:C.lineGray,width:1}});
+      s.addText(k.lbl,{x:x+0.2,y:y+0.12,w:cw-0.4,h:0.35,fontSize:12,fontFace:'微軟正黑體',color:C.mute,bold:true});
+      s.addText(String(k.v),{x:x+0.2,y:y+0.42,w:cw-0.4,h:0.65,fontSize:34,fontFace:'Consolas',bold:true,color:k.hi?C.bad:C.pink});
+      if(k.d)s.addText(k.d,{x:x+0.2,y:y+1.1,w:cw-0.4,h:0.35,fontSize:10,fontFace:'微軟正黑體',color:C.mute});});
+    s.addText('註：「改善/退步」以該指標方向判定（分數越高越好；異常/嚴重/待處理/怠速越低越好）。',
+      {x:0.45,y:5.0,w:12.3,h:0.35,fontSize:10,fontFace:'微軟正黑體',color:C.mute,italic:true});}
+
+  // === Slide 3: 公司整體評等 ===
+  {const s=pptx.addSlide();addTitle(s,'公司整體安全評等',dateLabel);
+    if(ov){
+      // 評等大圓
+      const gColor=ov.grade==='A'?C.good:ov.grade==='B'?'6CC24A':ov.grade==='C'?C.warn:ov.grade==='D'?C.orange:C.bad;
+      s.addShape('ellipse',{x:0.8,y:1.5,w:2.4,h:2.4,fill:{color:gColor},line:{color:gColor}});
+      s.addText(ov.grade||'–',{x:0.8,y:1.5,w:2.4,h:2.4,fontSize:90,fontFace:'微軟正黑體',bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+      s.addText('平均總分',{x:3.6,y:1.6,w:3,h:0.5,fontSize:16,fontFace:'微軟正黑體',color:C.mute,bold:true});
+      s.addText(f1(ov.score)+' 分',{x:3.6,y:2.1,w:5,h:1.2,fontSize:54,fontFace:'Consolas',bold:true,color:C.pink});
+      // 4 指標表
+      const rows=[
+        ['超速(40%)',f1(ov.speedR)+' 次/100KM',scoreToGrade(metScore(ov,'speed'))],
+        ['急轉彎(30%)',f1(ov.turnR)+' 次/100KM',scoreToGrade(metScore(ov,'turn'))],
+        ['急減速(20%)',f1(ov.decelR)+' 次/100KM',scoreToGrade(metScore(ov,'decel'))],
+        ['急加速(10%)',f1(ov.accelR)+' 次/100KM',scoreToGrade(metScore(ov,'accel'))]
+      ];
+      s.addTable([
+        [{text:'項目(權重)',options:{bold:true,fill:C.headBg}},{text:'發生率',options:{bold:true,fill:C.headBg}},{text:'等級',options:{bold:true,fill:C.headBg,align:'center'}}]
+      ].concat(rows.map(r=>[{text:r[0]},{text:r[1],options:{align:'right',fontFace:'Consolas'}},{text:r[2]||'–',options:{align:'center',bold:true,color:C.pink}}])),
+        {x:0.5,y:4.3,w:7,colW:[2.6,2.6,1.8],rowH:0.4,fontSize:13,fontFace:'微軟正黑體',border:{color:C.lineGray,pt:0.5}});
+      // 站/車/異常
+      const stats=[['統計天數',daysBetween(start,end)+' 天'],['資料站所',ov.vehicles?(allBranches().length+' 站'):'–'],['里程合計',fi(ov.km)+' KM'],['異常合計',fi(ov.count)+' 件'],['嚴重(D)',fi(wk.sevD.length)+' 件']];
+      stats.forEach((st,i)=>{const x=8.3,y=1.6+i*0.55;
+        s.addText(st[0],{x:x,y:y,w:1.8,h:0.45,fontSize:11,fontFace:'微軟正黑體',color:C.mute,bold:true});
+        s.addText(st[1],{x:x+1.8,y:y,w:2.8,h:0.45,fontSize:14,fontFace:'Consolas',bold:true,color:C.dark});});
+    }else{s.addText('本區間沒有可彙整的每日統計資料。',{x:0.5,y:3,w:12.3,h:0.5,fontSize:16,fontFace:'微軟正黑體',color:C.mute,align:'center'});}}
+
+  // === Slide 4: 課別排名 ===
+  {const s=pptx.addSlide();addTitle(s,'課別安全排名',dateLabel);
+    if(!courses.length){s.addText('本區間沒有資料。',{x:0.5,y:3,w:12.3,h:0.5,fontSize:16,fontFace:'微軟正黑體',color:C.mute,align:'center'});}
+    else{
+      const head=['#','課','評等','平均總分','站數','組數','異常','嚴重(D)','怠速事件','怠速重度(C) 人'];
+      const data=[head.map(t=>({text:t,options:{bold:true,fill:C.headBg,align:'center'}}))]
+        .concat(courses.map((c,i)=>{const hi=c.sevN>0;return [
+          {text:String(i+1),options:{align:'center'}},
+          {text:c.name,options:{bold:true}},
+          {text:c.agg.grade||'–',options:{align:'center',bold:true}},
+          {text:f1(c.agg.score),options:{align:'right',fontFace:'Consolas',bold:true}},
+          {text:fi(c.branchCount),options:{align:'right',fontFace:'Consolas'}},
+          {text:fi(c.groupCount),options:{align:'right',fontFace:'Consolas'}},
+          {text:fi(c.anomCount),options:{align:'right',fontFace:'Consolas'}},
+          {text:fi(c.sevN),options:{align:'right',fontFace:'Consolas',bold:true,color:hi?C.bad:undefined,fill:hi?'FFD1E3':undefined}},
+          {text:fi(c.idleEvents),options:{align:'right',fontFace:'Consolas'}},
+          {text:fi(c.idleCN),options:{align:'right',fontFace:'Consolas',color:c.idleCN>0?C.orange:undefined}}
+        ];}));
+      s.addTable(data,{x:0.4,y:1.15,w:12.5,colW:[0.5,1.4,0.9,1.4,0.9,0.9,1.2,1.4,1.4,1.5],rowH:0.42,fontSize:12,fontFace:'微軟正黑體',border:{color:C.lineGray,pt:0.5}});
+      s.addText('粉紅標示為含「嚴重(D)」之課別。',{x:0.4,y:6.9,w:12.5,h:0.3,fontSize:10,fontFace:'微軟正黑體',color:C.mute,italic:true});
+    }}
+
+  // === Slides 5+: 每課 ===
+  courses.forEach(c=>{const s=pptx.addSlide();addTitle(s,'課別深度分析 — '+c.name+(c.sevN>0?'　⚠ 含嚴重 '+c.sevN+' 件':''),dateLabel);
+    // 摘要
+    s.addText('評等 '+(c.agg.grade||'–')+' · 平均總分 '+f1(c.agg.score)+' 分 · '+c.branchCount+' 站 · '+c.groupCount+' 組 · 異常 '+c.anomCount+' 件 · 嚴重(D) '+c.sevN+' 件 · 怠速 '+c.idleEvents+' 件',
+      {x:0.45,y:1.05,w:12.5,h:0.45,fontSize:13,fontFace:'微軟正黑體',color:C.dark});
+    const groups=aggByGroup(wk,c.name);
+    if(!groups.length){s.addText('本區間此課無資料。',{x:0.5,y:3,w:12.3,h:0.5,fontSize:14,fontFace:'微軟正黑體',color:C.mute,align:'center'});return;}
+    const head=['#','組','評等','平均總分','站數','異常','嚴重(D)','怠速事件','怠速重度(C) 人'];
+    const data=[head.map(t=>({text:t,options:{bold:true,fill:C.headBg,align:'center'}}))]
+      .concat(groups.map((g,i)=>{const hi=g.sevN>0;return [
+        {text:String(i+1),options:{align:'center'}},
+        {text:g.name,options:{bold:true}},
+        {text:g.agg.grade||'–',options:{align:'center',bold:true}},
+        {text:f1(g.agg.score),options:{align:'right',fontFace:'Consolas',bold:true}},
+        {text:fi(g.branchCount),options:{align:'right',fontFace:'Consolas'}},
+        {text:fi(g.anomCount),options:{align:'right',fontFace:'Consolas'}},
+        {text:fi(g.sevN),options:{align:'right',fontFace:'Consolas',bold:true,color:hi?C.bad:undefined,fill:hi?'FFD1E3':undefined}},
+        {text:fi(g.idleEvents),options:{align:'right',fontFace:'Consolas'}},
+        {text:fi(g.idleCN),options:{align:'right',fontFace:'Consolas',color:g.idleCN>0?C.orange:undefined}}
+      ];}));
+    s.addTable(data,{x:0.4,y:1.6,w:12.5,colW:[0.5,2.0,0.9,1.5,1.0,1.4,1.5,1.6,2.1],rowH:0.42,fontSize:12,fontFace:'微軟正黑體',border:{color:C.lineGray,pt:0.5}});
+  });
+
+  // === 重點關注：嚴重站 TOP 5 ===
+  {const s=pptx.addSlide();addTitle(s,'需重點關注的站（嚴重(D) TOP 5）',dateLabel);
+    if(!sevStations.length){s.addText('本區間無嚴重(D)等級超速事件。',{x:0.5,y:3,w:12.3,h:0.5,fontSize:18,fontFace:'微軟正黑體',color:C.good,align:'center',bold:true});}
+    else{
+      const head=['#','課','組','站','嚴重(D) 件','異常合計','怠速事件'];
+      const data=[head.map(t=>({text:t,options:{bold:true,fill:C.headBg,align:'center'}}))]
+        .concat(sevStations.map((o,i)=>[
+          {text:String(i+1),options:{align:'center'}},
+          {text:o.course},
+          {text:o.group},
+          {text:o.branch,options:{bold:true,color:C.bad}},
+          {text:fi(o.sevN),options:{align:'right',bold:true,fontFace:'Consolas',color:C.bad}},
+          {text:fi(o.anomN),options:{align:'right',fontFace:'Consolas'}},
+          {text:fi(o.idleEvents),options:{align:'right',fontFace:'Consolas'}}
+        ]));
+      s.addTable(data,{x:0.4,y:1.2,w:12.5,colW:[0.6,1.6,1.6,2.0,2.0,2.2,2.5],rowH:0.5,fontSize:13,fontFace:'微軟正黑體',border:{color:C.lineGray,pt:0.5}});
+    }}
+
+  // === 駕駛 TOP 10 ===
+  {const s=pptx.addSlide();addTitle(s,'需重點關注的駕駛（TOP 10）',dateLabel);
+    if(!topDr.length){s.addText('本區間沒有資料。',{x:0.5,y:3,w:12.3,h:0.5,fontSize:14,fontFace:'微軟正黑體',color:C.mute,align:'center'});}
+    else{
+      const head=['#','課','站','駕駛','車號','異常','嚴重(D)','累計怠速','最高時速'];
+      const data=[head.map(t=>({text:t,options:{bold:true,fill:C.headBg,align:'center'}}))]
+        .concat(topDr.map((d,i)=>{const hi=d.sevN>0;return [
+          {text:String(i+1),options:{align:'center'}},
+          {text:d.course},
+          {text:d.branch},
+          {text:d.driver,options:{bold:true}},
+          {text:d.plate,options:{fontFace:'Consolas'}},
+          {text:fi(d.anomN),options:{align:'right',bold:true,fontFace:'Consolas'}},
+          {text:fi(d.sevN),options:{align:'right',fontFace:'Consolas',bold:true,color:hi?C.bad:undefined,fill:hi?'FFD1E3':undefined}},
+          {text:d.idleMin?idleFmt(d.idleMin):'–',options:{align:'right',fontFace:'Consolas',color:d.idleMin>=145?C.orange:undefined}},
+          {text:d.maxSpeed?(d.maxSpeed+' km/hr'):'–',options:{align:'right',fontFace:'Consolas'}}
+        ];}));
+      s.addTable(data,{x:0.3,y:1.15,w:12.7,colW:[0.5,1.3,1.3,1.6,1.4,1.0,1.2,1.7,1.7],rowH:0.42,fontSize:11.5,fontFace:'微軟正黑體',border:{color:C.lineGray,pt:0.5}});
+    }}
+
+  // === 嚴重(D)事件清單 ===
+  {const s=pptx.addSlide();addTitle(s,'超速嚴重(D) 事件清單',dateLabel+' · 共 '+wk.sevD.length+' 件');
+    if(!wk.sevD.length){s.addText('本區間無嚴重(D)等級超速事件。 ✓',{x:0.5,y:3,w:12.3,h:0.5,fontSize:20,fontFace:'微軟正黑體',color:C.good,align:'center',bold:true});}
+    else{
+      const list=wk.sevD.slice().sort((a,b)=>num(b.over)-num(a.over)).slice(0,18); // 至多 18 筆/頁
+      const head=['日期','課','站','駕駛','車號','法定','最高','超過(km)','地點'];
+      const data=[head.map(t=>({text:t,options:{bold:true,fill:C.headBg,align:'center'}}))]
+        .concat(list.map(r=>[
+          {text:r.date,options:{fontFace:'Consolas'}},
+          {text:courseOf(r.branch)},
+          {text:r.branch},
+          {text:r.driver,options:{bold:true}},
+          {text:r.plate,options:{fontFace:'Consolas'}},
+          {text:fi(num(r.legal)),options:{align:'right',fontFace:'Consolas'}},
+          {text:fi(num(r.maxSpeed)),options:{align:'right',fontFace:'Consolas',bold:true,color:C.bad}},
+          {text:'+'+fi(num(r.over)),options:{align:'right',fontFace:'Consolas',bold:true,color:C.bad}},
+          {text:txt(r.location)||'–',options:{fontSize:10}}
+        ]));
+      s.addTable(data,{x:0.25,y:1.15,w:12.85,colW:[1.3,1.0,1.0,1.2,1.2,0.8,0.9,1.1,3.3],rowH:0.32,fontSize:10.5,fontFace:'微軟正黑體',border:{color:C.lineGray,pt:0.5}});
+      if(wk.sevD.length>18)s.addText('共 '+wk.sevD.length+' 件，本頁顯示前 18 件（依超過 km 排序）',{x:0.5,y:7.0,w:12.3,h:0.3,fontSize:10,fontFace:'微軟正黑體',color:C.mute,italic:true});
+    }}
+
+  // === 怠速重度(C)清單 ===
+  {const s=pptx.addSlide();addTitle(s,'怠速重度(C) 駕駛清單',dateLabel+' · 累計 ≥ 2時25分');
+    if(!wk.idleC.length){s.addText('本區間無怠速重度(C)駕駛。 ✓',{x:0.5,y:3,w:12.3,h:0.5,fontSize:20,fontFace:'微軟正黑體',color:C.good,align:'center',bold:true});}
+    else{
+      const list=wk.idleC.slice().sort((a,b)=>b.min-a.min);
+      const head=['#','課','站','駕駛','車號','累計怠速','建議處置','建議懲處'];
+      const data=[head.map(t=>({text:t,options:{bold:true,fill:C.headBg,align:'center'}}))]
+        .concat(list.map((p,i)=>[
+          {text:String(i+1),options:{align:'center'}},
+          {text:courseOf(p.branch)},
+          {text:p.branch},
+          {text:p.driver,options:{bold:true}},
+          {text:p.plate,options:{fontFace:'Consolas'}},
+          {text:idleFmt(p.min),options:{align:'right',fontFace:'Consolas',bold:true,color:C.orange}},
+          {text:p.tier.disp},
+          {text:p.tier.disc}
+        ]));
+      s.addTable(data,{x:0.4,y:1.15,w:12.5,colW:[0.5,1.4,1.4,1.8,1.4,2.0,2.0,2.0],rowH:0.4,fontSize:12,fontFace:'微軟正黑體',border:{color:C.lineGray,pt:0.5}});
+    }}
+
+  // === 下週改善建議 ===
+  {const s=pptx.addSlide();addTitle(s,'下週改善建議 / 行動清單',dateLabel);
+    s.addShape('roundRect',{x:0.5,y:1.2,w:12.3,h:1.7,rectRadius:0.1,fill:{color:'FFFFFF'},line:{color:C.lineGray,width:1}});
+    s.addText('本週重點關注',{x:0.7,y:1.32,w:6,h:0.4,fontSize:14,fontFace:'微軟正黑體',bold:true,color:C.pink});
+    const bullets=[];
+    if(wk.sevD.length>0)bullets.push('· 嚴重(D) '+wk.sevD.length+' 件，需立即面談、開立改善單');
+    if(sevStations.length)bullets.push('· 重點關注站：'+sevStations.slice(0,3).map(o=>o.branch+'('+o.sevN+')').join('、'));
+    if(wk.idleC.length>0)bullets.push('· 怠速重度(C) '+wk.idleC.length+' 位駕駛須開立改善單');
+    if(wk.pending.length>0)bullets.push('· 仍有 '+wk.pending.length+' 筆異常待處理，應於下週前完成');
+    if(!bullets.length)bullets.push('· 本週無嚴重事件，請持續維持。');
+    s.addText(bullets.join('\n'),{x:0.7,y:1.65,w:11.8,h:1.2,fontSize:13,fontFace:'微軟正黑體',color:C.dark,lineSpacingMultiple:1.4});
+    s.addShape('roundRect',{x:0.5,y:3.1,w:12.3,h:1.7,rectRadius:0.1,fill:{color:'FFFFFF'},line:{color:C.lineGray,width:1}});
+    s.addText('下週改善目標（會議現場填寫）',{x:0.7,y:3.22,w:8,h:0.4,fontSize:14,fontFace:'微軟正黑體',bold:true,color:C.pink});
+    s.addText('1.\n2.\n3.',{x:0.7,y:3.6,w:11.8,h:1.1,fontSize:13,fontFace:'微軟正黑體',color:C.mute,lineSpacingMultiple:1.6});
+    s.addShape('roundRect',{x:0.5,y:5.0,w:12.3,h:1.7,rectRadius:0.1,fill:{color:'FFFFFF'},line:{color:C.lineGray,width:1}});
+    s.addText('備註',{x:0.7,y:5.12,w:6,h:0.4,fontSize:14,fontFace:'微軟正黑體',bold:true,color:C.pink});
+    s.addText(' ',{x:0.7,y:5.5,w:11.8,h:1.1,fontSize:13,fontFace:'微軟正黑體',color:C.mute});}
+
+  const fname='富昇物流_駕駛行為週報_'+start.replace(/-/g,'')+'_'+end.replace(/-/g,'')+'.pptx';
+  await pptx.writeFile({fileName:fname});
+  toast('PPT 已產出',fname);
+}
+
+// 開啟「週報區間」對話框
+function openWeeklyPicker(){
+  const dates=Object.keys(DAILY.days).concat(ANOM.records.map(r=>txt(r.date)).filter(Boolean));
+  const allDates=[...new Set(dates)].sort();
+  if(!allDates.length){toast('尚無資料可產出','請先匯入資料','warn');return;}
+  const latest=allDates[allDates.length-1];const defStart=addDays(latest,-6);
+  const body='<div style="display:flex;flex-direction:column;gap:14px;padding:6px 4px">'+
+    '<div style="color:var(--muted);font-size:calc(13px*var(--fs))">選擇週報區間（系統會自動抓相同長度的前一段作為「上週」比較）</div>'+
+    '<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:end">'+
+      '<div class="field"><label>起始日</label><input type="date" id="pptStart" value="'+defStart+'" min="'+allDates[0]+'" max="'+latest+'"></div>'+
+      '<div class="field"><label>結束日</label><input type="date" id="pptEnd" value="'+latest+'" min="'+allDates[0]+'" max="'+latest+'"></div>'+
+      '<button class="btn primary" id="pptDoGen" type="button">產出 PPT</button>'+
+    '</div>'+
+    '<div id="pptStatus" style="font-size:calc(12.5px*var(--fs));color:var(--muted)">已匯入資料範圍：'+fmtDate(allDates[0])+' ~ '+fmtDate(latest)+'（共 '+allDates.length+' 天有資料）</div>'+
+    '</div>';
+  openModal('產出每週分析 PPT',body);
+  setTimeout(()=>{
+    const btn=$('#pptDoGen');if(!btn)return;
+    btn.onclick=async()=>{
+      const a=$('#pptStart').value,b=$('#pptEnd').value;
+      if(!a||!b){toast('請選擇起始與結束日','','warn');return;}
+      if(a>b){toast('起始日不可晚於結束日','','warn');return;}
+      btn.disabled=true;const orig=btn.textContent;btn.textContent='產生中（首次需載入函式庫，約 5~15 秒）…';
+      try{await generateWeeklyPPT(a,b);$('#modal').classList.remove('show');}
+      catch(err){toast('產出失敗',err.message||String(err),'warn');}
+      finally{btn.disabled=false;btn.textContent=orig;}
+    };
+  },50);
+}
+$('#pptGen').onclick=openWeeklyPicker;
+
 
 /* ---------- init + auto refresh ---------- */
 (async()=>{

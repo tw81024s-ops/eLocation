@@ -1534,6 +1534,20 @@ function aggByGroup(wk,courseName){
     return {name:g.name,agg,branchCount:g.branches.size,anomCount,sevN,idleEvents,idleCN};
   }).sort((a,b)=>b.agg.score-a.agg.score);
 }
+// 站別（某課內），帶組別資訊，依組+分數排序
+function aggByBranchInCourse(wk,courseName){
+  const map={};
+  wk.branchDays.filter(b=>courseOf(b.branch)===courseName).forEach(b=>{const m=map[b.branch]=map[b.branch]||{name:b.branch,group:groupOf(b.branch),branchDays:[]};m.branchDays.push(b);});
+  const sevByBr={};wk.sevD.forEach(r=>{sevByBr[r.branch]=(sevByBr[r.branch]||0)+1;});
+  return Object.values(map).map(o=>{
+    const agg=aggBranches(o.branchDays);
+    const sevN=sevByBr[o.name]||0;
+    const idleEvents=wk.idles.filter(r=>r.branch===o.name).length;
+    const idleCN=wk.idleC.filter(p=>p.branch===o.name).length;
+    const anomCount=wk.anoms.filter(r=>r.branch===o.name).length;
+    return {name:o.name,group:o.group,agg,anomCount,sevN,idleEvents,idleCN};
+  }).sort((a,b)=>{if(a.group!==b.group)return String(a.group).localeCompare(String(b.group),'zh-Hant');return b.agg.score-a.agg.score;});
+}
 // 站別 TOP（依嚴重件數）
 function topStationsBySev(wk,n){
   const byBr={};
@@ -1620,16 +1634,16 @@ async function generateWeeklyPPT(start,end){
     s.addText('註：「改善/退步」以該指標方向判定（分數越高越好；異常/嚴重/待處理/怠速越低越好）。',
       {x:0.45,y:5.0,w:12.3,h:0.35,fontSize:10,fontFace:'微軟正黑體',color:C.mute,italic:true});}
 
-  // === Slide 3: 公司整體評等 ===
+  // === Slide 3: 公司整體評等（含安全指數雷達圖）===
   {const s=pptx.addSlide();addTitle(s,'公司整體安全評等',dateLabel);
     if(ov){
-      // 評等大圓
+      // 左上：評等大圓
       const gColor=ov.grade==='A'?C.good:ov.grade==='B'?'6CC24A':ov.grade==='C'?C.warn:ov.grade==='D'?C.orange:C.bad;
-      s.addShape('ellipse',{x:0.8,y:1.5,w:2.4,h:2.4,fill:{color:gColor},line:{color:gColor}});
-      s.addText(ov.grade||'–',{x:0.8,y:1.5,w:2.4,h:2.4,fontSize:90,fontFace:'微軟正黑體',bold:true,color:'FFFFFF',align:'center',valign:'middle'});
-      s.addText('平均總分',{x:3.6,y:1.6,w:3,h:0.5,fontSize:16,fontFace:'微軟正黑體',color:C.mute,bold:true});
-      s.addText(f1(ov.score)+' 分',{x:3.6,y:2.1,w:5,h:1.2,fontSize:54,fontFace:'Consolas',bold:true,color:C.pink});
-      // 4 指標表
+      s.addShape('ellipse',{x:0.7,y:1.4,w:2.0,h:2.0,fill:{color:gColor},line:{color:gColor}});
+      s.addText(ov.grade||'–',{x:0.7,y:1.4,w:2.0,h:2.0,fontSize:78,fontFace:'微軟正黑體',bold:true,color:'FFFFFF',align:'center',valign:'middle'});
+      s.addText('平均總分',{x:3.0,y:1.5,w:3,h:0.5,fontSize:14,fontFace:'微軟正黑體',color:C.mute,bold:true});
+      s.addText(f1(ov.score)+' 分',{x:3.0,y:2.0,w:4.5,h:1.3,fontSize:48,fontFace:'Consolas',bold:true,color:C.pink});
+      // 左下：4 指標表
       const rows=[
         ['超速(40%)',f1(ov.speedR)+' 次/100KM',scoreToGrade(metScore(ov,'speed'))],
         ['急轉彎(30%)',f1(ov.turnR)+' 次/100KM',scoreToGrade(metScore(ov,'turn'))],
@@ -1639,15 +1653,22 @@ async function generateWeeklyPPT(start,end){
       s.addTable([
         [{text:'項目(權重)',options:{bold:true,fill:C.headBg}},{text:'發生率',options:{bold:true,fill:C.headBg}},{text:'等級',options:{bold:true,fill:C.headBg,align:'center'}}]
       ].concat(rows.map(r=>[{text:r[0]},{text:r[1],options:{align:'right',fontFace:'Consolas'}},{text:r[2]||'–',options:{align:'center',bold:true,color:C.pink}}])),
-        {x:0.5,y:4.3,w:7,colW:[2.6,2.6,1.8],rowH:0.4,fontSize:13,fontFace:'微軟正黑體',border:{color:C.lineGray,pt:0.5}});
-      // 站/車/異常
+        {x:0.5,y:4.0,w:7,colW:[2.6,2.6,1.8],rowH:0.4,fontSize:13,fontFace:'微軟正黑體',border:{color:C.lineGray,pt:0.5}});
+      // 右上：安全指數雷達圖
+      s.addChart('radar',[{name:'安全指數',labels:['超速','急轉彎','急減速','急加速'],values:[metScore(ov,'speed'),metScore(ov,'turn'),metScore(ov,'decel'),metScore(ov,'accel')]}],
+        {x:7.7,y:1.2,w:5.4,h:4.2,radarStyle:'filled',chartColors:[C.pink],chartColorsOpacity:35,
+         showTitle:true,title:'安全指數雷達（0~100）',titleFontFace:'微軟正黑體',titleFontSize:13,titleColor:C.pink,
+         catAxisLabelFontFace:'微軟正黑體',catAxisLabelFontSize:12,catAxisLabelColor:C.dark,
+         valAxisMinVal:0,valAxisMaxVal:100,valAxisLabelFontSize:9,valAxisLabelColor:C.mute,
+         showLegend:false});
+      // 右下：統計
       const stats=[['統計天數',daysBetween(start,end)+' 天'],['資料站所',ov.vehicles?(allBranches().length+' 站'):'–'],['里程合計',fi(ov.km)+' KM'],['異常合計',fi(ov.count)+' 件'],['嚴重(D)',fi(wk.sevD.length)+' 件']];
-      stats.forEach((st,i)=>{const x=8.3,y=1.6+i*0.55;
-        s.addText(st[0],{x:x,y:y,w:1.8,h:0.45,fontSize:11,fontFace:'微軟正黑體',color:C.mute,bold:true});
-        s.addText(st[1],{x:x+1.8,y:y,w:2.8,h:0.45,fontSize:14,fontFace:'Consolas',bold:true,color:C.dark});});
+      stats.forEach((st,i)=>{const col=i%3,row=Math.floor(i/3);const x=7.7+col*1.8,y=5.55+row*0.65;
+        s.addText(st[0],{x:x,y:y,w:1.7,h:0.28,fontSize:10,fontFace:'微軟正黑體',color:C.mute,bold:true});
+        s.addText(st[1],{x:x,y:y+0.26,w:1.7,h:0.36,fontSize:13,fontFace:'Consolas',bold:true,color:C.dark});});
     }else{s.addText('本區間沒有可彙整的每日統計資料。',{x:0.5,y:3,w:12.3,h:0.5,fontSize:16,fontFace:'微軟正黑體',color:C.mute,align:'center'});}}
 
-  // === Slide 4: 課別排名 ===
+  // === Slide 4: 課別排名（含長條圖）===
   {const s=pptx.addSlide();addTitle(s,'課別安全排名',dateLabel);
     if(!courses.length){s.addText('本區間沒有資料。',{x:0.5,y:3,w:12.3,h:0.5,fontSize:16,fontFace:'微軟正黑體',color:C.mute,align:'center'});}
     else{
@@ -1665,19 +1686,32 @@ async function generateWeeklyPPT(start,end){
           {text:fi(c.idleEvents),options:{align:'right',fontFace:'Consolas'}},
           {text:fi(c.idleCN),options:{align:'right',fontFace:'Consolas',color:c.idleCN>0?C.orange:undefined}}
         ];}));
-      s.addTable(data,{x:0.4,y:1.15,w:12.5,colW:[0.5,1.4,0.9,1.4,0.9,0.9,1.2,1.4,1.4,1.5],rowH:0.42,fontSize:12,fontFace:'微軟正黑體',border:{color:C.lineGray,pt:0.5}});
-      s.addText('粉紅標示為含「嚴重(D)」之課別。',{x:0.4,y:6.9,w:12.5,h:0.3,fontSize:10,fontFace:'微軟正黑體',color:C.mute,italic:true});
+      // 壓縮表格高度（讓圖表有空間）
+      s.addTable(data,{x:0.4,y:1.1,w:12.5,colW:[0.5,1.6,1.0,1.5,1.0,1.0,1.3,1.5,1.5,1.6],rowH:0.36,fontSize:11.5,fontFace:'微軟正黑體',border:{color:C.lineGray,pt:0.5}});
+      // 長條圖：各課平均總分（依分數降序，與表格同序）
+      const tableBottom=1.1+0.36*(courses.length+1)+0.15;
+      s.addChart('bar',[{name:'平均總分',labels:courses.map(c=>c.name),values:courses.map(c=>+f1(c.agg.score))}],
+        {x:0.5,y:tableBottom,w:12.3,h:7.0-tableBottom-0.1,
+         barDir:'bar',chartColors:[C.pink],
+         showTitle:true,title:'各課平均總分（橫軸為分數，越長越好）',titleFontFace:'微軟正黑體',titleFontSize:13,titleColor:C.pink,
+         catAxisLabelFontFace:'微軟正黑體',catAxisLabelFontSize:11,catAxisLabelColor:C.dark,
+         valAxisMinVal:60,valAxisMaxVal:100,valAxisLabelFontFace:'Consolas',valAxisLabelFontSize:9,valAxisLabelColor:C.mute,
+         showValue:true,dataLabelFontFace:'Consolas',dataLabelFontSize:11,dataLabelColor:C.dark,dataLabelPosition:'outEnd',
+         showLegend:false,catAxisOrderReverse:true});
     }}
 
-  // === Slides 5+: 每課 ===
+  // === Slides 5+: 每課（組摘要+組分數圖 / 各站明細）===
   courses.forEach(c=>{const s=pptx.addSlide();addTitle(s,'課別深度分析 — '+c.name+(c.sevN>0?'　⚠ 含嚴重 '+c.sevN+' 件':''),dateLabel);
-    // 摘要
+    // 摘要列
     s.addText('評等 '+(c.agg.grade||'–')+' · 平均總分 '+f1(c.agg.score)+' 分 · '+c.branchCount+' 站 · '+c.groupCount+' 組 · 異常 '+c.anomCount+' 件 · 嚴重(D) '+c.sevN+' 件 · 怠速 '+c.idleEvents+' 件',
-      {x:0.45,y:1.05,w:12.5,h:0.45,fontSize:13,fontFace:'微軟正黑體',color:C.dark});
+      {x:0.45,y:1.0,w:12.5,h:0.4,fontSize:13,fontFace:'微軟正黑體',color:C.dark});
     const groups=aggByGroup(wk,c.name);
-    if(!groups.length){s.addText('本區間此課無資料。',{x:0.5,y:3,w:12.3,h:0.5,fontSize:14,fontFace:'微軟正黑體',color:C.mute,align:'center'});return;}
-    const head=['#','組','評等','平均總分','站數','異常','嚴重(D)','怠速事件','怠速重度(C) 人'];
-    const data=[head.map(t=>({text:t,options:{bold:true,fill:C.headBg,align:'center'}}))]
+    const stations=aggByBranchInCourse(wk,c.name);
+    if(!groups.length&&!stations.length){s.addText('本區間此課無資料。',{x:0.5,y:3,w:12.3,h:0.5,fontSize:14,fontFace:'微軟正黑體',color:C.mute,align:'center'});return;}
+    // 左：各組摘要表 ──
+    s.addText('各組摘要',{x:0.45,y:1.5,w:6,h:0.3,fontSize:12,fontFace:'微軟正黑體',bold:true,color:C.pink});
+    const gHead=['#','組','評等','分數','站數','異常','嚴重','怠速'];
+    const gData=[gHead.map(t=>({text:t,options:{bold:true,fill:C.headBg,align:'center'}}))]
       .concat(groups.map((g,i)=>{const hi=g.sevN>0;return [
         {text:String(i+1),options:{align:'center'}},
         {text:g.name,options:{bold:true}},
@@ -1686,13 +1720,42 @@ async function generateWeeklyPPT(start,end){
         {text:fi(g.branchCount),options:{align:'right',fontFace:'Consolas'}},
         {text:fi(g.anomCount),options:{align:'right',fontFace:'Consolas'}},
         {text:fi(g.sevN),options:{align:'right',fontFace:'Consolas',bold:true,color:hi?C.bad:undefined,fill:hi?'FFD1E3':undefined}},
-        {text:fi(g.idleEvents),options:{align:'right',fontFace:'Consolas'}},
-        {text:fi(g.idleCN),options:{align:'right',fontFace:'Consolas',color:g.idleCN>0?C.orange:undefined}}
+        {text:fi(g.idleEvents),options:{align:'right',fontFace:'Consolas'}}
       ];}));
-    s.addTable(data,{x:0.4,y:1.6,w:12.5,colW:[0.5,2.0,0.9,1.5,1.0,1.4,1.5,1.6,2.1],rowH:0.42,fontSize:12,fontFace:'微軟正黑體',border:{color:C.lineGray,pt:0.5}});
+    s.addTable(gData,{x:0.4,y:1.8,w:6.5,colW:[0.5,1.5,0.8,1.0,0.8,0.8,0.6,0.5],rowH:0.34,fontSize:11,fontFace:'微軟正黑體',border:{color:C.lineGray,pt:0.5}});
+    // 右：各組分數長條圖 ──
+    if(groups.length){
+      s.addChart('bar',[{name:'平均總分',labels:groups.map(g=>g.name),values:groups.map(g=>+f1(g.agg.score))}],
+        {x:7.1,y:1.5,w:5.9,h:2.0,
+         barDir:'bar',chartColors:[C.pink],
+         showTitle:true,title:'各組平均總分',titleFontFace:'微軟正黑體',titleFontSize:12,titleColor:C.pink,
+         catAxisLabelFontFace:'微軟正黑體',catAxisLabelFontSize:10,catAxisLabelColor:C.dark,
+         valAxisMinVal:60,valAxisMaxVal:100,valAxisLabelFontFace:'Consolas',valAxisLabelFontSize:8,valAxisLabelColor:C.mute,
+         showValue:true,dataLabelFontFace:'Consolas',dataLabelFontSize:10,dataLabelColor:C.dark,dataLabelPosition:'outEnd',
+         showLegend:false,catAxisOrderReverse:true});
+    }
+    // ── 各站明細 ──
+    const stY=Math.max(1.8+0.34*(1+groups.length)+0.2, 3.7);
+    s.addText('各站明細（依組分組、組內依平均總分排序）',{x:0.45,y:stY,w:10,h:0.3,fontSize:12,fontFace:'微軟正黑體',bold:true,color:C.pink});
+    const sHead=['#','組','站','評等','平均總分','異常','嚴重(D)','怠速','怠速重度(C) 人'];
+    const sData=[sHead.map(t=>({text:t,options:{bold:true,fill:C.headBg,align:'center'}}))]
+      .concat(stations.map((o,i)=>{const hi=o.sevN>0;return [
+        {text:String(i+1),options:{align:'center'}},
+        {text:o.group,options:{color:C.mute,fontSize:10.5}},
+        {text:o.name,options:{bold:true}},
+        {text:o.agg.grade||'–',options:{align:'center',bold:true}},
+        {text:f1(o.agg.score),options:{align:'right',fontFace:'Consolas',bold:true}},
+        {text:fi(o.anomCount),options:{align:'right',fontFace:'Consolas'}},
+        {text:fi(o.sevN),options:{align:'right',fontFace:'Consolas',bold:true,color:hi?C.bad:undefined,fill:hi?'FFD1E3':undefined}},
+        {text:fi(o.idleEvents),options:{align:'right',fontFace:'Consolas'}},
+        {text:fi(o.idleCN),options:{align:'right',fontFace:'Consolas',color:o.idleCN>0?C.orange:undefined}}
+      ];}));
+    const availH=7.1-(stY+0.35);const rowsN=stations.length+1;
+    const rowH=Math.max(0.26,Math.min(0.4,availH/rowsN));
+    s.addTable(sData,{x:0.4,y:stY+0.35,w:12.5,colW:[0.5,1.7,2.0,0.9,1.5,1.4,1.5,1.4,1.6],rowH,fontSize:rowH<0.32?10:11,fontFace:'微軟正黑體',border:{color:C.lineGray,pt:0.5}});
   });
 
-  // === 重點關注：嚴重站 TOP 5 ===
+  // === 重點關注：嚴重站 TOP 5（含長條圖）===
   {const s=pptx.addSlide();addTitle(s,'需重點關注的站（嚴重(D) TOP 5）',dateLabel);
     if(!sevStations.length){s.addText('本區間無嚴重(D)等級超速事件。',{x:0.5,y:3,w:12.3,h:0.5,fontSize:18,fontFace:'微軟正黑體',color:C.good,align:'center',bold:true});}
     else{
@@ -1707,10 +1770,21 @@ async function generateWeeklyPPT(start,end){
           {text:fi(o.anomN),options:{align:'right',fontFace:'Consolas'}},
           {text:fi(o.idleEvents),options:{align:'right',fontFace:'Consolas'}}
         ]));
-      s.addTable(data,{x:0.4,y:1.2,w:12.5,colW:[0.6,1.6,1.6,2.0,2.0,2.2,2.5],rowH:0.5,fontSize:13,fontFace:'微軟正黑體',border:{color:C.lineGray,pt:0.5}});
+      // 表格壓縮
+      s.addTable(data,{x:0.4,y:1.15,w:12.5,colW:[0.6,1.6,1.6,2.0,2.0,2.2,2.5],rowH:0.4,fontSize:12,fontFace:'微軟正黑體',border:{color:C.lineGray,pt:0.5}});
+      const tableBottom=1.15+0.4*(sevStations.length+1)+0.2;
+      // 長條圖：嚴重(D)件數
+      s.addChart('bar',[{name:'嚴重(D) 件',labels:sevStations.map(o=>o.branch),values:sevStations.map(o=>o.sevN)}],
+        {x:0.5,y:tableBottom,w:12.3,h:7.0-tableBottom-0.1,
+         barDir:'bar',chartColors:[C.bad],
+         showTitle:true,title:'各站嚴重(D)件數',titleFontFace:'微軟正黑體',titleFontSize:13,titleColor:C.bad,
+         catAxisLabelFontFace:'微軟正黑體',catAxisLabelFontSize:12,catAxisLabelColor:C.dark,
+         valAxisMinVal:0,valAxisLabelFontFace:'Consolas',valAxisLabelFontSize:9,valAxisLabelColor:C.mute,
+         showValue:true,dataLabelFontFace:'Consolas',dataLabelFontSize:11,dataLabelColor:C.dark,dataLabelPosition:'outEnd',
+         showLegend:false,catAxisOrderReverse:true});
     }}
 
-  // === 駕駛 TOP 10 ===
+  // === 駕駛 TOP 10（含長條圖）===
   {const s=pptx.addSlide();addTitle(s,'需重點關注的駕駛（TOP 10）',dateLabel);
     if(!topDr.length){s.addText('本區間沒有資料。',{x:0.5,y:3,w:12.3,h:0.5,fontSize:14,fontFace:'微軟正黑體',color:C.mute,align:'center'});}
     else{
@@ -1727,7 +1801,18 @@ async function generateWeeklyPPT(start,end){
           {text:d.idleMin?idleFmt(d.idleMin):'–',options:{align:'right',fontFace:'Consolas',color:d.idleMin>=145?C.orange:undefined}},
           {text:d.maxSpeed?(d.maxSpeed+' km/hr'):'–',options:{align:'right',fontFace:'Consolas'}}
         ];}));
-      s.addTable(data,{x:0.3,y:1.15,w:12.7,colW:[0.5,1.3,1.3,1.6,1.4,1.0,1.2,1.7,1.7],rowH:0.42,fontSize:11.5,fontFace:'微軟正黑體',border:{color:C.lineGray,pt:0.5}});
+      s.addTable(data,{x:0.3,y:1.1,w:12.7,colW:[0.5,1.4,1.4,1.6,1.5,1.0,1.2,1.7,1.7],rowH:0.32,fontSize:11,fontFace:'微軟正黑體',border:{color:C.lineGray,pt:0.5}});
+      const tableBottom=1.1+0.32*(topDr.length+1)+0.15;
+      // 長條圖：異常筆數 (有嚴重的紅色，否則粉色)
+      const colorsByBar=topDr.map(d=>d.sevN>0?C.bad:C.pink);
+      s.addChart('bar',[{name:'異常筆數',labels:topDr.map(d=>d.driver+(d.plate?'('+d.plate+')':'')),values:topDr.map(d=>d.anomN)}],
+        {x:0.5,y:tableBottom,w:12.3,h:7.0-tableBottom-0.1,
+         barDir:'bar',chartColors:[C.pink],
+         showTitle:true,title:'TOP 10 駕駛異常筆數',titleFontFace:'微軟正黑體',titleFontSize:13,titleColor:C.pink,
+         catAxisLabelFontFace:'微軟正黑體',catAxisLabelFontSize:10,catAxisLabelColor:C.dark,
+         valAxisMinVal:0,valAxisLabelFontFace:'Consolas',valAxisLabelFontSize:9,valAxisLabelColor:C.mute,
+         showValue:true,dataLabelFontFace:'Consolas',dataLabelFontSize:10,dataLabelColor:C.dark,dataLabelPosition:'outEnd',
+         showLegend:false,catAxisOrderReverse:true});
     }}
 
   // === 嚴重(D)事件清單 ===

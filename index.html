@@ -757,7 +757,7 @@ function renderKpis(){
   const orgN=orgBranches.length;
   const dataBranches=new Set(allBranches());
   const coveredN=orgBranches.filter(b=>dataBranches.has(b)).length;
-  const stationSub=(coveredN===orgN)?(DAILY.dept+' · 編制 '+orgN+' 全有資料'):(DAILY.dept+' · 編制 '+orgN+' / 有資料 '+coveredN);
+  const stationSub=(coveredN===orgN)?('編制 '+orgN+' · 全有資料'):('編制 '+orgN+' · 有資料 '+coveredN);
   const cards=[['c1','統計天數',dates.length+'<small> 天</small>',dates.length?dates[0]+' ~ '+latest:'',''],
     ['c2','站所數',orgN+'<small> 站</small>',stationSub,''],
     ['c3','異常事件',anomN+'<small> 筆</small>','點擊查看明細 →','detail'],

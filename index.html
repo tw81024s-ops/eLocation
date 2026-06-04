@@ -296,6 +296,11 @@ td.b{font-weight:700}
 .dcard.severe-bg{background:linear-gradient(180deg,#ffd1e3 0%,#ffbbd0 100%);border-color:var(--bad);box-shadow:0 6px 18px rgba(224,39,73,.16)}
 .dcard.severe-bg.clickable:hover{box-shadow:0 10px 24px rgba(224,39,73,.28);border-color:var(--bad)}
 .sev-flag{display:inline-block;background:var(--bad);color:#fff;font-size:calc(10.5px*var(--fs));font-weight:800;padding:1px 7px;border-radius:6px;margin-left:6px;letter-spacing:.5px}
+#backupBanner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 18px;margin:12px 18px 0;background:linear-gradient(90deg,#FFF7E0 0%,#FFE3EF 100%);border:2px solid #F0A500;border-radius:12px;color:#7a5a00;font-weight:700;font-size:calc(13px*var(--fs));box-shadow:0 4px 14px rgba(240,165,0,.18)}
+#backupBanner b{color:var(--bad)}
+#backupBanner .btn{padding:6px 14px;font-size:calc(12.5px*var(--fs))}
+#backupBanner .restore-btn{background:var(--accent);color:#fff;border:none}
+#backupBanner .restore-btn:hover{background:var(--accent2)}
 .scard .rk{position:absolute;top:4px;right:14px;font-family:var(--mono);font-weight:800;font-size:calc(40px*var(--fs));color:#ffdcec;line-height:1}
 .scard-h{display:flex;align-items:center;gap:13px;margin-bottom:10px}
 .scard-h .gb{width:calc(56px*var(--fs));height:calc(56px*var(--fs));border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-family:var(--mono);font-weight:800;font-size:calc(27px*var(--fs))}
@@ -351,6 +356,8 @@ td.b{font-weight:700}
       <input type="file" id="fileInput" accept=".xlsx,.xls" multiple hidden>
     </div>
   </header>
+
+  <div id="backupBanner" style="display:none"></div>
 
   <div class="kpis" id="kpis"></div>
 
@@ -537,6 +544,45 @@ function parseAnom(aoa){
     recs.push({date:date||'',branch:txt(r[col.branch]),plate,driver,behavior:txt(r[col.behavior]),level:txt(r[col.level]),time:txt(r[col.time]),maxSpeed,location:txt(r[col.loc]),legal:legal||self,selfLimit:self,over,degText:txt(r[col.dt]),degCode:txt(r[col.dc]),disposal:txt(r[col.disp]),disc:txt(r[col.disc])});}
   return recs.length?recs:null;
 }
+// 超速明細匯出（無「行為」欄）：依 等級 / 超速時間 / 道路速限 / 當時時速 / 最大異常值 等欄位辨識
+function parseSpeedDetailAOA(aoa){
+  const hi=findRow(aoa,r=>{const t=r.map(txt);return t.includes('車號')&&t.includes('駕駛')&&t.some(c=>c.includes('道路速限'))&&t.some(c=>c.includes('當時時速'));});
+  if(hi<0)return null;
+  const h=aoa[hi].map(txt);
+  const find=fn=>{for(let i=0;i<h.length;i++)if(fn(h[i]))return i;return -1;};
+  const col={
+    branch:h.indexOf('分公司'),plate:h.indexOf('車號'),driver:h.indexOf('駕駛'),level:h.indexOf('等級'),
+    timeS:find(x=>x.includes('超速時間')&&x.includes('起')),
+    timeE:find(x=>x.includes('超速時間')&&x.includes('迄')),
+    over:find(x=>x.includes('最大異常值')),
+    legal:find(x=>x.includes('道路速限')),
+    max:find(x=>x.includes('當時時速')),
+    loc:find(x=>x.includes('當時位置'))
+  };
+  if(col.plate<0||col.driver<0||col.legal<0||col.max<0)return null;
+  const stripKm=v=>{const s=String(v==null?'':v);const m=s.match(/-?\d+(\.\d+)?/);return m?parseFloat(m[0]):0;};
+  const clean=s=>String(s==null?'':s).replace(/[\s\u00a0]+/g,' ').trim();
+  const recs=[];
+  for(let i=hi+1;i<aoa.length;i++){
+    const r=aoa[i];const plate=clean(r[col.plate]),driver=clean(r[col.driver]);
+    if(!plate||!driver||plate==='車號')continue;
+    const tStr=clean(r[col.timeE>=0?col.timeE:col.timeS]);
+    const dm=tStr.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    const date=dm?(dm[1]+'-'+pad(dm[2])+'-'+pad(dm[3])):'';
+    const max=stripKm(r[col.max]);
+    const legal=stripKm(r[col.legal]);
+    const overRaw=col.over>=0?stripKm(r[col.over]):0;
+    const over=overRaw||Math.max(0,max-legal);
+    recs.push({
+      date,branch:clean(r[col.branch]),plate,driver,
+      behavior:'超速',level:clean(r[col.level]),
+      time:tStr,maxSpeed:max||'',location:clean(r[col.loc]),
+      legal:legal||'',selfLimit:'',over,
+      degText:clean(r[col.level]),degCode:'',disposal:'',disc:''
+    });
+  }
+  return recs.length?recs:null;
+}
 const anomUniq=x=>[x.date,x.plate,x.driver,x.time,x.location,x.maxSpeed].join('|');
 /* === Excel「公式」分類：依 法定限速級距 + 超過km 判定異常程度 === */
 const SEV_CODE={正常:'',輕度:'A',中度:'B',重度:'C',嚴重:'D'};
@@ -594,6 +640,7 @@ async function handleFiles(files){
           dateSet.add(d.date);continue;
         }
         a=parseAnom(aoa);
+        if(!a)a=parseSpeedDetailAOA(aoa);  // 「超速明細」格式 fallback（無「行為」欄）
       }
       if(a){a.forEach(x=>{const isIdle=x.behavior==='怠速';const u=anomUniq(x);
         if(seenInThisImport[u]){isIdle?rep.iDup++:rep.aDup.push(x);return;}        // 同次匯入內重複
@@ -1431,7 +1478,109 @@ function setBusy(b,label){busy=b;const btn=$('#importBtn');btn.disabled=b;$('#re
 $('#importBtn').onclick=()=>{if(!busy)$('#fileInput').click();};
 $('#fileInput').onchange=e=>{if(e.target.files.length)handleFiles([...e.target.files]);e.target.value='';};
 $('#refreshBtn').onclick=async()=>{if(busy)return;if(!ONLINE){toast('本機模式','無雲端後台可更新','warn');return;}setBusy(true,'更新中…');try{await loadAll();lastSig=signature();renderAll();toast('已更新','');}catch(e){setConn('err');toast('更新失敗',String(e.message||e),'err');}setBusy(false);};
-$('#clearBtn').onclick=async()=>{if(busy)return;if(!confirm('確定清除所有已匯入的統計與異常資料？此動作無法復原。'))return;setBusy(true,'清除中…');try{if(ONLINE)await gasPost({type:'clear'});DAILY={dept:DEPT_NAME,days:{}};ANOM={records:[]};if(!ONLINE)saveLocal();else await loadAll();}catch(e){toast('清除失敗',String(e.message||e),'err');}setBusy(false);lastSig=signature();renderAll();toast('已清除全部資料','');};
+/* ===== 清除全部:防呆 + 本機備份/還原 ===== */
+const BACKUP_KEY='fleet_clear_backup_v1';
+function saveBackup(){
+  try{
+    const snap={ts:Date.now(),DAILY:DAILY,ANOM:ANOM};
+    const s=JSON.stringify(snap);
+    localStorage.setItem(BACKUP_KEY,s);
+    return {ok:true,size:s.length};
+  }catch(e){return {ok:false,err:String(e.message||e)};}
+}
+function getBackup(){
+  try{const s=localStorage.getItem(BACKUP_KEY);return s?JSON.parse(s):null;}catch(e){return null;}
+}
+function clearBackup(){try{localStorage.removeItem(BACKUP_KEY);}catch(e){}}
+function refreshBackupBanner(){
+  const b=$('#backupBanner');if(!b)return;
+  const snap=getBackup();
+  if(snap){
+    const ts=new Date(snap.ts);
+    const tstr=ts.getFullYear()+'/'+pad(ts.getMonth()+1)+'/'+pad(ts.getDate())+' '+pad(ts.getHours())+':'+pad(ts.getMinutes());
+    const dc=Object.keys((snap.DAILY&&snap.DAILY.days)||{}).length;
+    const ac=((snap.ANOM&&snap.ANOM.records)||[]).length;
+    b.innerHTML='<span style="margin-right:auto">⚠ 偵測到本機備份(清除前快照　·　'+tstr+'　·　DAILY <b>'+dc+'</b> 天 / 異常 <b>'+ac+'</b> 筆)</span>'+
+      '<button class="btn restore-btn" id="restoreBackupBtn" type="button">⟲ 還原上次清除前</button>'+
+      '<button class="btn ghost" id="dismissBackupBtn" type="button">關閉提示</button>';
+    b.style.display='flex';
+    $('#restoreBackupBtn').onclick=restoreBackup;
+    $('#dismissBackupBtn').onclick=()=>{
+      if(confirm('關閉提示後本機備份會刪除,將無法在這台電腦立即還原(但仍可從 Google Sheets「版本記錄」還原)。確定關閉?'))
+      {clearBackup();refreshBackupBanner();}
+    };
+  }else{b.style.display='none';b.innerHTML='';}
+}
+async function restoreBackup(){
+  const snap=getBackup();if(!snap){toast('沒有可還原的備份','','warn');return;}
+  if(!confirm('確定要把「上次清除前」的資料還原回雲端嗎?\n\n備份時間: '+new Date(snap.ts).toLocaleString()+'\n資料量: DAILY '+Object.keys((snap.DAILY&&snap.DAILY.days)||{}).length+' 天 / 異常 '+((snap.ANOM&&snap.ANOM.records)||[]).length+' 筆\n\n還原會把這些資料寫回雲端,所有人都會再看到。'))return;
+  setBusy(true,'還原中…');
+  try{
+    if(ONLINE){
+      const dailyRows=[],dates=[];
+      Object.keys((snap.DAILY&&snap.DAILY.days)||{}).forEach(d=>{dates.push(d);((snap.DAILY.days[d].branches)||[]).forEach(b=>dailyRows.push(toDailySnake(b,d)));});
+      if(dailyRows.length)await gasPost({type:'daily',rows:dailyRows,dates});
+      const anomRows=((snap.ANOM&&snap.ANOM.records)||[]).map(toAnomSnake);
+      if(anomRows.length)await gasPost({type:'anom',rows:anomRows});
+      await loadAll();
+      toast('已還原雲端資料 ✓',dailyRows.length+' 筆每日 / '+anomRows.length+' 筆異常');
+    }else{
+      DAILY=snap.DAILY;ANOM=snap.ANOM;saveLocal();
+      toast('已還原本機資料 ✓','(離線模式,僅還原這台電腦)');
+    }
+    clearBackup();refreshBackupBanner();
+    setBusy(false);lastSig=signature();renderAll();
+  }catch(e){setBusy(false);toast('還原失敗',String(e.message||e),'err');}
+}
+function showClearConfirm(){
+  return new Promise(resolve=>{
+    let done=false;const finalize=v=>{if(done)return;done=true;resolve(v);};
+    const body=
+      '<div style="background:rgba(224,39,73,.10);border:2px solid var(--bad);border-radius:10px;padding:13px 14px;margin-bottom:12px">'+
+        '<div style="color:var(--bad);font-weight:800;font-size:calc(14px*var(--fs));margin-bottom:8px">⚠️ 這個動作會清除整個雲端的資料,所有人都會受影響</div>'+
+        '<div style="color:var(--txt);font-size:calc(12.5px*var(--fs));line-height:1.7">'+
+          '· DAILY 統計、所有異常與怠速紀錄都會從雲端清除<br>'+
+          '· 看板上「全公司、全部站」歷史紀錄會立刻消失<br>'+
+          '· 雖可從 Google Sheets 版本記錄還原,但會中斷工作流程'+
+        '</div>'+
+      '</div>'+
+      '<div style="background:#FFF7E0;border:1px solid #F0A500;border-radius:8px;padding:9px 12px;margin-bottom:14px;font-size:calc(12px*var(--fs));color:#7a5a00;line-height:1.6">'+
+        '✓ 系統會在清除前自動把現有資料備份到「這台電腦的瀏覽器」,清除後上方會出現「⟲ 還原上次清除前」按鈕,可一鍵還原(但僅限這台電腦能還原)。'+
+      '</div>'+
+      '<div style="margin-bottom:8px;color:var(--txt);font-size:calc(13px*var(--fs))">確定要清除?請在下面欄位輸入「<b style="color:var(--bad)">清除全部</b>」四個字才能繼續:</div>'+
+      '<input type="text" id="clearConfirmInput" autocomplete="off" placeholder="請輸入「清除全部」" style="width:100%;padding:9px 12px;font-size:calc(14px*var(--fs));border:2px solid var(--line);border-radius:8px;box-sizing:border-box;font-family:inherit">';
+    openModal('⚠️ 清除全部資料前的最後確認',body);
+    const m=$('#modal'),ok=$('#modalOk'),x=$('#modalX');
+    const origOkText=ok.textContent,origXOnclick=x.onclick;
+    ok.textContent='確認清除';ok.disabled=true;ok.style.opacity=.4;ok.style.cursor='not-allowed';ok.style.background='var(--bad)';
+    const restore=()=>{ok.textContent=origOkText;ok.disabled=false;ok.style.opacity='';ok.style.cursor='';ok.style.background='';ok.onclick=()=>m.classList.remove('show');x.onclick=origXOnclick;};
+    const inp=$('#clearConfirmInput');setTimeout(()=>inp&&inp.focus(),80);
+    inp.oninput=()=>{const okM=(inp.value.trim()==='清除全部');ok.disabled=!okM;ok.style.opacity=okM?1:.4;ok.style.cursor=okM?'pointer':'not-allowed';};
+    inp.onkeydown=e=>{if(e.key==='Enter'&&!ok.disabled){ok.click();}else if(e.key==='Escape'){x.click();}};
+    ok.onclick=()=>{if(ok.disabled)return;m.classList.remove('show');restore();finalize(true);};
+    x.onclick=()=>{m.classList.remove('show');restore();finalize(false);};
+  });
+}
+$('#clearBtn').onclick=async()=>{
+  if(busy)return;
+  const confirmed=await showClearConfirm();
+  if(!confirmed)return;
+  setBusy(true,'備份並清除中…');
+  const bk=saveBackup(); // 清除前自動快照(本機)
+  if(!bk.ok)console.warn('本機備份失敗:',bk.err);
+  try{
+    if(ONLINE)await gasPost({type:'clear'});
+    DAILY={dept:DEPT_NAME,days:{}};
+    ANOM={records:[]};
+    if(!ONLINE)saveLocal();else await loadAll();
+  }catch(e){toast('清除失敗',String(e.message||e),'err');}
+  setBusy(false);
+  lastSig=signature();renderAll();
+  refreshBackupBanner();
+  toast('已清除全部資料',bk.ok?'本機已自動備份,如要還原請點上方「⟲ 還原上次清除前」':'(本機備份失敗,如需還原請從 Google Sheets 版本記錄)');
+};
+
+
 function gotoTab(name){$$('.tab').forEach(x=>x.classList.toggle('on',x.dataset.tab===name));$$('.panel').forEach(p=>p.classList.toggle('on',p.id==='p-'+name));if(name==='trend')renderTrend();if(name==='branchppl')renderBranchPpl();if(name==='idle')renderIdle();window.scrollTo({top:0,behavior:'smooth'});}
 $$('.tab').forEach(t=>t.onclick=()=>gotoTab(t.dataset.tab));
 /* 怠速匯入 / 清除 / 匯出 事件 */
@@ -1921,6 +2070,7 @@ $('#pptGen').onclick=openWeeklyPicker;
     await loadAll();setConn('local');
   }
   lastSig=signature();renderAll();
+  refreshBackupBanner();
   if(ONLINE&&AUTO_REFRESH_SEC>0){setInterval(async()=>{if(busy||document.hidden||pendingCount()>0)return;try{await loadAll();const s=signature();if(s!==lastSig){lastSig=s;renderAll();toast('已同步最新資料','');setConn('cloud');}}catch(e){setConn('err');}},AUTO_REFRESH_SEC*1000);}
 })();
 </script>

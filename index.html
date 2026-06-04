@@ -752,8 +752,14 @@ function renderKpis(){
   if(latest){const bs=DAILY.days[latest].branches;const br=[...bs].sort((a,b)=>a.rank-b.rank);best=br[0]?br[0].branch:'–';worst=br[br.length-1]?br[br.length-1].branch:'–';avgScore=r1(avg(bs.map(b=>b.score)));}
   const anomN=ANOM.records.filter(r=>r.behavior!=='怠速').length;
   const idleN=ANOM.records.filter(r=>r.behavior==='怠速').length;
+  // 站所數：用 ORG 編制(可由站所管理修改) 為主，副標顯示資料涵蓋情況
+  const orgBranches=Object.keys(BR2CRS);
+  const orgN=orgBranches.length;
+  const dataBranches=new Set(allBranches());
+  const coveredN=orgBranches.filter(b=>dataBranches.has(b)).length;
+  const stationSub=(coveredN===orgN)?(DAILY.dept+' · 編制 '+orgN+' 全有資料'):(DAILY.dept+' · 編制 '+orgN+' / 有資料 '+coveredN);
   const cards=[['c1','統計天數',dates.length+'<small> 天</small>',dates.length?dates[0]+' ~ '+latest:'',''],
-    ['c2','站所數',allBranches().length+'<small> 站</small>',DAILY.dept,''],
+    ['c2','站所數',orgN+'<small> 站</small>',stationSub,''],
     ['c3','異常事件',anomN+'<small> 筆</small>','點擊查看明細 →','detail'],
     ['c4','最新平均總分',avgScore,latest?('最佳 '+best):'',''],
     ['c5','最新待改善',worst,latest||'尚無資料','']];

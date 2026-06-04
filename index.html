@@ -301,6 +301,30 @@ td.b{font-weight:700}
 #backupBanner .btn{padding:6px 14px;font-size:calc(12.5px*var(--fs))}
 #backupBanner .restore-btn{background:var(--accent);color:#fff;border:none}
 #backupBanner .restore-btn:hover{background:var(--accent2)}
+/* 站所管理 */
+#stationMgr{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999;display:none;align-items:center;justify-content:center;padding:24px}
+#stationMgr.show{display:flex}
+.smgr-card{background:var(--bg);border-radius:14px;width:1100px;max-width:96vw;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.smgr-h{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line);font-weight:800;font-size:calc(15px*var(--fs));color:var(--accent)}
+.smgr-h button{background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted);padding:4px 10px;border-radius:6px}
+.smgr-h button:hover{background:var(--panel2)}
+.smgr-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--panel)}
+.smgr-toolbar select,.smgr-toolbar input[type=text]{font-size:calc(12.5px*var(--fs));color:var(--txt);background:#fff}
+.smgr-note{padding:8px 18px;font-size:calc(11.5px*var(--fs));color:var(--muted);background:var(--panel2);border-bottom:1px solid var(--line)}
+.smgr-body{flex:1;overflow:auto;padding:0}
+.smgr-tbl{width:100%;border-collapse:collapse;font-size:calc(12.5px*var(--fs))}
+.smgr-tbl thead th{position:sticky;top:0;background:var(--panel2);padding:9px 11px;text-align:left;font-weight:700;color:var(--muted);border-bottom:1px solid var(--line);z-index:1}
+.smgr-tbl tbody td{padding:7px 11px;border-bottom:1px solid var(--line);vertical-align:middle}
+.smgr-tbl tbody tr:hover{background:rgba(230,0,126,.04)}
+.smgr-tbl tr.sm-unassigned{background:rgba(240,164,10,.06)}
+.smgr-tbl tr.sm-unassigned:hover{background:rgba(240,164,10,.12)}
+.smgr-tbl tr.sm-inactive{background:rgba(127,127,127,.05);color:var(--muted)}
+.smgr-tbl tr.sm-extra{background:rgba(230,0,126,.04)}
+.smgr-tbl select{padding:4px 7px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--txt);font-size:calc(12px*var(--fs));max-width:100%}
+.sm-tag{display:inline-block;padding:2px 8px;border-radius:6px;font-size:calc(11px*var(--fs));font-weight:700}
+.sm-tag-on{background:rgba(71,182,90,.18);color:var(--good)}
+.sm-tag-off{background:rgba(127,127,127,.15);color:var(--muted)}
+.sm-tag-extra{background:rgba(230,0,126,.15);color:var(--accent)}
 .scard .rk{position:absolute;top:4px;right:14px;font-family:var(--mono);font-weight:800;font-size:calc(40px*var(--fs));color:#ffdcec;line-height:1}
 .scard-h{display:flex;align-items:center;gap:13px;margin-bottom:10px}
 .scard-h .gb{width:calc(56px*var(--fs));height:calc(56px*var(--fs));border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-family:var(--mono);font-weight:800;font-size:calc(27px*var(--fs))}
@@ -352,6 +376,7 @@ td.b{font-weight:700}
       <span class="pill" id="connPill"><span class="d"></span><span id="connTxt">啟動中…</span></span>
       <button class="btn" id="refreshBtn" title="重新抓取最新資料"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-2.6-6.4M21 4v5h-5"/></svg>更新</button>
       <button class="btn primary" id="importBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0-12l-4 4m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>匯入 Excel</button>
+      <button class="btn ghost" id="stationMgrBtn" type="button" title="管理站所主檔與課/組歸屬">⚙ 站所管理</button>
       <button class="btn ghost danger" id="clearBtn">清除全部</button>
       <input type="file" id="fileInput" accept=".xlsx,.xls" multiple hidden>
     </div>
@@ -667,10 +692,19 @@ async function handleFiles(files){
   }catch(e){ toast('上傳失敗',String(e.message||e)+'（請檢查 GAS 部署/網址）','err'); setBusy(false); renderAll(); return; }
   setBusy(false);
   lastSig=signature();renderAll();
+  // 匯入驗證：收集這次匯入用到的站所代碼，跑驗證
+  const importedBranches=new Set();
+  dailySnake.forEach(r=>{if(r.branch)importedBranches.add(r.branch);});
+  anomSnake.forEach(r=>{if(r.branch)importedBranches.add(r.branch);});
+  const valIssues=validateImport([...importedBranches]);
   const idleMsg=idleSheets?('怠速 新增 '+rep.iNew+' 筆'+(rep.iUpd?('／更新 '+rep.iUpd):'')+(rep.iDup?('／重複略過 '+rep.iDup):'')+'（已上雲端共用）'):'';
-  if(idleSheets&&!rep.dDates.size&&!rep.aNew&&!rep.aUpd&&!rep.aDup.length){toast('已匯入怠速資料 ✓',idleMsg);return;}
+  if(idleSheets&&!rep.dDates.size&&!rep.aNew&&!rep.aUpd&&!rep.aDup.length){toast('已匯入怠速資料 ✓',idleMsg);if(valIssues.unknown.length||valIssues.inactive.length||valIssues.unassigned.length)setTimeout(()=>showImportValidation(valIssues),800);return;}
   if(idleSheets)toast('另含怠速明細 ✓',idleMsg);
   showImportSummary(rep,bad);
+  // 匯入總結看完後再跳驗證提醒（若有問題）
+  if(valIssues.unknown.length||valIssues.inactive.length||valIssues.unassigned.length){
+    setTimeout(()=>showImportValidation(valIssues),900);
+  }
 }
 function showImportSummary(rep,bad){
   const hasData=rep.dDates.size||rep.aNew||rep.aUpd||rep.aDup.length;
@@ -762,7 +796,8 @@ function gaugeCardsHTML(b,big){return '<div class="gauges">'+RANK_METRICS.map(m=
   '<div class="gauge-card"><div class="gt">'+m[2]+' '+m[1]+'</div>'+gaugeSVG(metScore(b,m[0]),metRate(b,m[0]),big)+'</div>').join('')+'</div>';}
 
 /* === 組織階層：課 → 組 → 站 === */
-const ORG=[
+// === 站所組織編制 ORG（可由站所管理介面動態修改，存 localStorage）===
+const ORG_DEFAULT=[
  ['北一課','北一北組',['Nt3','NS5','Nt16','Nt19']],
  ['北一課','北一南組',['Nt21','NS18']],
  ['北二課','北二北組',['NS2','Nt17']],
@@ -776,11 +811,223 @@ const ORG=[
  ['南二課','南二北組',['Kt2']],
  ['南二課','南二南組',['KS1','KS3']],
 ];
-const BR2GRP={},BR2CRS={};ORG.forEach(([c,g,bs])=>bs.forEach(b=>{BR2GRP[b]=g;BR2CRS[b]=c;}));
+let ORG=ORG_DEFAULT.map(e=>[e[0],e[1],e[2].slice()]);
+let BR2GRP={},BR2CRS={};
+let COURSE_ORDER=[],GROUP_ORDER=[];
+function rebuildOrg(){
+  BR2GRP={};BR2CRS={};
+  ORG.forEach(([c,g,bs])=>bs.forEach(b=>{BR2GRP[b]=g;BR2CRS[b]=c;}));
+  COURSE_ORDER=[...new Set(ORG.map(o=>o[0]))];
+  GROUP_ORDER=ORG.map(o=>o[1]);
+}
+const ORG_KEY='fleet_org_v1';
+function loadOrgOverride(){try{const s=localStorage.getItem(ORG_KEY);if(s){const arr=JSON.parse(s);if(Array.isArray(arr)&&arr.length)ORG=arr;}}catch(e){}rebuildOrg();}
+function saveOrgOverride(){try{localStorage.setItem(ORG_KEY,JSON.stringify(ORG));}catch(e){toast('儲存失敗','瀏覽器儲存空間不足','warn');}}
+function resetOrgToDefault(){ORG=ORG_DEFAULT.map(e=>[e[0],e[1],e[2].slice()]);rebuildOrg();try{localStorage.removeItem(ORG_KEY);}catch(e){}}
+loadOrgOverride();
 const courseOf=b=>BR2CRS[b]||'未分類';
 const groupOf=b=>BR2GRP[b]||'未分類';
-const COURSE_ORDER=[...new Set(ORG.map(o=>o[0]))];
-const GROUP_ORDER=ORG.map(o=>o[1]);
+// === 站所主檔（147 站，從「站所資料 2026-03-31」匯出檔內嵌；c=代碼/t=城市/d=區/a=地址/e=啟用1停用0） ===
+const STATION_MASTER=[
+{c:"NS01",t:"臺北市",d:"內湖區",a:"堤頂大道1段351號",e:1},
+{c:"NS02",t:"新北市",d:"三重區",a:"興德路129號",e:1},
+{c:"NS03(舊)",t:"臺北市",d:"中山區",a:"中山北路3段22號",e:0},
+{c:"NS04(舊)",t:"臺北市",d:"文山區",a:"萬慶街27號",e:0},
+{c:"NS05",t:"臺北市",d:"北投區",a:"承德路7段400號",e:1},
+{c:"CS01",t:"臺中市",d:"西屯區",a:"工業區十路16號",e:0},
+{c:"TS01",t:"桃園市",d:"大園區",a:"高鐵站前西路3段77號",e:1},
+{c:"SS01",t:"臺南市",d:"新營區",a:"南紙街94號長榮三段->柳營外環道",e:0},
+{c:"KS01",t:"高雄市",d:"前鎮區",a:"成功二路4號",e:1},
+{c:"NS06",t:"桃園市",d:"龜山區",a:"科技三路80號",e:1},
+{c:"SS02",t:"臺南市",d:"新市區",a:"國際路15號",e:0},
+{c:"TS03",t:"桃園市",d:"蘆竹區",a:"蘆竹街177號",e:1},
+{c:"CS03",t:"臺中市",d:"東區",a:"自由路3段30號",e:1},
+{c:"NS08",t:"新北市",d:"新莊區",a:"中正路669號",e:1},
+{c:"CS04",t:"臺中市",d:"豐原區",a:"豐勢路1段577巷76號",e:1},
+{c:"SS03",t:"臺南市",d:"永康區",a:"仁愛街391號",e:1},
+{c:"SS04(舊)",t:"臺南市",d:"南區",a:"中華西路1段23號",e:0},
+{c:"NS10",t:"新北市",d:"中和區",a:"立德街199號",e:1},
+{c:"OP",t:"臺北市",d:"內湖區",a:"瑞光路480號",e:1},
+{c:"KS02",t:"高雄市",d:"左營區",a:"民族一路851號",e:0},
+{c:"NS09",t:"新北市",d:"蘆洲區",a:"國道路2段86號",e:0},
+{c:"TS07",t:"桃園市",d:"平鎮區",a:"雙福路1段65號E棟",e:0},
+{c:"TS06",t:"苗栗縣",d:"竹南鎮",a:"公義路1639號",e:0},
+{c:"SS05",t:"雲林縣",d:"斗南鎮",a:"德業路16號",e:0},
+{c:"SS06",t:"嘉義縣",d:"民雄鄉",a:"工業二路17號",e:0},
+{c:"TS09",t:"桃園市",d:"平鎮區",a:"平東路659巷42號",e:1},
+{c:"NS13",t:"新北市",d:"中和區",a:"民享街4號",e:0},
+{c:"NS15",t:"新北市",d:"新店區",a:"中正路525-1號",e:1},
+{c:"NS12",t:"臺北市",d:"南港區",a:"成福路183號",e:1},
+{c:"TS04",t:"桃園市",d:"楊梅區",a:"高獅路589號",e:1},
+{c:"NS11",t:"新北市",d:"汐止區",a:"中興路43之8號",e:0},
+{c:"NS17",t:"新北市",d:"土城區",a:"民族街11號",e:0},
+{c:"DC-sorter",t:"桃園市",d:"大園區",a:"高鐵站前西路3段77號",e:1},
+{c:"CS05",t:"臺中市",d:"西區",a:"五權五街151號",e:0},
+{c:"NS16(舊)",t:"臺北市",d:"中山區",a:"八德路2段260號",e:0},
+{c:"NS19",t:"新北市",d:"淡水區",a:"民權路27號",e:1},
+{c:"CS12",t:"臺中市",d:"西屯區",a:"協和南巷3-5號",e:1},
+{c:"TS10/DC10",t:"桃園市",d:"大園區",a:"中山南路2段207-1號",e:1},
+{c:"DC01-14",t:"桃園市",d:"大園區",a:"高鐵站前西路3段77號",e:1},
+{c:"DC03-14",t:"桃園市",d:"龜山區",a:"科技三路80號",e:1},
+{c:"NS02-14",t:"新北市",d:"三重區",a:"興德路129號",e:1},
+{c:"NS05-14",t:"臺北市",d:"北投區",a:"承德路7段400號",e:1},
+{c:"DC07-14",t:"臺南市",d:"永康區",a:"仁愛街391號",e:1},
+{c:"CS04-14",t:"臺中市",d:"豐原區",a:"豐勢路1段577巷76號",e:1},
+{c:"TWM",t:"新北市",d:"五股區",a:"五權路48號",e:1},
+{c:"TS11_DC11",t:"桃園市",d:"楊梅區",a:"梅獅路359巷19號",e:1},
+{c:"DC2",t:"桃園市",d:"蘆竹區",a:"南青路1255號",e:1},
+{c:"St08",t:"臺南市",d:"北區",a:"成功路22巷3號",e:1},
+{c:"DC04-014",t:"桃園市",d:"蘆竹區",a:"蘆竹街177號",e:0},
+{c:"FS1",t:"桃園市",d:"楊梅區",a:"梅獅路395巷59號",e:0},
+{c:"TS4_DC6",t:"桃園市",d:"楊梅區",a:"高獅路589號",e:1},
+{c:"DC09",t:"桃園市",d:"平鎮區",a:"平東路659巷42號",e:1},
+{c:"TS02-014",t:"新竹縣",d:"竹北市",a:"環北路2段50號",e:0},
+{c:"TS05-1",t:"新竹市",d:"東區",a:"建新路111號",e:0},
+{c:"大智通",t:"新北市",d:"樹林區",a:"佳園路2段70-1號",e:1},
+{c:"日翊",t:"桃園市",d:"大溪區",a:"莿仔寮新光東路76巷22-2號",e:0},
+{c:"Kt05",t:"高雄市",d:"鳳山區",a:"鳳仁路86之17號",e:1},
+{c:"CS2(舊)",t:"彰化縣",d:"彰化市",a:"彰草路120號",e:0},
+{c:"瑞光",t:"臺北市",d:"內湖區",a:"瑞光路480號",e:1},
+{c:"Kt06",t:"高雄市",d:"岡山區",a:"育才路56巷19號",e:1},
+{c:"DC12-14",t:"臺中市",d:"西屯區",a:"協和南巷3-5號",e:1},
+{c:"TS02",t:"新竹縣",d:"竹北市",a:"環北路2段50號",e:0},
+{c:"St09",t:"臺南市",d:"新營區",a:"東山中路59號",e:0},
+{c:"KS01-14",t:"高雄市",d:"前鎮區",a:"成功二路4號",e:1},
+{c:"KS03",t:"屏東縣",d:"屏東市",a:"華安路2號",e:1},
+{c:"NS18",t:"基隆市",d:"七堵區",a:"工建北路16號",e:1},
+{c:"SS07",t:"臺南市",d:"新市區",a:"大營大營1-8號",e:1},
+{c:"Tt08",t:"苗栗縣",d:"苗栗市",a:"中正路1327號",e:1},
+{c:"SDC-14",t:"臺南市",d:"新市區",a:"大營1-8號",e:1},
+{c:"Kt02",t:"高雄市",d:"仁武區",a:"仁發二路20號",e:1},
+{c:"Nt13",t:"新北市",d:"中和區",a:"中山路3段136巷10弄13號",e:1},
+{c:"黑貓",t:"新北市",d:"五股區",a:"五工路129號",e:1},
+{c:"St05",t:"雲林縣",d:"斗南鎮",a:"建國二路112號",e:1},
+{c:"Tt06",t:"新竹市",d:"香山區",a:"中華路6段228號",e:1},
+{c:"Ct06",t:"南投縣",d:"南投市",a:"吉利路122號",e:1},
+{c:"St06",t:"嘉義市",d:"西區",a:"埤竹路36-3號",e:1},
+{c:"洲子",t:"臺北市",d:"內湖區",a:"洲子街96號",e:1},
+{c:"萊爾富",t:"新北市",d:"樹林區",a:"味王街1號",e:1},
+{c:"冠森",t:"臺中市",d:"西屯區",a:"清武巷45-88號",e:0},
+{c:"冠森(電)",t:"臺中市",d:"西屯區",a:"清武巷45-88號",e:1},
+{c:"Nt04",t:"臺北市",d:"文山區",a:"汀州路4段265號",e:0},
+{c:"Nt03",t:"臺北市",d:"大同區",a:"環河北路1段321號",e:1},
+{c:"FS2",t:"桃園市",d:"楊梅區",a:"梅獅路395巷59號",e:0},
+{c:"Tt6",t:"苗栗縣",d:"竹南鎮",a:"公義路1639",e:0},
+{c:"Tt8",t:"苗栗縣",d:"苗栗市",a:"中正路1327",e:0},
+{c:"安順(電)",t:"高雄市",d:"湖內區",a:"中正路1段868",e:1},
+{c:"DC10/TS10",t:"桃園市",d:"大園區",a:"中山南路2段207號",e:0},
+{c:"千禧",t:"臺北市",d:"內湖區",a:"洲子街73號",e:1},
+{c:"慈濟三重",t:"新北市",d:"三重區",a:"中正北路472號",e:1},
+{c:"棧板-觀音",t:"桃園市",d:"觀音區",a:"環南路405號",e:1},
+{c:"棧板-新吉",t:"臺南市",d:"安南區",a:"大安街新吉一路168號",e:1},
+{c:"電研",t:"桃園市",d:"楊梅區",a:"電研路68號",e:0},
+{c:"許厝港",t:"桃園市",d:"大園區",a:"南港里許厝港529號",e:0},
+{c:"昶捷",t:"桃園市",d:"蘆竹區",a:"新南路1段370之6號",e:0},
+{c:"佶傳",t:"新北市",d:"鶯歌區",a:"環河路32-17號",e:1},
+{c:"大園倉",t:"桃園市",d:"大園區",a:"航科路161號",e:1},
+{c:"電研倉",t:"桃園市",d:"楊梅區",a:"電研路68號",e:1},
+{c:"新富倉",t:"桃園市",d:"觀音區",a:"新富路889號",e:1},
+{c:"許厝港倉",t:"桃園市",d:"大園區",a:"許厝港路529號",e:1},
+{c:"統昶鶯歌倉",t:"新北市",d:"鶯歌區",a:"二甲路295號",e:1},
+{c:"和美倉",t:"彰化縣",d:"和美鎮",a:"線東路2段571號9~11碼頭",e:1},
+{c:"全家",t:"桃園市",d:"大溪區",a:"莿仔寮新光東路76巷22-2號",e:1},
+{c:"百事達觀音",t:"桃園市",d:"觀音區",a:"大觀路4段101號",e:0},
+{c:"中華棧板-金華",t:"桃園市",d:"觀音區",a:"金華路101號",e:1},
+{c:"慈濟-善化",t:"臺南市",d:"善化區",a:"小新營346號",e:1},
+{c:"FS3",t:"桃園市",d:"楊梅區",a:"梅獅路395巷59號(A棟)",e:1},
+{c:"TS03_DC4",t:"桃園市",d:"蘆竹區",a:"蘆竹街177號",e:1},
+{c:"SDCA",t:"臺南市",d:"新市區",a:"大營1-8號",e:1},
+{c:"物業-內湖",t:"臺北市",d:"內湖區",a:"瑞湖街62號",e:1},
+{c:"物業-東京",t:"臺北市",d:"內湖區",a:"堤頂大道2段183.185號",e:1},
+{c:"CS4A",t:"臺中市",d:"豐原區",a:"豐勢路1段577巷76號(家電倉)",e:1},
+{c:"TS05",t:"新竹市",d:"東區",a:"建新路111號",e:1},
+{c:"Nt11",t:"新北市",d:"汐止區",a:"祥雲街1-2號",e:1},
+{c:"Et01",t:"宜蘭縣",d:"壯圍鄉",a:"大福路3段269號",e:1},
+{c:"Et02",t:"花蓮縣",d:"吉安鄉",a:"明仁三街29號",e:1},
+{c:"Nt20",t:"基隆市",d:"七堵區",a:"明德三路111號之8",e:1},
+{c:"Nt16",t:"臺北市",d:"中正區",a:"三元街227號",e:1},
+{c:"St04",t:"臺南市",d:"南區",a:"新仁路25號",e:1},
+{c:"Ct02",t:"臺中市",d:"西屯區",a:"協和南巷3-3號",e:1},
+{c:"薪航-五股",t:"新北市",d:"五股區",a:"中興路3段1之12號",e:1},
+{c:"Et1-薪航",t:"宜蘭縣",d:"壯圍鄉",a:"大福路3段269號",e:0},
+{c:"Et2-薪航",t:"花蓮縣",d:"吉安鄉",a:"明仁三街29號",e:0},
+{c:"兆洋倉",t:"桃園市",d:"新屋區",a:"民族路6段675巷36-1號",e:1},
+{c:"生洋山林倉",t:"桃園市",d:"蘆竹區",a:"山林路2段6-1號",e:1},
+{c:"中保五福倉",t:"桃園市",d:"蘆竹區",a:"油管路1段218號",e:1},
+{c:"竹運幼獅倉",t:"桃園市",d:"楊梅區",a:"梅獅路359-2號",e:1},
+{c:"東方超捷南崁倉",t:"桃園市",d:"蘆竹區",a:"新南路1段370-6號",e:1},
+{c:"萬泰海湖倉",t:"桃園市",d:"蘆竹區",a:"海山東街37巷10號",e:1},
+{c:"黑貓鳳仁倉",t:"高雄市",d:"岡山區",a:"岡燕路485巷103號",e:1},
+{c:"Nt17",t:"新北市",d:"土城區",a:"永豐路264-1號",e:1},
+{c:"中保和平一倉",t:"桃園市",d:"蘆竹區",a:"海山中街75號",e:1},
+{c:"DC11-14",t:"桃園市",d:"楊梅區",a:"二重溪梅獅路359巷19號",e:1},
+{c:"DC04-14",t:"桃園市",d:"蘆竹區",a:"蘆竹街177號",e:1},
+{c:"Nt21",t:"臺北市",d:"內湖區",a:"安康路32巷24弄7號",e:1},
+{c:"Ct05",t:"臺中市",d:"西屯區",a:"協和南巷3-5號",e:1},
+{c:"Nt12",t:"臺北市",d:"內湖區",a:"安康路32巷24弄7號",e:1},
+{c:"Nt22",t:"臺北市",d:"信義區",a:"松山路393巷36號",e:1},
+{c:"NT23(停用)",t:"新北市",d:"樹林區",a:"田尾街153號之19",e:0},
+{c:"Nt23",t:"新北市",d:"樹林區",a:"田尾街153-19號",e:1},
+{c:"OK來來物流",t:"桃園市",d:"大溪區",a:"仁美街新光東路63巷88號",e:1},
+{c:"DC9-14",t:"桃園市",d:"平鎮區",a:"平東路659巷42之3號",e:1},
+{c:"DC11A",t:"桃園市",d:"楊梅區",a:"梅獅路395巷59號",e:1},
+{c:"DC02-14",t:"桃園市",d:"蘆竹區",a:"南青路1255號",e:1},
+{c:"Nt19",t:"新北市",d:"淡水區",a:"崁頂57-2號",e:1},
+{c:"新瑞-新竹物流",t:"桃園市",d:"中壢區",a:"中園路2段276號",e:1},
+{c:"Nt08",t:"新北市",d:"新莊區",a:"民安路329巷7號",e:1},
+{c:"XV10",t:"連江縣",d:"南竿鄉",a:"四維村8號",e:0}
+];
+// 代碼正規化：處理 NS01↔NS1、NS02-14↔NS2、KS01-14↔KS1、TS11_DC11↔TS11、St08↔St8 等變體
+function normStation(code){
+  let s=String(code==null?'':code).trim();
+  if(!s)return '';
+  s=s.replace(/[\(（][^\)）]*[\)）]/g,'').trim();
+  s=s.toUpperCase();
+  s=s.replace(/[-_\/](DC\w*[A-Z0-9]*|1[14][A-Z0-9]*|10[A-Z0-9]*)$/i,'').trim();
+  s=s.replace(/^([A-Z]+)0+(\d+)/,'$1$2');
+  return s;
+}
+const MASTER_INDEX={};STATION_MASTER.forEach(s=>{MASTER_INDEX[normStation(s.c)]=s;});
+function lookupMaster(code){return MASTER_INDEX[normStation(code)]||null;}
+// 匯入驗證：傳入一組站所代碼，回傳 issues
+function validateImport(branches){
+  const issues={unknown:[],inactive:[],unassigned:[]};
+  const seen=new Set();
+  branches.forEach(b=>{
+    const code=txt(b);if(!code||seen.has(code))return;seen.add(code);
+    const m=lookupMaster(code);
+    const inOrg=!!BR2CRS[code];
+    if(!m)issues.unknown.push(code);
+    else if(!m.e)issues.inactive.push({code,info:m});
+    if(!inOrg)issues.unassigned.push({code,info:m});
+  });
+  return issues;
+}
+function showImportValidation(issues){
+  const total=issues.unknown.length+issues.inactive.length+issues.unassigned.length;
+  if(!total)return;
+  let h='<div style="font-size:calc(13px*var(--fs));color:var(--muted);margin-bottom:12px;line-height:1.6">本次匯入的資料中，有 <b style="color:var(--bad)">'+total+'</b> 項需要注意：</div>';
+  if(issues.unknown.length){
+    h+='<div style="margin-bottom:14px;background:rgba(224,39,73,.08);border:1px solid var(--bad);border-radius:8px;padding:11px 13px">'+
+       '<div style="font-weight:800;color:var(--bad);margin-bottom:6px">⚠ 未知站所代碼（'+issues.unknown.length+'）— 不在站所主檔</div>'+
+       '<div style="font-family:var(--mono);font-size:calc(12px*var(--fs));color:var(--dark);line-height:1.8">'+issues.unknown.join('、')+'</div>'+
+       '<div style="font-size:calc(11.5px*var(--fs));color:var(--muted);margin-top:6px">建議到「站所管理」確認此代碼是否為新站或拼錯</div></div>';
+  }
+  if(issues.inactive.length){
+    h+='<div style="margin-bottom:14px;background:rgba(240,164,10,.10);border:1px solid #F0A500;border-radius:8px;padding:11px 13px">'+
+       '<div style="font-weight:800;color:#a36400;margin-bottom:6px">⚠ 主檔顯示為停用（'+issues.inactive.length+'）— 但仍出現在資料中</div>'+
+       '<div style="font-family:var(--mono);font-size:calc(12px*var(--fs));color:var(--dark);line-height:1.8">'+issues.inactive.map(o=>o.code+'（'+o.info.t+o.info.d+'）').join('、')+'</div></div>';
+  }
+  if(issues.unassigned.length){
+    h+='<div style="margin-bottom:14px;background:rgba(230,0,126,.08);border:1px solid var(--accent);border-radius:8px;padding:11px 13px">'+
+       '<div style="font-weight:800;color:var(--accent);margin-bottom:6px">⚠ 尚未指派課/組（'+issues.unassigned.length+'）— 會被歸為「未分類」</div>'+
+       '<div style="font-family:var(--mono);font-size:calc(12px*var(--fs));color:var(--dark);line-height:1.8">'+issues.unassigned.map(o=>o.code+(o.info?('（'+o.info.t+o.info.d+'）'):'（不在主檔）')).join('、')+'</div>'+
+       '<div style="font-size:calc(11.5px*var(--fs));color:var(--muted);margin-top:6px">請到「站所管理」按下方按鈕為這些站指派課/組</div></div>';
+  }
+  h+='<div style="margin-top:14px;text-align:center"><button class="btn primary" id="goManageStation" type="button">→ 打開站所管理</button></div>';
+  openModal('⚠ 匯入資料檢查 ('+total+' 項提醒)',h);
+  setTimeout(()=>{const b=document.getElementById('goManageStation');if(b)b.onclick=()=>{document.getElementById('modal').classList.remove('show');openStationManager();};},80);
+}
 function scoreToGrade(s){return s>=90?'A':s>=80?'B':s>=70?'C':s>=60?'D':s>0?'E':'';}
 function aggBranches(bs){
   const cAvg=k=>r1(avg(bs.map(b=>b[k])));
@@ -1478,7 +1725,146 @@ function setBusy(b,label){busy=b;const btn=$('#importBtn');btn.disabled=b;$('#re
 $('#importBtn').onclick=()=>{if(!busy)$('#fileInput').click();};
 $('#fileInput').onchange=e=>{if(e.target.files.length)handleFiles([...e.target.files]);e.target.value='';};
 $('#refreshBtn').onclick=async()=>{if(busy)return;if(!ONLINE){toast('本機模式','無雲端後台可更新','warn');return;}setBusy(true,'更新中…');try{await loadAll();lastSig=signature();renderAll();toast('已更新','');}catch(e){setConn('err');toast('更新失敗',String(e.message||e),'err');}setBusy(false);};
-/* ===== 清除全部:防呆 + 本機備份/還原 ===== */
+/* ===== 站所管理 UI ===== */
+let _smState={q:'',filter:'all',showInactive:false};
+function openStationManager(){
+  let m=document.getElementById('stationMgr');
+  if(!m){
+    m=document.createElement('div');m.id='stationMgr';
+    m.innerHTML='<div class="smgr-card"><div class="smgr-h"><span id="smgrTitle">⚙ 站所管理</span><button id="smgrX" type="button">✕</button></div>'+
+      '<div class="smgr-toolbar">'+
+        '<input type="text" id="smgrSearch" placeholder="搜尋代碼/城市/區/地址…" style="flex:1;min-width:180px;max-width:300px;padding:7px 11px;border:1px solid var(--line);border-radius:7px">'+
+        '<select id="smgrFilter" style="padding:7px 9px;border:1px solid var(--line);border-radius:7px">'+
+          '<option value="all">全部</option>'+
+          '<option value="assigned">已歸屬到課/組</option>'+
+          '<option value="unassigned">未歸屬</option>'+
+        '</select>'+
+        '<label style="display:flex;align-items:center;gap:6px;color:var(--muted);font-size:calc(12.5px*var(--fs))"><input type="checkbox" id="smgrShowInactive">顯示已停用</label>'+
+        '<button class="btn primary" id="smgrAddBtn" type="button">+ 新增站所</button>'+
+        '<button class="btn ghost" id="smgrResetBtn" type="button" title="把所有課/組歸屬恢復成系統預設(預設 30 站)">↺ 還原預設編制</button>'+
+        '<span id="smgrCount" style="margin-left:auto;color:var(--muted);font-size:calc(12.5px*var(--fs));font-weight:700"></span>'+
+      '</div>'+
+      '<div class="smgr-note">說明：白底為已歸屬到課/組(出現在排行榜)；黃底為主檔有但未歸屬；灰底為已停用。所有修改會即時儲存到這台電腦的瀏覽器。</div>'+
+      '<div class="smgr-body" id="smgrBody"></div>'+
+    '</div>';
+    document.body.appendChild(m);
+    m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('show');});
+    document.getElementById('smgrX').onclick=()=>m.classList.remove('show');
+    document.getElementById('smgrSearch').oninput=e=>{_smState.q=e.target.value.trim().toLowerCase();renderStationManagerTable();};
+    document.getElementById('smgrFilter').onchange=e=>{_smState.filter=e.target.value;renderStationManagerTable();};
+    document.getElementById('smgrShowInactive').onchange=e=>{_smState.showInactive=e.target.checked;renderStationManagerTable();};
+    document.getElementById('smgrAddBtn').onclick=openAddStationDialog;
+    document.getElementById('smgrResetBtn').onclick=()=>{if(confirm('要把所有課/組歸屬恢復成系統預設(預設 30 站)嗎?\n\n你目前的所有自訂歸屬會被清除(站所主檔不變)。'))resetOrgToDefault(),renderStationManagerTable(),renderAll(),toast('已還原預設編制','');};
+  }
+  m.classList.add('show');
+  renderStationManagerTable();
+}
+function buildStationList(){
+  // 把主檔 + ORG 中但不在主檔的站，合併成一份完整清單
+  const byNorm={};
+  STATION_MASTER.forEach(s=>{byNorm[normStation(s.c)]={c:s.c,t:s.t,d:s.d,a:s.a,e:s.e,inMaster:true};});
+  // ORG 中可能有主檔沒有的站(早期使用者已使用、但不在 Excel 主檔)
+  Object.keys(BR2CRS).forEach(b=>{const n=normStation(b);if(!byNorm[n])byNorm[n]={c:b,t:'',d:'',a:'',e:1,inMaster:false};});
+  return Object.values(byNorm);
+}
+function renderStationManagerTable(){
+  const box=document.getElementById('smgrBody');if(!box)return;
+  const all=buildStationList();
+  const q=_smState.q;
+  let list=all.filter(s=>{
+    if(!_smState.showInactive&&s.inMaster&&!s.e)return false;
+    if(q){const blob=(s.c+' '+s.t+' '+s.d+' '+s.a).toLowerCase();if(!blob.includes(q))return false;}
+    const assigned=!!BR2CRS[s.c];
+    if(_smState.filter==='assigned'&&!assigned)return false;
+    if(_smState.filter==='unassigned'&&assigned)return false;
+    return true;
+  });
+  list.sort((a,b)=>{
+    const aa=!!BR2CRS[a.c],ba=!!BR2CRS[b.c];
+    if(aa!==ba)return ba-aa; // 已歸屬在上
+    return a.c.localeCompare(b.c);
+  });
+  const assignedN=all.filter(s=>BR2CRS[s.c]).length;
+  const masterN=all.filter(s=>s.inMaster).length;
+  document.getElementById('smgrCount').textContent='顯示 '+list.length+' / 主檔 '+masterN+' 站 · 已歸屬 '+assignedN;
+  // 課/組下拉選項
+  const coursesAll=[...new Set(ORG.map(o=>o[0]))];
+  const courseOpts=v=>'<option value="">(未歸屬)</option>'+coursesAll.map(c=>'<option value="'+esc(c)+'"'+(v===c?' selected':'')+'>'+esc(c)+'</option>').join('');
+  let h='<table class="smgr-tbl"><thead><tr><th style="width:120px">代碼</th><th>位置/地址</th><th style="width:90px">主檔狀態</th><th style="width:140px">課</th><th style="width:140px">組</th><th style="width:80px">操作</th></tr></thead><tbody>';
+  if(!list.length)h+='<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--muted)">沒有符合條件的站所</td></tr>';
+  else list.forEach(s=>{
+    const code=s.c;const course=BR2CRS[code]||'';const group=BR2GRP[code]||'';
+    const assigned=!!course;
+    const rowClass=!s.inMaster?'sm-extra':(!s.e?'sm-inactive':(assigned?'':'sm-unassigned'));
+    const status=!s.inMaster?'<span class="sm-tag sm-tag-extra">不在主檔</span>':(s.e?'<span class="sm-tag sm-tag-on">啟用</span>':'<span class="sm-tag sm-tag-off">停用</span>');
+    const groupsForCourse=course?[...new Set(ORG.filter(o=>o[0]===course).map(o=>o[1]))]:[];
+    const groupOpts='<option value="">(選組)</option>'+groupsForCourse.map(g=>'<option value="'+esc(g)+'"'+(group===g?' selected':'')+'>'+esc(g)+'</option>').join('');
+    h+='<tr class="'+rowClass+'" data-code="'+esc(code)+'">'+
+      '<td class="num"><b>'+esc(code)+'</b></td>'+
+      '<td>'+(s.t||s.d?('<div style="font-size:calc(12.5px*var(--fs))">'+esc(s.t+' '+s.d)+'</div><div style="font-size:calc(11px*var(--fs));color:var(--muted)">'+esc(s.a)+'</div>'):'<span style="color:var(--dim)">—</span>')+'</td>'+
+      '<td>'+status+'</td>'+
+      '<td><select class="sm-course">'+courseOpts(course)+'</select></td>'+
+      '<td><select class="sm-group">'+groupOpts+(course?'':'<option disabled>請先選課</option>')+'</select></td>'+
+      '<td><button class="btn ghost sm-del" type="button" title="從編制移除（資料不會被刪）" style="padding:3px 9px;font-size:calc(11px*var(--fs));color:var(--bad)">移除</button></td>'+
+      '</tr>';
+  });
+  h+='</tbody></table>';
+  box.innerHTML=h;
+  // 綁定操作
+  box.querySelectorAll('tr[data-code]').forEach(tr=>{
+    const code=tr.dataset.code;
+    const cSel=tr.querySelector('.sm-course'),gSel=tr.querySelector('.sm-group');
+    cSel.onchange=()=>{
+      const newC=cSel.value;
+      if(!newC){assignStation(code,'','');renderStationManagerTable();renderAll();return;}
+      // 該課的組
+      const gs=[...new Set(ORG.filter(o=>o[0]===newC).map(o=>o[1]))];
+      // 重建組下拉
+      gSel.innerHTML='<option value="">(選組)</option>'+gs.map(g=>'<option value="'+g+'">'+g+'</option>').join('')+'<option value="__NEW__">+ 新增組…</option>';
+    };
+    gSel.onchange=()=>{
+      let g=gSel.value;
+      if(g==='__NEW__'){g=prompt('請輸入新組別名稱(例如:北一西組):',cSel.value+'-新組');if(!g){gSel.value='';return;}}
+      if(!cSel.value){toast('請先選課','','warn');gSel.value='';return;}
+      if(!g)return;
+      assignStation(code,cSel.value,g);renderStationManagerTable();renderAll();
+    };
+    tr.querySelector('.sm-del').onclick=()=>{
+      if(!confirm('從編制移除站所「'+code+'」?\n\n資料不會被刪除，但這個站不會再出現在排行榜或評等中(會被歸為「未分類」)。'))return;
+      assignStation(code,'','');renderStationManagerTable();renderAll();
+    };
+  });
+}
+function assignStation(code,course,group){
+  // 1) 從目前 ORG 中移除這個站
+  ORG.forEach(entry=>{const i=entry[2].indexOf(code);if(i>=0)entry[2].splice(i,1);});
+  // 2) 清掉空組
+  ORG=ORG.filter(e=>e[2].length>0);
+  // 3) 若要指派
+  if(course&&group){
+    const ex=ORG.find(e=>e[0]===course&&e[1]===group);
+    if(ex)ex[2].push(code);else ORG.push([course,group,[code]]);
+  }
+  rebuildOrg();saveOrgOverride();
+}
+function openAddStationDialog(){
+  // 簡單 prompt-based 對話
+  const code=prompt('新站所代碼(例如 Nt22):');if(!code)return;
+  const c2=code.trim();if(!c2)return;
+  if(BR2CRS[c2]){toast('此代碼已在編制中','請使用編輯','warn');return;}
+  if(!lookupMaster(c2)&&!confirm('代碼「'+c2+'」不在站所主檔，仍要新增到編制嗎?(主檔可從「+ 新增站所」加入主檔)'))return;
+  const courses=[...new Set(ORG.map(o=>o[0]))];
+  const courseLabel='請選擇課(輸入完整名稱):\n'+courses.map((c,i)=>(i+1)+'. '+c).join('\n')+'\n或直接輸入新課名';
+  let course=prompt(courseLabel,courses[0]||'');if(!course)return;course=course.trim();
+  const groups=[...new Set(ORG.filter(o=>o[0]===course).map(o=>o[1]))];
+  let group=prompt('請輸入組別(此課現有:'+(groups.join('、')||'無')+'):',groups[0]||(course+'-組'));if(!group)return;group=group.trim();
+  assignStation(c2,course,group);renderStationManagerTable();renderAll();toast('已新增','「'+c2+'」→ '+course+' / '+group);
+}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+// 綁定按鈕
+$('#stationMgrBtn').onclick=openStationManager;
+
+
 const BACKUP_KEY='fleet_clear_backup_v1';
 function saveBackup(){
   try{

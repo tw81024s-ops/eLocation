@@ -810,6 +810,7 @@ const ORG_DEFAULT=[
  ['南一課','南一南組',['SS3','St4','SS7','St8']],
  ['南二課','南二北組',['Kt2']],
  ['南二課','南二南組',['KS1','KS3']],
+ ['區域外包','區域外包',[]],
 ];
 let ORG=ORG_DEFAULT.map(e=>[e[0],e[1],e[2].slice()]);
 let BR2GRP={},BR2CRS={};
@@ -821,7 +822,15 @@ function rebuildOrg(){
   GROUP_ORDER=ORG.map(o=>o[1]);
 }
 const ORG_KEY='fleet_org_v1';
-function loadOrgOverride(){try{const s=localStorage.getItem(ORG_KEY);if(s){const arr=JSON.parse(s);if(Array.isArray(arr)&&arr.length)ORG=arr;}}catch(e){}rebuildOrg();}
+function loadOrgOverride(){
+  try{const s=localStorage.getItem(ORG_KEY);if(s){const arr=JSON.parse(s);if(Array.isArray(arr)&&arr.length)ORG=arr;}}catch(e){}
+  // 自動補上「區域外包」課/組（舊版 localStorage 沒有的話）
+  if(!ORG.some(([c])=>c==='區域外包')){
+    ORG.push(['區域外包','區域外包',[]]);
+    try{localStorage.setItem(ORG_KEY,JSON.stringify(ORG));}catch(e){}
+  }
+  rebuildOrg();
+}
 function saveOrgOverride(){try{localStorage.setItem(ORG_KEY,JSON.stringify(ORG));}catch(e){toast('儲存失敗','瀏覽器儲存空間不足','warn');}}
 function resetOrgToDefault(){ORG=ORG_DEFAULT.map(e=>[e[0],e[1],e[2].slice()]);rebuildOrg();try{localStorage.removeItem(ORG_KEY);}catch(e){}}
 loadOrgOverride();

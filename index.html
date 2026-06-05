@@ -325,6 +325,13 @@ td.b{font-weight:700}
 .sm-tag-on{background:rgba(71,182,90,.18);color:var(--good)}
 .sm-tag-off{background:rgba(127,127,127,.15);color:var(--muted)}
 .sm-tag-extra{background:rgba(230,0,126,.15);color:var(--accent)}
+/* 時間範圍篩選 */
+#periodBar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 18px;margin:12px 18px 0;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+#periodBar .pb-label{font-weight:800;color:var(--accent);font-size:calc(12.5px*var(--fs));margin-right:4px;letter-spacing:.5px}
+#periodBar .pb-btn{padding:5px 11px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--txt);font-size:calc(12.5px*var(--fs));cursor:pointer;font-weight:600;transition:all .15s}
+#periodBar .pb-btn:hover{border-color:var(--accent);color:var(--accent)}
+#periodBar .pb-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:800}
+#periodBar .pb-meta{margin-left:auto;color:var(--muted);font-size:calc(11.5px*var(--fs));font-weight:600;letter-spacing:.3px}
 .scard .rk{position:absolute;top:4px;right:14px;font-family:var(--mono);font-weight:800;font-size:calc(40px*var(--fs));color:#ffdcec;line-height:1}
 .scard-h{display:flex;align-items:center;gap:13px;margin-bottom:10px}
 .scard-h .gb{width:calc(56px*var(--fs));height:calc(56px*var(--fs));border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-family:var(--mono);font-weight:800;font-size:calc(27px*var(--fs))}
@@ -383,6 +390,8 @@ td.b{font-weight:700}
   </header>
 
   <div id="backupBanner" style="display:none"></div>
+
+  <div id="periodBar"></div>
 
   <div class="kpis" id="kpis"></div>
 
@@ -741,17 +750,69 @@ function openModal(title,bodyHtml){
 /* ---------- helpers / render ---------- */
 function gradeCls(g){g=txt(g).toUpperCase();if(!g)return 'g-none';if(g==='A'||g==='B')return 'g-good';if(g==='C'||g==='D')return 'g-warn';return 'g-bad';}
 const gbadge=g=>'<span class="badge '+gradeCls(g)+'">'+(txt(g)||'–')+'</span>';
-const sortedDates=()=>Object.keys(DAILY.days).sort();
+const sortedDates=()=>Object.keys(DAILY.days).filter(inPeriod).sort();
 function allBranches(){const s=new Set();sortedDates().forEach(d=>DAILY.days[d].branches.forEach(b=>s.add(b.branch)));return[...s].sort();}
+/* ===== 時間範圍篩選 PERIOD ===== */
+function _periodDefault(){const n=new Date();return {type:'month',y:n.getFullYear(),m:n.getMonth()+1};}
+let PERIOD=_periodDefault();
+function inPeriod(d){
+  if(!d)return false;
+  if(PERIOD.type==='all')return true;
+  if(PERIOD.type==='month'){return d.startsWith(PERIOD.y+'-'+pad(PERIOD.m));}
+  if(PERIOD.type==='range'){return d>=PERIOD.from&&d<=PERIOD.to;}
+  return true;
+}
+function anomView(){return ANOM.records.filter(r=>inPeriod(r.date));}
+function periodLabel(){
+  if(PERIOD.type==='all')return '全部資料';
+  if(PERIOD.type==='month')return PERIOD.y+'/'+pad(PERIOD.m);
+  if(PERIOD.type==='range')return PERIOD.from+' ~ '+PERIOD.to;
+  return '';
+}
+function changePeriod(type,opts){
+  if(type==='month_cur'){const n=new Date();PERIOD={type:'month',y:n.getFullYear(),m:n.getMonth()+1};}
+  else if(type==='month_prev'){const n=new Date();n.setDate(1);n.setMonth(n.getMonth()-1);PERIOD={type:'month',y:n.getFullYear(),m:n.getMonth()+1};}
+  else if(type==='all'){PERIOD={type:'all'};}
+  else if(type==='custom'&&opts){PERIOD={type:'range',from:opts.from,to:opts.to};}
+  renderPeriodBar();renderAll();
+}
+function renderPeriodBar(){
+  const bar=document.getElementById('periodBar');if(!bar)return;
+  const n=new Date();const curY=n.getFullYear(),curM=n.getMonth()+1;
+  const prev=new Date();prev.setDate(1);prev.setMonth(prev.getMonth()-1);const pY=prev.getFullYear(),pM=prev.getMonth()+1;
+  const isCur=PERIOD.type==='month'&&PERIOD.y===curY&&PERIOD.m===curM;
+  const isPrev=PERIOD.type==='month'&&PERIOD.y===pY&&PERIOD.m===pM;
+  const isAll=PERIOD.type==='all';
+  const isCustom=PERIOD.type==='range';
+  // 計算本範圍內的資料量
+  const datesInPeriod=Object.keys(DAILY.days).filter(inPeriod);
+  const anomCnt=ANOM.records.filter(r=>inPeriod(r.date)&&r.behavior!=='怠速').length;
+  const idleCnt=ANOM.records.filter(r=>inPeriod(r.date)&&r.behavior==='怠速').length;
+  bar.innerHTML='<span class="pb-label">時間範圍</span>'+
+    '<button type="button" class="pb-btn '+(isCur?'active':'')+'" data-pt="month_cur">本月 ('+curY+'/'+pad(curM)+')</button>'+
+    '<button type="button" class="pb-btn '+(isPrev?'active':'')+'" data-pt="month_prev">上月 ('+pY+'/'+pad(pM)+')</button>'+
+    '<button type="button" class="pb-btn '+(isAll?'active':'')+'" data-pt="all">全部資料</button>'+
+    '<button type="button" class="pb-btn '+(isCustom?'active':'')+'" data-pt="custom">自訂日期…'+(isCustom?(' ('+PERIOD.from+'~'+PERIOD.to+')'):'')+'</button>'+
+    '<span class="pb-meta">'+periodLabel()+' · 含 '+datesInPeriod.length+' 天 / 異常 '+anomCnt+' 筆 / 怠速 '+idleCnt+' 筆</span>';
+  bar.querySelectorAll('.pb-btn').forEach(b=>b.onclick=()=>{
+    const t=b.dataset.pt;
+    if(t==='custom'){
+      const from=prompt('起始日期 (YYYY-MM-DD):',PERIOD.from||(curY+'-'+pad(curM)+'-01'));if(!from)return;
+      const to=prompt('結束日期 (YYYY-MM-DD):',PERIOD.to||(curY+'-'+pad(curM)+'-'+pad(new Date(curY,curM,0).getDate())));if(!to)return;
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to)){toast('日期格式錯誤','請用 YYYY-MM-DD 格式','warn');return;}
+      changePeriod('custom',{from,to});
+    }else{changePeriod(t);}
+  });
+}
 function aggDay(bs){return{score:r1(avg(bs.map(b=>b.score))),count:sum(bs.map(b=>b.count)),km:sum(bs.map(b=>b.km)),speedR:r1(avg(bs.map(b=>b.speedR))),turnR:r1(avg(bs.map(b=>b.turnR))),decelR:r1(avg(bs.map(b=>b.decelR))),accelR:r1(avg(bs.map(b=>b.accelR)))};}
 
 function renderKpis(){
   const dates=sortedDates();const k=$('#kpis');
-  if(!dates.length&&!ANOM.records.length){k.innerHTML='';return;}
+  if(!dates.length&&!anomView().length){k.innerHTML='';return;}
   const latest=dates[dates.length-1];let best='–',worst='–',avgScore='–';
   if(latest){const bs=DAILY.days[latest].branches;const br=[...bs].sort((a,b)=>a.rank-b.rank);best=br[0]?br[0].branch:'–';worst=br[br.length-1]?br[br.length-1].branch:'–';avgScore=r1(avg(bs.map(b=>b.score)));}
-  const anomN=ANOM.records.filter(r=>r.behavior!=='怠速').length;
-  const idleN=ANOM.records.filter(r=>r.behavior==='怠速').length;
+  const anomN=anomView().filter(r=>r.behavior!=='怠速').length;
+  const idleN=anomView().filter(r=>r.behavior==='怠速').length;
   // 站所數：用 ORG 編制(可由站所管理修改) 為主，副標顯示資料涵蓋情況
   const orgBranches=Object.keys(BR2CRS);
   const orgN=orgBranches.length;
@@ -1066,7 +1127,7 @@ function wireCrumb(box,targets){box.querySelectorAll('a.crumb').forEach(a=>a.onc
 let SEVERE_BR=new Set(),SEVERE_PER=new Set(),SEVERE_BR_CNT={},SEVERE_PER_CNT={};
 function rebuildSevereCache(){
   SEVERE_BR=new Set();SEVERE_PER=new Set();SEVERE_BR_CNT={};SEVERE_PER_CNT={};
-  ANOM.records.forEach(r=>{
+  anomView().forEach(r=>{
     if(!r.behavior||!r.behavior.includes('超速'))return;
     if(sevOf(r).text!=='嚴重')return;
     // 已設定處置或懲處 → 視為已處理，不計入粉紅警示
@@ -1164,7 +1225,7 @@ function renderRankStation(day,branch){
     '<div class="tot">總分<b>'+f1(b.score)+'<small>分</small></b></div></div>'+weightTableHTML(b)+'</div>'+
     '<div><div class="sc-ttl">安全指數</div>'+gaugeCardsHTML(b,true)+'</div></div></div>';
   // 個人評比（由異常明細彙整該站駕駛）
-  const recs=ANOM.records.filter(r=>r.branch===branch);
+  const recs=anomView().filter(r=>r.branch===branch);
   const ord=['輕度','中度','重度','嚴重'];
   const ppl={};
   recs.forEach(r=>{const k=r.plate+'|'+r.driver;const p=ppl[k]=ppl[k]||{driver:r.driver,plate:r.plate,total:0,beh:{},worst:-1,max:0};
@@ -1198,7 +1259,7 @@ function showPersonDetail(branch,plate,driver){
   const esc=s=>String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
   const stime=t=>{if(!t)return '';const m=String(t).match(/(\d{1,2})\/(\d{1,2})\D+(\d{1,2}:\d{2})/);return m?(pad(m[1])+'/'+pad(m[2])+' '+m[3]):String(t);};
   // 異常（非怠速）
-  const anom=ANOM.records.filter(r=>r.branch===branch&&r.plate===plate&&r.driver===driver&&txt(r.behavior)!=='怠速')
+  const anom=anomView().filter(r=>r.branch===branch&&r.plate===plate&&r.driver===driver&&txt(r.behavior)!=='怠速')
     .sort((a,b)=>num(b.over)-num(a.over));
   // 怠速
   const idleRows=IDLE.filter(r=>r[0]===branch&&r[1]===plate&&r[2]===driver).slice().sort((a,b)=>b[3]-a[3]);
@@ -1240,7 +1301,7 @@ let IDLE=[]; // 由 ANOM 推導：每筆 [分公司, 車號, 駕駛, 分鐘, 結
 let IDLE_DATE='';
 let idleSel={branch:null,plate:null};
 // 從共用的異常資料抽出怠速，讓所有開啟者看到同一份
-function refreshIdle(){const ir=ANOM.records.filter(r=>txt(r.behavior)==='怠速');IDLE=ir.map(r=>[txt(r.branch),txt(r.plate),txt(r.driver),num(r.over),txt(r.time),txt(r.location)]);const ds=[...new Set(ir.map(r=>txt(r.date)).filter(Boolean))].sort();IDLE_DATE=ds[ds.length-1]||'';}
+function refreshIdle(){const ir=anomView().filter(r=>txt(r.behavior)==='怠速');IDLE=ir.map(r=>[txt(r.branch),txt(r.plate),txt(r.driver),num(r.over),txt(r.time),txt(r.location)]);const ds=[...new Set(ir.map(r=>txt(r.date)).filter(Boolean))].sort();IDLE_DATE=ds[ds.length-1]||'';}
 // 怠速分級：依「每位駕駛累計怠速時數」分 A/B/C（單位：分鐘；90=1時30分、145=2時25分）
 const IDLE_RULE=[
   {code:'A',name:'輕度',color:'var(--t-light)',range:'≤ 1時30分',disp:'提醒注意',disc:'—',rule:'—'},
@@ -1379,20 +1440,20 @@ function renderTrend(){
 function setOpts(sel,arr,allLabel){const el=$(sel);const prev=el.value;el.innerHTML='<option value="">'+(allLabel||'全部')+'</option>'+arr.map(x=>'<option>'+x+'</option>').join('');if(arr.includes(prev))el.value=prev;}
 function fillDetailFilters(){
   const br=new Set(),be=new Set(),de=new Set();
-  ANOM.records.forEach(r=>{if(r.behavior==='怠速')return;if(r.branch)br.add(r.branch);if(r.behavior)be.add(r.behavior);if(r.degText)de.add(r.degText);});
+  anomView().forEach(r=>{if(r.behavior==='怠速')return;if(r.branch)br.add(r.branch);if(r.behavior)be.add(r.behavior);if(r.degText)de.add(r.degText);});
   setOpts('#dfBranch',[...br].sort());setOpts('#dfBehavior',[...be].sort());
   const ord=['輕度','中度','重度','嚴重'];setOpts('#dfDegree',[...de].sort((a,b)=>ord.indexOf(a)-ord.indexOf(b)));
   setOpts('#spBranch',[...br].sort(),'全部站所');
-  const dates=[...new Set(ANOM.records.filter(r=>r.behavior&&r.behavior.includes('超速')).map(r=>r.date).filter(Boolean))].sort().reverse();
+  const dates=[...new Set(anomView().filter(r=>r.behavior&&r.behavior.includes('超速')).map(r=>r.date).filter(Boolean))].sort().reverse();
   setOpts('#spDate',dates,'全部（累積）');setOpts('#bpDate',dates,'全部（累積）');
 }
-function filteredAnom(){const b=$('#dfBranch').value,be=$('#dfBehavior').value,de=$('#dfDegree').value,q=$('#dfSearch').value.trim();return ANOM.records.filter(r=>r.behavior!=='怠速'&&(!b||r.branch===b)&&(!be||r.behavior===be)&&(!de||r.degText===de)&&(!q||(r.driver+r.plate+r.location).includes(q)));}
+function filteredAnom(){const b=$('#dfBranch').value,be=$('#dfBehavior').value,de=$('#dfDegree').value,q=$('#dfSearch').value.trim();return anomView().filter(r=>r.behavior!=='怠速'&&(!b||r.branch===b)&&(!be||r.behavior===be)&&(!de||r.degText===de)&&(!q||(r.driver+r.plate+r.location).includes(q)));}
 const detailExpanded={};
 let detailSubSort={key:'over',dir:-1};
 let detailSubFilter={sev:'',status:''};
 function renderDetail(){
   const t=$('#detailTable');
-  if(!ANOM.records.length){emptyTable(t,'尚未匯入異常明細','匯入「異常明細表」(逐筆事件，含駕駛、車號、超速地點)即可查詢。');return;}
+  if(!anomView().length){emptyTable(t,'尚未匯入異常明細','匯入「異常明細表」(逐筆事件，含駕駛、車號、超速地點)即可查詢。');return;}
   const rows=filteredAnom();
   if(!rows.length){emptyTable(t,'無符合條件的資料','調整上方篩選或搜尋條件試試。');return;}
   detailRows=[];
@@ -1502,7 +1563,7 @@ let speedHighlight=null;
 // 首頁摘要卡片 → 浮動視窗列出對應明細（每筆可點跳到超速頁設定）
 function openCardModal(card,br,cell){
   const dF=$('#bpDate')?$('#bpDate').value:'';
-  let recs=ANOM.records.filter(r=>r.behavior&&r.behavior.includes('超速'));
+  let recs=anomView().filter(r=>r.behavior&&r.behavior.includes('超速'));
   if(dF)recs=recs.filter(r=>r.date===dF);
   let title='',list=recs;
   const isHandled=r=>{const d=txt(r.disposal),c=txt(r.disc);return (d&&d!=='-')||(c&&c!=='-');};
@@ -1553,7 +1614,7 @@ function renderSpeed(){
   const minSev=$('#spSev').value,brF=$('#spBranch').value,mi=minSev?ord.indexOf(minSev):-1;
   const dF=$('#spDate')?$('#spDate').value:'';
   const sevFilter=it=>{const t=sevOf(it).text;if(minSev==='嚴重')return t==='嚴重';if(mi>=0)return ord.indexOf(t)>=mi;return true;};
-  let recs=ANOM.records.filter(r=>r.behavior&&r.behavior.includes('超速'));
+  let recs=anomView().filter(r=>r.behavior&&r.behavior.includes('超速'));
   if(dF)recs=recs.filter(r=>r.date===dF);
   if(brF)recs=recs.filter(r=>r.branch===brF);
   recs=recs.filter(sevFilter);
@@ -1640,7 +1701,7 @@ let bpRows=[];
 function bpData(){
   const ord=['輕度','中度','重度','嚴重'];
   const dF=$('#bpDate')?$('#bpDate').value:'';
-  let recs=ANOM.records.filter(r=>r.behavior&&r.behavior.includes('超速'));
+  let recs=anomView().filter(r=>r.behavior&&r.behavior.includes('超速'));
   if(dF)recs=recs.filter(r=>r.date===dF);
   const branches={};
   recs.forEach(r=>{
@@ -1730,7 +1791,7 @@ function renderBranchPpl(){
     wireSort();
   }
 }
-function renderAll(){refreshIdle();renderKpis();renderRank();renderTrend();fillDetailFilters();renderDetail();renderSpeed();renderBranchPpl();renderIdle();renderFoot();}
+function renderAll(){renderPeriodBar();refreshIdle();renderKpis();renderRank();renderTrend();fillDetailFilters();renderDetail();renderSpeed();renderBranchPpl();renderIdle();renderFoot();}
 
 /* ---------- conn / busy ---------- */
 function setConn(state){const p=$('#connPill'),t=$('#connTxt');p.className='pill '+(state==='cloud'?'cloud':state==='err'?'err':'local');t.textContent=state==='cloud'?'雲端已連線':state==='err'?'連線失敗':'本機預覽模式';}

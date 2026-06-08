@@ -338,6 +338,44 @@ td.b{font-weight:700}
 .latest-data.stale .ld-dot{background:var(--bad);box-shadow:0 0 6px rgba(224,39,73,.6)}
 .latest-data .ld-stale{color:var(--muted);font-weight:700;margin-left:2px;font-size:calc(11.5px*var(--fs))}
 .latest-data.stale .ld-stale{color:var(--bad)}
+/* === 駕駛月績效 PERF === */
+.perf-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin:0 0 16px}
+.pkpi{position:relative;background:linear-gradient(135deg,#fff 0%,#FFF7FB 100%);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:0 2px 12px rgba(230,0,126,.06);overflow:hidden}
+.pkpi::before{content:'';position:absolute;top:0;left:0;width:4px;height:100%;background:var(--accent);border-radius:14px 0 0 14px}
+.pkpi.pkpi-warn::before{background:var(--bad)}
+.pkpi.pkpi-acc::before{background:linear-gradient(180deg,#FFB800,#F0A500)}
+.pkpi .pk-lbl{font-size:calc(11.5px*var(--fs));color:var(--muted);font-weight:700;letter-spacing:.6px;margin-bottom:6px}
+.pkpi .pk-val{font-size:calc(28px*var(--fs));font-weight:900;color:var(--accent);line-height:1.1;letter-spacing:-.5px}
+.pkpi .pk-val span{font-size:calc(13px*var(--fs));color:var(--muted);font-weight:700;margin-left:3px}
+.pkpi.pkpi-warn .pk-val{color:var(--bad)}
+.pkpi.pkpi-acc .pk-val{color:#a36400;font-size:calc(22px*var(--fs))}
+.pkpi .pk-sub{font-size:calc(11.5px*var(--fs));color:var(--muted);margin-top:4px;font-weight:600}
+.perf-tbl-wrap{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:auto;max-height:70vh}
+.perf-tbl{width:100%;border-collapse:collapse;font-size:calc(12.5px*var(--fs))}
+.perf-tbl thead th{position:sticky;top:0;background:linear-gradient(180deg,#FFE3EF 0%,#FFD3E4 100%);color:var(--accent);font-weight:800;padding:11px 10px;text-align:left;letter-spacing:.3px;border-bottom:2px solid var(--accent);z-index:1}
+.perf-tbl thead th.num{text-align:right}
+.perf-tbl tbody td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+.perf-tbl tbody td.num{text-align:right;font-family:var(--mono),Consolas,monospace}
+.perf-tbl tbody tr:hover{background:rgba(230,0,126,.04)}
+.perf-tbl .pr-rank{text-align:center}
+.perf-tbl .rk{display:inline-block;min-width:28px;padding:3px 7px;border-radius:7px;background:var(--panel2);color:var(--muted);font-weight:800;font-size:calc(11.5px*var(--fs))}
+.perf-tbl .rk.rk-top1{background:linear-gradient(135deg,#FFD700,#FFA500);color:#fff;box-shadow:0 2px 6px rgba(255,165,0,.4)}
+.perf-tbl .rk.rk-top2{background:linear-gradient(135deg,#C0C0C0,#888);color:#fff;box-shadow:0 2px 6px rgba(150,150,150,.3)}
+.perf-tbl .rk.rk-top3{background:linear-gradient(135deg,#CD7F32,#8B5A2B);color:#fff;box-shadow:0 2px 6px rgba(139,90,43,.3)}
+.perf-tbl .pr-driver b{color:var(--txt)}
+.perf-tbl .pr-driver .pr-plate{font-size:calc(10.5px*var(--fs));color:var(--muted);font-family:var(--mono),Consolas;margin-top:1px}
+.perf-tbl .pr-drive{position:relative;min-width:200px}
+.perf-tbl .pr-bar{position:relative;height:18px;background:var(--panel2);border-radius:6px;overflow:hidden}
+.perf-tbl .pr-bar-fill{position:absolute;top:0;left:0;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:6px;transition:width .3s}
+.perf-tbl .pr-bar-txt{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:calc(11px*var(--fs));font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.4);white-space:nowrap}
+.perf-tbl .pr-pct{display:inline-block;padding:3px 9px;border-radius:7px;font-weight:800;font-size:calc(11.5px*var(--fs))}
+.perf-tbl .pr-pct.pr-ok{background:rgba(71,182,90,.18);color:#15a85c}
+.perf-tbl .pr-pct.pr-warn{background:rgba(240,164,10,.18);color:#a36400}
+.perf-tbl .pr-pct.pr-bad{background:rgba(224,39,73,.18);color:var(--bad)}
+.empty-perf{text-align:center;padding:60px 20px;background:#fff;border:2px dashed var(--line);border-radius:14px}
+.empty-perf .ep-icon{font-size:48px;margin-bottom:10px}
+.empty-perf .ep-title{font-size:calc(16px*var(--fs));font-weight:800;color:var(--txt);margin-bottom:6px}
+.empty-perf .ep-desc{font-size:calc(13px*var(--fs));color:var(--muted);line-height:1.7}
 .scard .rk{position:absolute;top:4px;right:14px;font-family:var(--mono);font-weight:800;font-size:calc(40px*var(--fs));color:#ffdcec;line-height:1}
 .scard-h{display:flex;align-items:center;gap:13px;margin-bottom:10px}
 .scard-h .gb{width:calc(56px*var(--fs));height:calc(56px*var(--fs));border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-family:var(--mono);font-weight:800;font-size:calc(27px*var(--fs))}
@@ -408,6 +446,7 @@ td.b{font-weight:700}
     <div class="tab" data-tab="detail">異常明細查詢</div>
     <div class="tab" data-tab="speed">超速名單分類</div>
     <div class="tab" data-tab="idle">怠速查看</div>
+    <div class="tab" data-tab="perf">駕駛績效</div>
   </div>
 
   <section class="panel" id="p-rank">
@@ -492,6 +531,29 @@ td.b{font-weight:700}
     </div>
     <div id="idleView" class="rankview"></div>
     <input type="file" id="idleFileInput" accept=".xlsx,.xls" multiple hidden>
+  </section>
+
+  <section class="panel" id="p-perf">
+    <div class="toolbar">
+      <div class="field"><label>月份</label><select id="perfMonth"></select></div>
+      <div class="field"><label>課別</label><select id="perfCourse"><option value="">全部</option></select></div>
+      <div class="field" style="margin:0"><input type="text" id="perfSearch" placeholder="搜尋駕駛／車號／站…" style="min-width:200px"></div>
+      <div class="field"><label>排序</label><select id="perfSort">
+        <option value="drive">總出車時數(高→低)</option>
+        <option value="km">總里程(高→低)</option>
+        <option value="run">總開車時數(高→低)</option>
+        <option value="idle">總怠速時數(高→低)</option>
+        <option value="idleRatio">怠速比(高→低)</option>
+        <option value="days">出車天數(高→低)</option>
+      </select></div>
+      <button class="btn primary" id="perfImportBtn">📥 匯入績效 Excel</button>
+      <button class="btn" id="perfExport">匯出 CSV</button>
+      <button class="btn ghost danger" id="perfDeleteMonth" title="刪除目前所選月份的資料">🗑 刪除此月</button>
+      <span class="meta" id="perfMeta" style="margin-left:auto"></span>
+    </div>
+    <div id="perfKpis" class="perf-kpis"></div>
+    <div id="perfBody"></div>
+    <input type="file" id="perfFileInput" accept=".xlsx,.xls" multiple hidden>
   </section>
 
   <div class="note" id="footnote"></div>
@@ -624,6 +686,54 @@ function parseSpeedDetailAOA(aoa){
   return recs.length?recs:null;
 }
 const anomUniq=x=>[x.date,x.plate,x.driver,x.time,x.location,x.maxSpeed].join('|');
+/* === 駕駛月績效 PERF（單獨儲存於 localStorage，與 DAILY/ANOM 分開）=== */
+const PERF_KEY='fleet_perf_v1';
+let PERF={months:{}};
+function loadPerf(){try{const s=localStorage.getItem(PERF_KEY);if(s){const o=JSON.parse(s);if(o&&o.months)PERF=o;}}catch(e){}}
+function savePerf(){try{localStorage.setItem(PERF_KEY,JSON.stringify(PERF));}catch(e){toast('儲存失敗','瀏覽器空間不足，請清除部分舊月份資料','warn');}}
+function hmToMin(s){s=String(s==null?'':s);const m=s.match(/(\d+)時(\d+)分/);if(m)return parseInt(m[1])*60+parseInt(m[2]);const m2=s.match(/(\d+)\s*時/);if(m2)return parseInt(m2[1])*60;const m3=s.match(/(\d+)\s*分/);if(m3)return parseInt(m3[1]);return 0;}
+function minToHM(m){m=Math.max(0,Math.round(m||0));const h=Math.floor(m/60);return h+'時'+pad(m%60)+'分';}
+function parsePerfAOA(aoa){
+  const hi=findRow(aoa,r=>{const t=r.map(txt);return t.includes('駕駛')&&t.includes('車號')&&t.some(c=>c.includes('總出車時數'));});
+  if(hi<0)return null;
+  const h=aoa[hi].map(txt);
+  const find=p=>{for(let i=0;i<h.length;i++)if(p(h[i]))return i;return -1;};
+  const col={
+    course:h.indexOf('課別'),branch:h.indexOf('分公司'),driver:h.indexOf('駕駛'),plate:h.indexOf('車號'),
+    days:find(x=>x.includes('出車天數')),
+    driveT:find(x=>x.includes('總出車時數')),drive1:find(x=>x.includes('單日平均出車')),
+    engineT:find(x=>x.includes('總發動時數')),engine1:find(x=>x.includes('單日平均發動')),
+    runT:find(x=>x.includes('總開車時數')),run1:find(x=>x.includes('單日平均開車')),
+    idleT:find(x=>x.includes('總怠速時數')),idle1:find(x=>x.includes('單日平均怠速')),
+    stopT:find(x=>x.includes('總熄火時數')),stop1:find(x=>x.includes('單日平均熄火')),
+    km:find(x=>x.includes('總里程數')),fuel:find(x=>x.includes('油耗')),co2:find(x=>x.includes('碳排')),cost:find(x=>x.includes('總成本'))
+  };
+  if(col.driver<0||col.plate<0||col.driveT<0)return null;
+  // 從前幾列描述抓月份
+  let month='';
+  for(let i=0;i<hi;i++){const row=aoa[i]||[];for(let c=0;c<row.length;c++){const s=txt(row[c]);
+    let m=s.match(/(\d{4})\s*年\s*(\d{1,2})\s*月/)||s.match(/(\d{4})[-\/](\d{1,2})[-\/]\d{1,2}/);
+    if(m){month=m[1]+'-'+pad(m[2]);break;}}if(month)break;}
+  if(!month){const n=new Date();n.setDate(0);month=n.getFullYear()+'-'+pad(n.getMonth()+1);} // fallback: 上個月
+  const records=[];
+  for(let i=hi+1;i<aoa.length;i++){
+    const r=aoa[i];const driver=txt(r[col.driver]);const plate=txt(r[col.plate]);
+    if(!driver||driver==='駕駛'||!plate)continue;
+    records.push({
+      course:txt(r[col.course]),branch:txt(r[col.branch]),driver,plate,
+      days:num(r[col.days]),
+      driveMin:hmToMin(r[col.driveT]),driveDayMin:hmToMin(r[col.drive1]),
+      engineMin:hmToMin(r[col.engineT]),engineDayMin:hmToMin(r[col.engine1]),
+      runMin:hmToMin(r[col.runT]),runDayMin:hmToMin(r[col.run1]),
+      idleMin:hmToMin(r[col.idleT]),idleDayMin:hmToMin(r[col.idle1]),
+      stopMin:hmToMin(r[col.stopT]),stopDayMin:hmToMin(r[col.stop1]),
+      km:num(r[col.km]),fuel:num(r[col.fuel]),co2:num(r[col.co2]),cost:num(r[col.cost])
+    });
+  }
+  if(!records.length)return null;
+  return {month,records};
+}
+loadPerf();
 /* === Excel「公式」分類：依 法定限速級距 + 超過km 判定異常程度 === */
 const SEV_CODE={正常:'',輕度:'A',中度:'B',重度:'C',嚴重:'D'};
 const SUGGEST_DISP={正常:'',輕度:'',中度:'面談單',重度:'改善單',嚴重:'/扣牌'};
@@ -659,10 +769,14 @@ async function handleFiles(files){
   const rep={dDates:new Set(),dAdd:0,dUpd:[],aNew:0,aUpd:0,aDup:[],aUpdList:[],iNew:0,iUpd:0,iDup:0};
   const seenInThisImport={};
   let idleSheets=0;
+  const perfImports=[];
   for(const f of files){
     let wb;try{const buf=await f.arrayBuffer();wb=XLSX.read(buf,{type:'array'});}catch(e){bad++;continue;}
     for(const name of wb.SheetNames){
       const aoa=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:false,defval:''});
+      // 駕駛月績效格式辨識(獨立於 DAILY/ANOM)
+      const pf=parsePerfAOA(aoa);
+      if(pf){PERF.months[pf.month]={ts:Date.now(),records:pf.records};savePerf();perfImports.push({month:pf.month,n:pf.records.length});continue;}
       const idle=parseIdleAOA(aoa);          // 自動辨識「怠速明細」→ 轉成異常(行為=怠速)，沿用雲端共用
       let a=null;
       if(idle){idleSheets++;a=idle.rows.map(r=>idleRowToAnom(r,idle.date));}
@@ -707,6 +821,13 @@ async function handleFiles(files){
   }catch(e){ toast('上傳失敗',String(e.message||e)+'（請檢查 GAS 部署/網址）','err'); setBusy(false); renderAll(); return; }
   setBusy(false);
   lastSig=signature();renderAll();
+  // 駕駛月績效匯入提示
+  if(perfImports.length){
+    const pmsg=perfImports.map(p=>p.month+'  共 '+p.n+' 筆').join('、');
+    toast('已匯入駕駛月績效 ✓','請至「駕駛績效」頁籤查看 → '+pmsg);
+    // 若整批只有 perf,沒有 daily/anom/idle,直接結束
+    if(!rep.dDates.size&&!rep.aNew&&!rep.aUpd&&!rep.aDup.length&&!idleSheets)return;
+  }
   // 匯入驗證：收集這次匯入用到的站所代碼，跑驗證
   const importedBranches=new Set();
   dailySnake.forEach(r=>{if(r.branch)importedBranches.add(r.branch);});
@@ -1330,6 +1451,85 @@ function idleAgg(fn){
 }
 function bandsHTML(a){return '<div class="bands">'+IDLE_RULE.map(t=>{const n=t.code==='A'?a.A:t.code==='B'?a.B:a.C;return '<div class="band" style="--bc:'+t.color+'"><span class="bn">'+n+'</span><div class="bt">'+t.name+'（'+t.code+'）</div><div class="bd">'+t.range+'</div></div>';}).join('')+'</div>';}
 function idleStack(a){const t=(a.A+a.B+a.C)||1;return '<div class="stack">'+IDLE_RULE.map(r=>{const n=r.code==='A'?a.A:r.code==='B'?a.B:a.C;return n?('<i style="width:'+(n/t*100).toFixed(1)+'%;background:'+r.color+'"></i>'):'';}).join('')+'</div>';}
+/* ===== 駕駛月績效 PERF 頁籤 ===== */
+let _perfState={month:'',course:'',q:'',sort:'drive'};
+function renderPerf(){
+  const months=Object.keys(PERF.months).sort().reverse();
+  const sel=document.getElementById('perfMonth');if(!sel)return;
+  // 月份下拉(維持選擇)
+  const cur=_perfState.month&&months.includes(_perfState.month)?_perfState.month:(months[0]||'');
+  _perfState.month=cur;
+  sel.innerHTML=months.length?months.map(m=>'<option value="'+m+'"'+(m===cur?' selected':'')+'>'+m+'</option>').join(''):'<option value="">尚未匯入</option>';
+  const body=document.getElementById('perfBody');
+  const kpis=document.getElementById('perfKpis');
+  const meta=document.getElementById('perfMeta');
+  if(!cur||!PERF.months[cur]||!PERF.months[cur].records.length){
+    kpis.innerHTML='';meta.textContent='';
+    body.innerHTML='<div class="empty-perf"><div class="ep-icon">📊</div><div class="ep-title">尚未匯入駕駛月績效</div><div class="ep-desc">點上方「📥 匯入績效 Excel」匯入「月績效排行表」(例如 5月績效總表.xlsx)</div></div>';
+    return;
+  }
+  const all=PERF.months[cur].records;
+  const ts=PERF.months[cur].ts?new Date(PERF.months[cur].ts).toLocaleString():'';
+  // 課別下拉
+  const courses=[...new Set(all.map(r=>r.course).filter(Boolean))];
+  const cSel=document.getElementById('perfCourse');
+  const curC=_perfState.course;
+  cSel.innerHTML='<option value="">全部</option>'+courses.map(c=>'<option value="'+esc(c)+'"'+(c===curC?' selected':'')+'>'+esc(c)+'</option>').join('');
+  // 過濾
+  let list=all.slice();
+  if(curC)list=list.filter(r=>r.course===curC);
+  if(_perfState.q){const q=_perfState.q.toLowerCase();list=list.filter(r=>(r.driver+' '+r.plate+' '+r.branch).toLowerCase().includes(q));}
+  // 排序
+  const sortMap={drive:r=>-r.driveMin,km:r=>-r.km,run:r=>-r.runMin,idle:r=>-r.idleMin,idleRatio:r=>-(r.runMin?r.idleMin/r.runMin:0),days:r=>-r.days};
+  list.sort((a,b)=>sortMap[_perfState.sort](a)-sortMap[_perfState.sort](b));
+  // KPI 卡片
+  const tot=(k)=>list.reduce((s,r)=>s+r[k],0);
+  const totDriveMin=tot('driveMin'),totRunMin=tot('runMin'),totIdleMin=tot('idleMin'),totKm=tot('km'),totDays=tot('days');
+  const avgDayDriveMin=list.length?Math.round(list.reduce((s,r)=>s+r.driveDayMin,0)/list.length):0;
+  const idleRatio=totRunMin?(totIdleMin/totRunMin*100):0;
+  // 找排行龍頭
+  const topDrive=list[0];
+  const topKm=list.slice().sort((a,b)=>b.km-a.km)[0];
+  const topIdle=list.slice().sort((a,b)=>(b.runMin?b.idleMin/b.runMin:0)-(a.runMin?a.idleMin/a.runMin:0))[0];
+  kpis.innerHTML=
+    '<div class="pkpi"><div class="pk-lbl">駕駛人數</div><div class="pk-val">'+list.length+'<span> 位</span></div><div class="pk-sub">本月 '+all.length+' 位'+(curC?'，目前篩 '+curC:'')+'</div></div>'+
+    '<div class="pkpi"><div class="pk-lbl">總出車時數</div><div class="pk-val">'+Math.round(totDriveMin/60)+'<span> 時</span></div><div class="pk-sub">單日平均 '+minToHM(avgDayDriveMin)+'</div></div>'+
+    '<div class="pkpi"><div class="pk-lbl">總開車時數</div><div class="pk-val">'+Math.round(totRunMin/60)+'<span> 時</span></div><div class="pk-sub">總怠速 '+Math.round(totIdleMin/60)+' 時</div></div>'+
+    '<div class="pkpi pkpi-warn"><div class="pk-lbl">整體怠速比</div><div class="pk-val">'+idleRatio.toFixed(1)+'<span> %</span></div><div class="pk-sub">怠速時數 / 開車時數</div></div>'+
+    '<div class="pkpi"><div class="pk-lbl">總里程</div><div class="pk-val">'+fi(Math.round(totKm))+'<span> km</span></div><div class="pk-sub">人均 '+(list.length?fi(Math.round(totKm/list.length)):0)+' km</div></div>'+
+    '<div class="pkpi pkpi-acc"><div class="pk-lbl">出車冠軍</div><div class="pk-val">'+(topDrive?esc(topDrive.driver):'-')+'</div><div class="pk-sub">'+(topDrive?(esc(topDrive.branch)+' · '+Math.round(topDrive.driveMin/60)+'時'):'')+'</div></div>';
+  // 表格
+  const maxDrive=Math.max(1,...list.map(r=>r.driveMin));
+  const rows=list.map((r,i)=>{
+    const ratio=r.runMin?(r.idleMin/r.runMin*100):0;
+    const ratioClass=ratio>=40?'pr-bad':ratio>=25?'pr-warn':'pr-ok';
+    const barW=Math.round(r.driveMin/maxDrive*100);
+    const rankBadge=i<3?'<span class="rk rk-top'+(i+1)+'">'+(i+1)+'</span>':'<span class="rk">'+(i+1)+'</span>';
+    return '<tr>'+
+      '<td class="pr-rank">'+rankBadge+'</td>'+
+      '<td>'+esc(r.course)+'</td>'+
+      '<td><b>'+esc(r.branch)+'</b></td>'+
+      '<td class="pr-driver"><b>'+esc(r.driver)+'</b><div class="pr-plate">'+esc(r.plate)+'</div></td>'+
+      '<td class="num">'+r.days+' <small>天</small></td>'+
+      '<td class="num pr-drive"><div class="pr-bar"><div class="pr-bar-fill" style="width:'+barW+'%"></div></div><span class="pr-bar-txt">'+minToHM(r.driveMin)+'</span></td>'+
+      '<td class="num">'+minToHM(r.driveDayMin)+'</td>'+
+      '<td class="num">'+minToHM(r.runMin)+'</td>'+
+      '<td class="num">'+minToHM(r.idleMin)+'</td>'+
+      '<td class="num"><span class="pr-pct '+ratioClass+'">'+ratio.toFixed(1)+'%</span></td>'+
+      '<td class="num">'+fi(Math.round(r.km))+'</td>'+
+      '</tr>';
+  }).join('');
+  body.innerHTML=
+    '<div class="perf-tbl-wrap"><table class="perf-tbl">'+
+    '<thead><tr>'+
+      '<th style="width:50px">#</th><th>課</th><th>站</th><th>駕駛 / 車號</th>'+
+      '<th class="num">出車天</th><th class="num" style="min-width:200px">總出車時數</th>'+
+      '<th class="num">單日出車</th><th class="num">總開車</th><th class="num">總怠速</th>'+
+      '<th class="num">怠速比</th><th class="num">總里程(km)</th>'+
+    '</tr></thead>'+
+    '<tbody>'+rows+'</tbody></table></div>';
+  meta.innerHTML='共 '+list.length+' 位駕駛'+(curC?'(篩 '+curC+')':'')+' &nbsp;·&nbsp; 月份 <b>'+cur+'</b>'+(ts?' &nbsp;·&nbsp; 匯入 '+ts:'');
+}
 function renderIdle(){
   const box=$('#idleView');if(!box)return;
   refreshIdle();
@@ -1797,7 +1997,7 @@ function renderBranchPpl(){
     wireSort();
   }
 }
-function renderAll(){renderPeriodBar();renderLatestData();refreshIdle();renderKpis();renderRank();renderTrend();fillDetailFilters();renderDetail();renderSpeed();renderBranchPpl();renderIdle();renderFoot();}
+function renderAll(){renderPeriodBar();renderLatestData();refreshIdle();renderKpis();renderRank();renderTrend();fillDetailFilters();renderDetail();renderSpeed();renderBranchPpl();renderIdle();renderPerf();renderFoot();}
 function renderLatestData(){
   const el=document.getElementById('latestData');if(!el)return;
   // 取所有資料來源中最大的日期(不受時間範圍篩選影響)
@@ -2072,6 +2272,26 @@ $('#clearBtn').onclick=async()=>{
 
 function gotoTab(name){$$('.tab').forEach(x=>x.classList.toggle('on',x.dataset.tab===name));$$('.panel').forEach(p=>p.classList.toggle('on',p.id==='p-'+name));if(name==='trend')renderTrend();if(name==='branchppl')renderBranchPpl();if(name==='idle')renderIdle();window.scrollTo({top:0,behavior:'smooth'});}
 $$('.tab').forEach(t=>t.onclick=()=>gotoTab(t.dataset.tab));
+/* 績效頁籤事件 */
+$('#perfImportBtn').onclick=()=>{if(!busy)$('#perfFileInput').click();};
+$('#perfFileInput').onchange=e=>{if(e.target.files.length)handleFiles([...e.target.files]);e.target.value='';};
+$('#perfMonth').onchange=e=>{_perfState.month=e.target.value;renderPerf();};
+$('#perfCourse').onchange=e=>{_perfState.course=e.target.value;renderPerf();};
+$('#perfSort').onchange=e=>{_perfState.sort=e.target.value;renderPerf();};
+$('#perfSearch').oninput=e=>{_perfState.q=e.target.value.trim();renderPerf();};
+$('#perfDeleteMonth').onclick=()=>{
+  const m=_perfState.month;if(!m||!PERF.months[m]){toast('沒有可刪除的月份','','warn');return;}
+  if(!confirm('確定要刪除 '+m+' 的駕駛績效資料?\n\n共 '+PERF.months[m].records.length+' 筆,資料只存在這台電腦的瀏覽器,刪除後若沒備份就找不回來。'))return;
+  delete PERF.months[m];savePerf();_perfState.month='';renderPerf();toast('已刪除 '+m+' 的績效資料','');
+};
+$('#perfExport').onclick=()=>{
+  const m=_perfState.month;if(!m||!PERF.months[m]){toast('沒有可匯出的資料','','warn');return;}
+  const recs=PERF.months[m].records;
+  const head=['課別','分公司','駕駛','車號','出車天數','總出車時數','單日平均出車','總開車時數','總怠速時數','怠速比%','總里程(km)'];
+  const csv=[head.join(',')].concat(recs.map(r=>{const ratio=r.runMin?(r.idleMin/r.runMin*100).toFixed(1):'0';return [r.course,r.branch,r.driver,r.plate,r.days,minToHM(r.driveMin),minToHM(r.driveDayMin),minToHM(r.runMin),minToHM(r.idleMin),ratio,Math.round(r.km)].join(',');})).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='績效_'+m+'.csv';a.click();URL.revokeObjectURL(url);
+};
 /* 怠速匯入 / 清除 / 匯出 事件 */
 $('#idleImportBtn').onclick=()=>{if(!busy)$('#idleFileInput').click();};
 $('#idleSearch').oninput=()=>{idleSel={branch:null,plate:null};renderIdle();};

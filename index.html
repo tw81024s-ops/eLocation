@@ -331,6 +331,12 @@ td.b{font-weight:700}
 #periodBar .pb-btn{padding:5px 11px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--txt);font-size:calc(12.5px*var(--fs));cursor:pointer;font-weight:600;transition:all .15s}
 #periodBar .pb-btn:hover{border-color:var(--accent);color:var(--accent)}
 #periodBar .pb-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);font-weight:800}
+#periodBar .pb-quick{background:var(--panel2);color:var(--muted)}
+#periodBar .pb-quick:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
+#periodBar .pb-sel{padding:5px 9px;border:1px solid var(--line);border-radius:7px;background:#fff;color:var(--txt);font-size:calc(12.5px*var(--fs));font-weight:700;cursor:pointer;font-family:inherit}
+#periodBar .pb-sel:hover:not(:disabled){border-color:var(--accent)}
+#periodBar .pb-sel:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(230,0,126,.15)}
+#periodBar .pb-sel:disabled{opacity:.4;cursor:not-allowed}
 #periodBar .pb-meta{margin-left:auto;color:var(--muted);font-size:calc(11.5px*var(--fs));font-weight:600;letter-spacing:.3px}
 .latest-data{display:inline-flex;align-items:center;gap:7px;margin-top:7px;padding:4px 13px;background:#fff;border:1px solid rgba(255,255,255,.6);border-radius:99px;font-size:calc(12.5px*var(--fs));color:var(--accent);font-weight:800;letter-spacing:.4px;width:fit-content;box-shadow:0 2px 8px rgba(0,0,0,.08)}
 .latest-data .ld-dot{width:8px;height:8px;border-radius:50%;background:#15a85c;box-shadow:0 0 6px rgba(21,168,92,.5)}
@@ -376,6 +382,37 @@ td.b{font-weight:700}
 .empty-perf .ep-icon{font-size:48px;margin-bottom:10px}
 .empty-perf .ep-title{font-size:calc(16px*var(--fs));font-weight:800;color:var(--txt);margin-bottom:6px}
 .empty-perf .ep-desc{font-size:calc(13px*var(--fs));color:var(--muted);line-height:1.7}
+/* PERF 麵包屑 + drill */
+.pcrumb-bar{display:flex;align-items:center;gap:6px;padding:10px 14px;margin-bottom:14px;background:linear-gradient(90deg,#FFE3EF 0%,#FFF7FB 100%);border:1px solid var(--accent);border-radius:10px;font-size:calc(13.5px*var(--fs))}
+.pcrumb-bar a.pcrumb:hover{text-decoration:underline}
+.psum-tbl tbody tr.psum-row{cursor:pointer;transition:background .12s}
+.psum-tbl tbody tr.psum-row:hover{background:linear-gradient(90deg,rgba(230,0,126,.08),rgba(230,0,126,.02))}
+.perf-tbl tbody tr.pdrv-row{cursor:pointer}
+.perf-tbl tbody td.psum-go{font-size:18px;color:var(--accent);font-weight:800;text-align:center}
+.perf-tbl tbody tr:hover td.psum-go{color:var(--accent2)}
+/* 個人駕駛詳細卡 */
+.pdc{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 4px 16px rgba(230,0,126,.08)}
+.pdc-head{display:flex;align-items:center;gap:18px;padding:20px 24px;background:linear-gradient(135deg,#FFE3EF 0%,#FFD3E4 100%);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.pdc-avatar{width:56px;height:56px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:30px;box-shadow:0 4px 10px rgba(230,0,126,.15)}
+.pdc-id{flex:1;min-width:180px}
+.pdc-name{font-size:calc(22px*var(--fs));font-weight:900;color:var(--accent);letter-spacing:.5px}
+.pdc-meta{font-size:calc(13px*var(--fs));color:var(--muted);font-weight:600;margin-top:3px}
+.pdc-ranks{display:flex;gap:10px;flex-wrap:wrap}
+.pdc-rank-item{background:#fff;padding:8px 14px;border-radius:9px;border:1px solid rgba(255,255,255,.6);min-width:110px}
+.pri-lbl{font-size:calc(10.5px*var(--fs));color:var(--muted);font-weight:700;letter-spacing:.3px}
+.pri-val{font-size:calc(18px*var(--fs));font-weight:900;color:var(--accent);line-height:1.2;margin-top:1px}
+.pri-val span{font-size:calc(11px*var(--fs));color:var(--muted);font-weight:700}
+.pdc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line)}
+.pdc-cell{background:#fff;padding:14px 16px}
+.pdc-cell.pdc-cell-warn{background:linear-gradient(180deg,#FFF7E0,#fff)}
+.pdc-cell.pdc-cell-bad{background:linear-gradient(180deg,#FFE3EF,#fff)}
+.pdc-cell.pdc-cell-ok{background:linear-gradient(180deg,#E8F8EF,#fff)}
+.pdc-lbl{font-size:calc(11.5px*var(--fs));color:var(--muted);font-weight:700;letter-spacing:.3px;margin-bottom:5px}
+.pdc-val{font-size:calc(20px*var(--fs));font-weight:900;color:var(--txt);line-height:1.1;font-family:var(--mono),Consolas,monospace}
+.pdc-val small{font-size:calc(12px*var(--fs));color:var(--muted);font-weight:700;margin-left:2px;font-family:inherit}
+.pdc-cell-bad .pdc-val{color:var(--bad)}
+.pdc-cell-ok .pdc-val{color:#15a85c}
+.pdc-sub{font-size:calc(11px*var(--fs));color:var(--muted);margin-top:4px;font-weight:600}
 .scard .rk{position:absolute;top:4px;right:14px;font-family:var(--mono);font-weight:800;font-size:calc(40px*var(--fs));color:#ffdcec;line-height:1}
 .scard-h{display:flex;align-items:center;gap:13px;margin-bottom:10px}
 .scard-h .gb{width:calc(56px*var(--fs));height:calc(56px*var(--fs));border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-family:var(--mono);font-weight:800;font-size:calc(27px*var(--fs))}
@@ -536,8 +573,7 @@ td.b{font-weight:700}
   <section class="panel" id="p-perf">
     <div class="toolbar">
       <div class="field"><label>月份</label><select id="perfMonth"></select></div>
-      <div class="field"><label>課別</label><select id="perfCourse"><option value="">全部</option></select></div>
-      <div class="field" style="margin:0"><input type="text" id="perfSearch" placeholder="搜尋駕駛／車號／站…" style="min-width:200px"></div>
+      <div class="field" style="margin:0"><input type="text" id="perfSearch" placeholder="搜尋駕駛／車號／站／課組…" style="min-width:220px"></div>
       <div class="field"><label>排序</label><select id="perfSort">
         <option value="drive">總出車時數(高→低)</option>
         <option value="km">總里程(高→低)</option>
@@ -896,39 +932,64 @@ function periodLabel(){
   if(PERIOD.type==='range')return PERIOD.from+' ~ '+PERIOD.to;
   return '';
 }
-function changePeriod(type,opts){
-  if(type==='month_cur'){const n=new Date();PERIOD={type:'month',y:n.getFullYear(),m:n.getMonth()+1};}
-  else if(type==='month_prev'){const n=new Date();n.setDate(1);n.setMonth(n.getMonth()-1);PERIOD={type:'month',y:n.getFullYear(),m:n.getMonth()+1};}
-  else if(type==='all'){PERIOD={type:'all'};}
-  else if(type==='custom'&&opts){PERIOD={type:'range',from:opts.from,to:opts.to};}
-  renderPeriodBar();renderAll();
-}
 function renderPeriodBar(){
   const bar=document.getElementById('periodBar');if(!bar)return;
   const n=new Date();const curY=n.getFullYear(),curM=n.getMonth()+1;
-  const prev=new Date();prev.setDate(1);prev.setMonth(prev.getMonth()-1);const pY=prev.getFullYear(),pM=prev.getMonth()+1;
-  const isCur=PERIOD.type==='month'&&PERIOD.y===curY&&PERIOD.m===curM;
-  const isPrev=PERIOD.type==='month'&&PERIOD.y===pY&&PERIOD.m===pM;
+  // 從資料中蒐集所有出現過的年份(含當年)
+  const yearSet=new Set([curY]);
+  Object.keys(DAILY.days||{}).forEach(d=>{const y=parseInt(String(d).slice(0,4));if(y)yearSet.add(y);});
+  ANOM.records.forEach(r=>{const d=txt(r.date);if(d){const y=parseInt(d.slice(0,4));if(y)yearSet.add(y);}});
+  const yearList=[...yearSet].sort((a,b)=>b-a);
+  // 蒐集每個年-月有資料的集合(讓下拉可標示哪些月份有資料)
+  const ymSet=new Set();
+  Object.keys(DAILY.days||{}).forEach(d=>{const m=String(d).match(/^(\d{4})-(\d{2})/);if(m)ymSet.add(m[1]+'-'+m[2]);});
+  ANOM.records.forEach(r=>{const d=txt(r.date);const m=d.match(/^(\d{4})-(\d{2})/);if(m)ymSet.add(m[1]+'-'+m[2]);});
+  const isMonth=PERIOD.type==='month';
   const isAll=PERIOD.type==='all';
   const isCustom=PERIOD.type==='range';
-  // 計算本範圍內的資料量
-  const datesInPeriod=Object.keys(DAILY.days).filter(inPeriod);
-  const anomCnt=ANOM.records.filter(r=>inPeriod(r.date)&&r.behavior!=='怠速').length;
-  const idleCnt=ANOM.records.filter(r=>inPeriod(r.date)&&r.behavior==='怠速').length;
+  const selY=isMonth?PERIOD.y:curY;
+  const selM=isMonth?PERIOD.m:curM;
+  // 計算範圍內資料量
+  const dCnt=Object.keys(DAILY.days||{}).filter(inPeriod).length;
+  const aCnt=ANOM.records.filter(r=>inPeriod(r.date)&&r.behavior!=='怠速').length;
+  const iCnt=ANOM.records.filter(r=>inPeriod(r.date)&&r.behavior==='怠速').length;
+  const yearOpts=yearList.map(y=>'<option value="'+y+'"'+(y===selY?' selected':'')+'>'+y+' 年</option>').join('');
+  const monthOpts=Array.from({length:12},(_,i)=>i+1).map(m=>{
+    const has=ymSet.has(selY+'-'+pad(m));
+    return '<option value="'+m+'"'+(m===selM?' selected':'')+'>'+m+' 月'+(has?' ●':'')+'</option>';
+  }).join('');
+  const disable=(isAll||isCustom)?' disabled':'';
   bar.innerHTML='<span class="pb-label">時間範圍</span>'+
-    '<button type="button" class="pb-btn '+(isCur?'active':'')+'" data-pt="month_cur">本月 ('+curY+'/'+pad(curM)+')</button>'+
-    '<button type="button" class="pb-btn '+(isPrev?'active':'')+'" data-pt="month_prev">上月 ('+pY+'/'+pad(pM)+')</button>'+
+    '<select id="pbYear" class="pb-sel"'+disable+'>'+yearOpts+'</select>'+
+    '<select id="pbMonth" class="pb-sel"'+disable+'>'+monthOpts+'</select>'+
+    '<button type="button" class="pb-btn pb-quick" data-q="cur">本月</button>'+
+    '<button type="button" class="pb-btn pb-quick" data-q="prev">上月</button>'+
     '<button type="button" class="pb-btn '+(isAll?'active':'')+'" data-pt="all">全部資料</button>'+
-    '<button type="button" class="pb-btn '+(isCustom?'active':'')+'" data-pt="custom">自訂日期…'+(isCustom?(' ('+PERIOD.from+'~'+PERIOD.to+')'):'')+'</button>'+
-    '<span class="pb-meta">'+periodLabel()+' · 含 '+datesInPeriod.length+' 天 / 異常 '+anomCnt+' 筆 / 怠速 '+idleCnt+' 筆</span>';
-  bar.querySelectorAll('.pb-btn').forEach(b=>b.onclick=()=>{
+    '<button type="button" class="pb-btn '+(isCustom?'active':'')+'" data-pt="custom">自訂區間…'+(isCustom?(' ('+PERIOD.from+'~'+PERIOD.to+')'):'')+'</button>'+
+    '<span class="pb-meta">'+periodLabel()+' · 含 '+dCnt+' 天 / 異常 '+aCnt+' 筆 / 怠速 '+iCnt+' 筆</span>';
+  // 綁定事件
+  const applyMonth=()=>{
+    const y=parseInt(document.getElementById('pbYear').value);
+    const m=parseInt(document.getElementById('pbMonth').value);
+    PERIOD={type:'month',y,m};renderPeriodBar();renderAll();
+  };
+  document.getElementById('pbYear').onchange=applyMonth;
+  document.getElementById('pbMonth').onchange=applyMonth;
+  bar.querySelectorAll('.pb-quick').forEach(b=>b.onclick=()=>{
+    if(b.dataset.q==='cur'){PERIOD={type:'month',y:curY,m:curM};}
+    else{const p=new Date();p.setDate(1);p.setMonth(p.getMonth()-1);PERIOD={type:'month',y:p.getFullYear(),m:p.getMonth()+1};}
+    renderPeriodBar();renderAll();
+  });
+  bar.querySelectorAll('.pb-btn[data-pt]').forEach(b=>b.onclick=()=>{
     const t=b.dataset.pt;
     if(t==='custom'){
+      const lastDay=new Date(curY,curM,0).getDate();
       const from=prompt('起始日期 (YYYY-MM-DD):',PERIOD.from||(curY+'-'+pad(curM)+'-01'));if(!from)return;
-      const to=prompt('結束日期 (YYYY-MM-DD):',PERIOD.to||(curY+'-'+pad(curM)+'-'+pad(new Date(curY,curM,0).getDate())));if(!to)return;
+      const to=prompt('結束日期 (YYYY-MM-DD):',PERIOD.to||(curY+'-'+pad(curM)+'-'+pad(lastDay)));if(!to)return;
       if(!/^\d{4}-\d{2}-\d{2}$/.test(from)||!/^\d{4}-\d{2}-\d{2}$/.test(to)){toast('日期格式錯誤','請用 YYYY-MM-DD 格式','warn');return;}
-      changePeriod('custom',{from,to});
-    }else{changePeriod(t);}
+      PERIOD={type:'range',from,to};
+    }else if(t==='all'){PERIOD={type:'all'};}
+    renderPeriodBar();renderAll();
   });
 }
 function aggDay(bs){return{score:r1(avg(bs.map(b=>b.score))),count:sum(bs.map(b=>b.count)),km:sum(bs.map(b=>b.km)),speedR:r1(avg(bs.map(b=>b.speedR))),turnR:r1(avg(bs.map(b=>b.turnR))),decelR:r1(avg(bs.map(b=>b.decelR))),accelR:r1(avg(bs.map(b=>b.accelR)))};}
@@ -1452,11 +1513,44 @@ function idleAgg(fn){
 function bandsHTML(a){return '<div class="bands">'+IDLE_RULE.map(t=>{const n=t.code==='A'?a.A:t.code==='B'?a.B:a.C;return '<div class="band" style="--bc:'+t.color+'"><span class="bn">'+n+'</span><div class="bt">'+t.name+'（'+t.code+'）</div><div class="bd">'+t.range+'</div></div>';}).join('')+'</div>';}
 function idleStack(a){const t=(a.A+a.B+a.C)||1;return '<div class="stack">'+IDLE_RULE.map(r=>{const n=r.code==='A'?a.A:r.code==='B'?a.B:a.C;return n?('<i style="width:'+(n/t*100).toFixed(1)+'%;background:'+r.color+'"></i>'):'';}).join('')+'</div>';}
 /* ===== 駕駛月績效 PERF 頁籤 ===== */
-let _perfState={month:'',course:'',q:'',sort:'drive'};
+let _perfState={month:'',q:'',sort:'drive'};
+let perfSel={course:null,group:null,branch:null,driver:null,plate:null};
+function perfAgg(records){
+  const drivers=records.length;
+  const tot=k=>records.reduce((s,r)=>s+(r[k]||0),0);
+  const totDrive=tot('driveMin'),totRun=tot('runMin'),totIdle=tot('idleMin');
+  return {drivers,totDays:tot('days'),totDrive,totRun,totIdle,totKm:tot('km'),
+    avgDriveDay:drivers?Math.round(records.reduce((s,r)=>s+r.driveDayMin,0)/drivers):0,
+    idleRatio:totRun?totIdle/totRun*100:0};
+}
+function perfCrumb(){
+  const root={course:null,group:null,branch:null,driver:null,plate:null};
+  const parts=[['公司',root]];
+  if(perfSel.course)parts.push([perfSel.course+'課',{...root,course:perfSel.course}]);
+  if(perfSel.group)parts.push([perfSel.group,{...root,course:perfSel.course,group:perfSel.group}]);
+  if(perfSel.branch)parts.push([perfSel.branch,{...root,course:perfSel.course,group:perfSel.group,branch:perfSel.branch}]);
+  if(perfSel.driver)parts.push([perfSel.driver+' / '+perfSel.plate,perfSel]);
+  const links=parts.map((p,i)=>i===parts.length-1
+    ?'<span style="color:var(--txt);font-weight:800">'+esc(p[0])+'</span>'
+    :'<a class="pcrumb" data-i="'+i+'" style="color:var(--accent);cursor:pointer;font-weight:700;text-decoration:none">'+esc(p[0])+'</a>'
+  ).join(' <span style="color:var(--dim);margin:0 4px">›</span> ');
+  return {html:'<div class="pcrumb-bar">'+links+'</div>',targets:parts.map(p=>p[1])};
+}
+function perfKPIs(scopeRecords,scopeLabel){
+  const a=perfAgg(scopeRecords);
+  const topDrive=scopeRecords.slice().sort((x,y)=>y.driveMin-x.driveMin)[0];
+  return '<div class="perf-kpis">'+
+    '<div class="pkpi"><div class="pk-lbl">駕駛人數</div><div class="pk-val">'+a.drivers+'<span> 位</span></div><div class="pk-sub">'+(scopeLabel||'目前範圍')+'</div></div>'+
+    '<div class="pkpi"><div class="pk-lbl">總出車時數</div><div class="pk-val">'+Math.round(a.totDrive/60)+'<span> 時</span></div><div class="pk-sub">單日平均 '+minToHM(a.avgDriveDay)+'</div></div>'+
+    '<div class="pkpi"><div class="pk-lbl">總開車時數</div><div class="pk-val">'+Math.round(a.totRun/60)+'<span> 時</span></div><div class="pk-sub">總怠速 '+Math.round(a.totIdle/60)+' 時</div></div>'+
+    '<div class="pkpi '+(a.idleRatio>=40?'pkpi-warn':'')+'"><div class="pk-lbl">整體怠速比</div><div class="pk-val">'+a.idleRatio.toFixed(1)+'<span> %</span></div><div class="pk-sub">怠速時數 / 開車時數</div></div>'+
+    '<div class="pkpi"><div class="pk-lbl">總里程</div><div class="pk-val">'+fi(Math.round(a.totKm))+'<span> km</span></div><div class="pk-sub">人均 '+(a.drivers?fi(Math.round(a.totKm/a.drivers)):0)+' km</div></div>'+
+    '<div class="pkpi pkpi-acc"><div class="pk-lbl">出車冠軍</div><div class="pk-val">'+(topDrive?esc(topDrive.driver):'-')+'</div><div class="pk-sub">'+(topDrive?(esc(topDrive.branch)+' · '+Math.round(topDrive.driveMin/60)+'時'):'')+'</div></div>'+
+    '</div>';
+}
 function renderPerf(){
   const months=Object.keys(PERF.months).sort().reverse();
   const sel=document.getElementById('perfMonth');if(!sel)return;
-  // 月份下拉(維持選擇)
   const cur=_perfState.month&&months.includes(_perfState.month)?_perfState.month:(months[0]||'');
   _perfState.month=cur;
   sel.innerHTML=months.length?months.map(m=>'<option value="'+m+'"'+(m===cur?' selected':'')+'>'+m+'</option>').join(''):'<option value="">尚未匯入</option>';
@@ -1470,65 +1564,184 @@ function renderPerf(){
   }
   const all=PERF.months[cur].records;
   const ts=PERF.months[cur].ts?new Date(PERF.months[cur].ts).toLocaleString():'';
-  // 課別下拉
-  const courses=[...new Set(all.map(r=>r.course).filter(Boolean))];
-  const cSel=document.getElementById('perfCourse');
-  const curC=_perfState.course;
-  cSel.innerHTML='<option value="">全部</option>'+courses.map(c=>'<option value="'+esc(c)+'"'+(c===curC?' selected':'')+'>'+esc(c)+'</option>').join('');
-  // 過濾
-  let list=all.slice();
-  if(curC)list=list.filter(r=>r.course===curC);
-  if(_perfState.q){const q=_perfState.q.toLowerCase();list=list.filter(r=>(r.driver+' '+r.plate+' '+r.branch).toLowerCase().includes(q));}
-  // 排序
+  kpis.innerHTML='';// 改由各層渲染函式自己呈現 KPI(scope-aware)
+  meta.innerHTML='月份 <b>'+cur+'</b> · 共 '+all.length+' 位駕駛'+(ts?' &nbsp;·&nbsp; 匯入 '+ts:'');
+  // 依 drill 狀態派發
+  if(perfSel.driver&&perfSel.plate)return renderPerfDriverCard(all);
+  if(perfSel.branch)return renderPerfDriversLevel(all);
+  if(perfSel.group)return renderPerfBranchesLevel(all);
+  if(perfSel.course)return renderPerfGroupsLevel(all);
+  return renderPerfCoursesLevel(all);
+}
+/* ----- Level 1: 課別總覽 ----- */
+function renderPerfCoursesLevel(all){
+  const by={};all.forEach(r=>{const k=r.course||'(未分課)';(by[k]=by[k]||[]).push(r);});
+  const nodes=Object.entries(by).map(([n,recs])=>({name:n,agg:perfAgg(recs)}));
+  _renderPerfSummary(all,nodes,'課','course','點課別 → 看組別匯總','公司全部');
+}
+/* ----- Level 2: 組別總覽(課內) ----- */
+function renderPerfGroupsLevel(all){
+  const scope=all.filter(r=>r.course===perfSel.course);
+  const by={};scope.forEach(r=>{const g=BR2GRP[r.branch]||'(未分組)';(by[g]=by[g]||[]).push(r);});
+  const nodes=Object.entries(by).map(([n,recs])=>({name:n,agg:perfAgg(recs)}));
+  _renderPerfSummary(scope,nodes,'組','group','點組別 → 看站別匯總',perfSel.course+'課');
+}
+/* ----- Level 3: 站別總覽(組內) ----- */
+function renderPerfBranchesLevel(all){
+  const scope=all.filter(r=>r.course===perfSel.course&&(BR2GRP[r.branch]||'(未分組)')===perfSel.group);
+  const by={};scope.forEach(r=>{(by[r.branch]=by[r.branch]||[]).push(r);});
+  const nodes=Object.entries(by).map(([n,recs])=>({name:n,agg:perfAgg(recs)}));
+  _renderPerfSummary(scope,nodes,'站','branch','點站 → 看駕駛清單',perfSel.group);
+}
+/* ----- Summary table 通用(Level 1-3) ----- */
+function _renderPerfSummary(scopeRecords,nodes,levelLabel,levelKey,clickHint,scopeName){
+  const q=_perfState.q.toLowerCase();
+  if(q)nodes=nodes.filter(n=>n.name.toLowerCase().includes(q));
+  const sortMap={drive:n=>-n.agg.totDrive,km:n=>-n.agg.totKm,run:n=>-n.agg.totRun,idle:n=>-n.agg.totIdle,idleRatio:n=>-n.agg.idleRatio,days:n=>-n.agg.totDays};
+  nodes.sort((a,b)=>(sortMap[_perfState.sort]||sortMap.drive)(a)-(sortMap[_perfState.sort]||sortMap.drive)(b));
+  const maxDrive=Math.max(1,...nodes.map(n=>n.agg.totDrive));
+  const {html:crumb,targets}=perfCrumb();
+  const kpiHTML=perfKPIs(scopeRecords,scopeName);
+  const rowsHTML=nodes.map((n,i)=>{
+    const r=n.agg.idleRatio;
+    const rc=r>=40?'pr-bad':r>=25?'pr-warn':'pr-ok';
+    const bw=Math.round(n.agg.totDrive/maxDrive*100);
+    const badge=i<3?'<span class="rk rk-top'+(i+1)+'">'+(i+1)+'</span>':'<span class="rk">'+(i+1)+'</span>';
+    return '<tr class="psum-row" data-key="'+esc(n.name)+'" title="'+clickHint+'">'+
+      '<td class="pr-rank">'+badge+'</td>'+
+      '<td><b style="color:var(--accent);font-size:calc(14px*var(--fs))">'+esc(n.name)+'</b></td>'+
+      '<td class="num"><b>'+n.agg.drivers+'</b> <small>位</small></td>'+
+      '<td class="num pr-drive"><div class="pr-bar"><div class="pr-bar-fill" style="width:'+bw+'%"></div></div><span class="pr-bar-txt">'+minToHM(n.agg.totDrive)+'</span></td>'+
+      '<td class="num">'+minToHM(n.agg.avgDriveDay)+'</td>'+
+      '<td class="num">'+minToHM(n.agg.totRun)+'</td>'+
+      '<td class="num">'+minToHM(n.agg.totIdle)+'</td>'+
+      '<td class="num"><span class="pr-pct '+rc+'">'+r.toFixed(1)+'%</span></td>'+
+      '<td class="num">'+fi(Math.round(n.agg.totKm))+'</td>'+
+      '<td class="psum-go">›</td></tr>';
+  }).join('');
+  const body=document.getElementById('perfBody');
+  body.innerHTML=crumb+kpiHTML+
+    '<div class="perf-tbl-wrap"><table class="perf-tbl psum-tbl">'+
+    '<thead><tr>'+
+      '<th style="width:50px">#</th><th>'+levelLabel+'</th><th class="num">駕駛數</th>'+
+      '<th class="num" style="min-width:220px">總出車時數</th>'+
+      '<th class="num">單日均</th><th class="num">總開車</th><th class="num">總怠速</th>'+
+      '<th class="num">怠速比</th><th class="num">總里程(km)</th><th style="width:30px"></th>'+
+    '</tr></thead><tbody>'+
+    (nodes.length?rowsHTML:'<tr><td colspan="10" style="text-align:center;padding:36px;color:var(--muted)">沒有符合條件的資料</td></tr>')+
+    '</tbody></table></div>';
+  // 麵包屑導覽
+  body.querySelectorAll('a.pcrumb').forEach(a=>a.onclick=()=>{perfSel=targets[+a.dataset.i];renderPerf();});
+  // 點列下鑽
+  body.querySelectorAll('tr.psum-row').forEach(tr=>tr.onclick=()=>{
+    const key=tr.dataset.key;
+    if(levelKey==='course')perfSel={course:key,group:null,branch:null,driver:null,plate:null};
+    else if(levelKey==='group')perfSel={course:perfSel.course,group:key,branch:null,driver:null,plate:null};
+    else if(levelKey==='branch')perfSel={course:perfSel.course,group:perfSel.group,branch:key,driver:null,plate:null};
+    renderPerf();
+  });
+}
+/* ----- Level 4: 站內駕駛清單 ----- */
+function renderPerfDriversLevel(all){
+  let list=all.filter(r=>r.branch===perfSel.branch);
+  const scope=list.slice();
+  const q=_perfState.q.toLowerCase();
+  if(q)list=list.filter(r=>(r.driver+' '+r.plate).toLowerCase().includes(q));
   const sortMap={drive:r=>-r.driveMin,km:r=>-r.km,run:r=>-r.runMin,idle:r=>-r.idleMin,idleRatio:r=>-(r.runMin?r.idleMin/r.runMin:0),days:r=>-r.days};
-  list.sort((a,b)=>sortMap[_perfState.sort](a)-sortMap[_perfState.sort](b));
-  // KPI 卡片
-  const tot=(k)=>list.reduce((s,r)=>s+r[k],0);
-  const totDriveMin=tot('driveMin'),totRunMin=tot('runMin'),totIdleMin=tot('idleMin'),totKm=tot('km'),totDays=tot('days');
-  const avgDayDriveMin=list.length?Math.round(list.reduce((s,r)=>s+r.driveDayMin,0)/list.length):0;
-  const idleRatio=totRunMin?(totIdleMin/totRunMin*100):0;
-  // 找排行龍頭
-  const topDrive=list[0];
-  const topKm=list.slice().sort((a,b)=>b.km-a.km)[0];
-  const topIdle=list.slice().sort((a,b)=>(b.runMin?b.idleMin/b.runMin:0)-(a.runMin?a.idleMin/a.runMin:0))[0];
-  kpis.innerHTML=
-    '<div class="pkpi"><div class="pk-lbl">駕駛人數</div><div class="pk-val">'+list.length+'<span> 位</span></div><div class="pk-sub">本月 '+all.length+' 位'+(curC?'，目前篩 '+curC:'')+'</div></div>'+
-    '<div class="pkpi"><div class="pk-lbl">總出車時數</div><div class="pk-val">'+Math.round(totDriveMin/60)+'<span> 時</span></div><div class="pk-sub">單日平均 '+minToHM(avgDayDriveMin)+'</div></div>'+
-    '<div class="pkpi"><div class="pk-lbl">總開車時數</div><div class="pk-val">'+Math.round(totRunMin/60)+'<span> 時</span></div><div class="pk-sub">總怠速 '+Math.round(totIdleMin/60)+' 時</div></div>'+
-    '<div class="pkpi pkpi-warn"><div class="pk-lbl">整體怠速比</div><div class="pk-val">'+idleRatio.toFixed(1)+'<span> %</span></div><div class="pk-sub">怠速時數 / 開車時數</div></div>'+
-    '<div class="pkpi"><div class="pk-lbl">總里程</div><div class="pk-val">'+fi(Math.round(totKm))+'<span> km</span></div><div class="pk-sub">人均 '+(list.length?fi(Math.round(totKm/list.length)):0)+' km</div></div>'+
-    '<div class="pkpi pkpi-acc"><div class="pk-lbl">出車冠軍</div><div class="pk-val">'+(topDrive?esc(topDrive.driver):'-')+'</div><div class="pk-sub">'+(topDrive?(esc(topDrive.branch)+' · '+Math.round(topDrive.driveMin/60)+'時'):'')+'</div></div>';
-  // 表格
+  list.sort((a,b)=>(sortMap[_perfState.sort]||sortMap.drive)(a)-(sortMap[_perfState.sort]||sortMap.drive)(b));
+  const {html:crumb,targets}=perfCrumb();
+  const kpiHTML=perfKPIs(scope,perfSel.branch+' 站');
   const maxDrive=Math.max(1,...list.map(r=>r.driveMin));
   const rows=list.map((r,i)=>{
     const ratio=r.runMin?(r.idleMin/r.runMin*100):0;
-    const ratioClass=ratio>=40?'pr-bad':ratio>=25?'pr-warn':'pr-ok';
-    const barW=Math.round(r.driveMin/maxDrive*100);
-    const rankBadge=i<3?'<span class="rk rk-top'+(i+1)+'">'+(i+1)+'</span>':'<span class="rk">'+(i+1)+'</span>';
-    return '<tr>'+
-      '<td class="pr-rank">'+rankBadge+'</td>'+
-      '<td>'+esc(r.course)+'</td>'+
-      '<td><b>'+esc(r.branch)+'</b></td>'+
+    const rc=ratio>=40?'pr-bad':ratio>=25?'pr-warn':'pr-ok';
+    const bw=Math.round(r.driveMin/maxDrive*100);
+    const badge=i<3?'<span class="rk rk-top'+(i+1)+'">'+(i+1)+'</span>':'<span class="rk">'+(i+1)+'</span>';
+    return '<tr class="pdrv-row" data-driver="'+esc(r.driver)+'" data-plate="'+esc(r.plate)+'" title="點查看個人詳細">'+
+      '<td class="pr-rank">'+badge+'</td>'+
       '<td class="pr-driver"><b>'+esc(r.driver)+'</b><div class="pr-plate">'+esc(r.plate)+'</div></td>'+
       '<td class="num">'+r.days+' <small>天</small></td>'+
-      '<td class="num pr-drive"><div class="pr-bar"><div class="pr-bar-fill" style="width:'+barW+'%"></div></div><span class="pr-bar-txt">'+minToHM(r.driveMin)+'</span></td>'+
+      '<td class="num pr-drive"><div class="pr-bar"><div class="pr-bar-fill" style="width:'+bw+'%"></div></div><span class="pr-bar-txt">'+minToHM(r.driveMin)+'</span></td>'+
       '<td class="num">'+minToHM(r.driveDayMin)+'</td>'+
       '<td class="num">'+minToHM(r.runMin)+'</td>'+
       '<td class="num">'+minToHM(r.idleMin)+'</td>'+
-      '<td class="num"><span class="pr-pct '+ratioClass+'">'+ratio.toFixed(1)+'%</span></td>'+
+      '<td class="num"><span class="pr-pct '+rc+'">'+ratio.toFixed(1)+'%</span></td>'+
       '<td class="num">'+fi(Math.round(r.km))+'</td>'+
-      '</tr>';
+      '<td class="psum-go">›</td></tr>';
   }).join('');
-  body.innerHTML=
+  const body=document.getElementById('perfBody');
+  body.innerHTML=crumb+kpiHTML+
     '<div class="perf-tbl-wrap"><table class="perf-tbl">'+
     '<thead><tr>'+
-      '<th style="width:50px">#</th><th>課</th><th>站</th><th>駕駛 / 車號</th>'+
-      '<th class="num">出車天</th><th class="num" style="min-width:200px">總出車時數</th>'+
+      '<th style="width:50px">#</th><th>駕駛 / 車號</th>'+
+      '<th class="num">出車天</th><th class="num" style="min-width:220px">總出車時數</th>'+
       '<th class="num">單日出車</th><th class="num">總開車</th><th class="num">總怠速</th>'+
-      '<th class="num">怠速比</th><th class="num">總里程(km)</th>'+
-    '</tr></thead>'+
-    '<tbody>'+rows+'</tbody></table></div>';
-  meta.innerHTML='共 '+list.length+' 位駕駛'+(curC?'(篩 '+curC+')':'')+' &nbsp;·&nbsp; 月份 <b>'+cur+'</b>'+(ts?' &nbsp;·&nbsp; 匯入 '+ts:'');
+      '<th class="num">怠速比</th><th class="num">總里程(km)</th><th style="width:30px"></th>'+
+    '</tr></thead><tbody>'+
+    (list.length?rows:'<tr><td colspan="10" style="text-align:center;padding:36px;color:var(--muted)">沒有符合條件的駕駛</td></tr>')+
+    '</tbody></table></div>';
+  body.querySelectorAll('a.pcrumb').forEach(a=>a.onclick=()=>{perfSel=targets[+a.dataset.i];renderPerf();});
+  body.querySelectorAll('tr.pdrv-row').forEach(tr=>tr.onclick=()=>{
+    perfSel={course:perfSel.course,group:perfSel.group,branch:perfSel.branch,driver:tr.dataset.driver,plate:tr.dataset.plate};
+    renderPerf();
+  });
+}
+/* ----- Level 5: 單一駕駛詳細卡 ----- */
+function renderPerfDriverCard(all){
+  const r=all.find(x=>x.branch===perfSel.branch&&x.driver===perfSel.driver&&x.plate===perfSel.plate);
+  if(!r){perfSel.driver=null;perfSel.plate=null;return renderPerf();}
+  const ratio=r.runMin?(r.idleMin/r.runMin*100):0;
+  const rc=ratio>=40?'pr-bad':ratio>=25?'pr-warn':'pr-ok';
+  // 同站內排名
+  const stnList=all.filter(x=>x.branch===perfSel.branch);
+  const stnRankByDrive=stnList.slice().sort((a,b)=>b.driveMin-a.driveMin).findIndex(x=>x.driver===r.driver&&x.plate===r.plate)+1;
+  const stnRankByKm=stnList.slice().sort((a,b)=>b.km-a.km).findIndex(x=>x.driver===r.driver&&x.plate===r.plate)+1;
+  // 公司排名(全部駕駛)
+  const allRankByDrive=all.slice().sort((a,b)=>b.driveMin-a.driveMin).findIndex(x=>x.driver===r.driver&&x.plate===r.plate)+1;
+  const allRankByKm=all.slice().sort((a,b)=>b.km-a.km).findIndex(x=>x.driver===r.driver&&x.plate===r.plate)+1;
+  const {html:crumb,targets}=perfCrumb();
+  const body=document.getElementById('perfBody');
+  // 比例(站內平均對照)
+  const stnAgg=perfAgg(stnList);
+  const cmp=(my,avg,unit,higherIsBetter)=>{
+    if(!avg)return '<span style="color:var(--muted)">—</span>';
+    const diff=my-avg,pct=avg?(diff/avg*100):0;
+    const good=higherIsBetter?(diff>=0):(diff<=0);
+    const color=good?'#15a85c':'var(--bad)';
+    const arr=diff>0?'↑':diff<0?'↓':'';
+    return '<span style="color:'+color+';font-weight:700;font-size:calc(11.5px*var(--fs))">'+arr+' '+Math.abs(Math.round(pct))+'% vs 站均</span>';
+  };
+  body.innerHTML=crumb+
+    '<div class="pdc">'+
+      '<div class="pdc-head">'+
+        '<div class="pdc-avatar">👤</div>'+
+        '<div class="pdc-id">'+
+          '<div class="pdc-name">'+esc(r.driver)+'</div>'+
+          '<div class="pdc-meta">'+esc(r.course)+'課 · '+esc(r.branch)+' · 車號 <b>'+esc(r.plate)+'</b></div>'+
+        '</div>'+
+        '<div class="pdc-ranks">'+
+          '<div class="pdc-rank-item"><div class="pri-lbl">站內排名(出車)</div><div class="pri-val">#'+stnRankByDrive+'<span> / '+stnList.length+'</span></div></div>'+
+          '<div class="pdc-rank-item"><div class="pri-lbl">站內排名(里程)</div><div class="pri-val">#'+stnRankByKm+'<span> / '+stnList.length+'</span></div></div>'+
+          '<div class="pdc-rank-item"><div class="pri-lbl">公司排名(出車)</div><div class="pri-val">#'+allRankByDrive+'<span> / '+all.length+'</span></div></div>'+
+          '<div class="pdc-rank-item"><div class="pri-lbl">公司排名(里程)</div><div class="pri-val">#'+allRankByKm+'<span> / '+all.length+'</span></div></div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="pdc-grid">'+
+        '<div class="pdc-cell"><div class="pdc-lbl">出車天數</div><div class="pdc-val">'+r.days+' <small>天</small></div><div class="pdc-sub">'+cmp(r.days,stnAgg.totDays/stnList.length,'天',true)+'</div></div>'+
+        '<div class="pdc-cell"><div class="pdc-lbl">總出車時數</div><div class="pdc-val">'+minToHM(r.driveMin)+'</div><div class="pdc-sub">'+cmp(r.driveMin,stnAgg.totDrive/stnList.length,'分',true)+'</div></div>'+
+        '<div class="pdc-cell"><div class="pdc-lbl">單日平均出車</div><div class="pdc-val">'+minToHM(r.driveDayMin)+'</div><div class="pdc-sub">'+cmp(r.driveDayMin,stnAgg.avgDriveDay,'分',true)+'</div></div>'+
+        '<div class="pdc-cell"><div class="pdc-lbl">總發動時數</div><div class="pdc-val">'+minToHM(r.engineMin)+'</div><div class="pdc-sub">單日 '+minToHM(r.engineDayMin)+'</div></div>'+
+        '<div class="pdc-cell"><div class="pdc-lbl">總開車時數</div><div class="pdc-val">'+minToHM(r.runMin)+'</div><div class="pdc-sub">單日 '+minToHM(r.runDayMin)+'</div></div>'+
+        '<div class="pdc-cell"><div class="pdc-lbl">總怠速時數</div><div class="pdc-val">'+minToHM(r.idleMin)+'</div><div class="pdc-sub">單日 '+minToHM(r.idleDayMin)+'</div></div>'+
+        '<div class="pdc-cell pdc-cell-'+(rc==='pr-bad'?'bad':rc==='pr-warn'?'warn':'ok')+'"><div class="pdc-lbl">怠速比</div><div class="pdc-val">'+ratio.toFixed(1)+' <small>%</small></div><div class="pdc-sub">'+(ratio>=40?'⚠ 過高':ratio>=25?'稍偏高':'良好')+'</div></div>'+
+        '<div class="pdc-cell"><div class="pdc-lbl">總熄火時數</div><div class="pdc-val">'+minToHM(r.stopMin)+'</div><div class="pdc-sub">單日 '+minToHM(r.stopDayMin)+'</div></div>'+
+        '<div class="pdc-cell"><div class="pdc-lbl">總里程</div><div class="pdc-val">'+fi(Math.round(r.km))+' <small>km</small></div><div class="pdc-sub">'+cmp(r.km,stnAgg.totKm/stnList.length,'km',true)+'</div></div>'+
+        (r.fuel?'<div class="pdc-cell"><div class="pdc-lbl">油耗</div><div class="pdc-val">'+fi(Math.round(r.fuel))+' <small>L</small></div><div class="pdc-sub">'+(r.km?'km/L '+(r.km/r.fuel).toFixed(2):'')+'</div></div>':'')+
+        (r.co2?'<div class="pdc-cell"><div class="pdc-lbl">碳排放</div><div class="pdc-val">'+fi(Math.round(r.co2))+' <small>kg</small></div></div>':'')+
+        (r.cost?'<div class="pdc-cell"><div class="pdc-lbl">總成本</div><div class="pdc-val">'+fi(Math.round(r.cost))+'</div></div>':'')+
+      '</div>'+
+    '</div>';
+  body.querySelectorAll('a.pcrumb').forEach(a=>a.onclick=()=>{perfSel=targets[+a.dataset.i];renderPerf();});
 }
 function renderIdle(){
   const box=$('#idleView');if(!box)return;
@@ -2275,8 +2488,7 @@ $$('.tab').forEach(t=>t.onclick=()=>gotoTab(t.dataset.tab));
 /* 績效頁籤事件 */
 $('#perfImportBtn').onclick=()=>{if(!busy)$('#perfFileInput').click();};
 $('#perfFileInput').onchange=e=>{if(e.target.files.length)handleFiles([...e.target.files]);e.target.value='';};
-$('#perfMonth').onchange=e=>{_perfState.month=e.target.value;renderPerf();};
-$('#perfCourse').onchange=e=>{_perfState.course=e.target.value;renderPerf();};
+$('#perfMonth').onchange=e=>{_perfState.month=e.target.value;perfSel={course:null,group:null,branch:null,driver:null,plate:null};renderPerf();};
 $('#perfSort').onchange=e=>{_perfState.sort=e.target.value;renderPerf();};
 $('#perfSearch').oninput=e=>{_perfState.q=e.target.value.trim();renderPerf();};
 $('#perfDeleteMonth').onclick=()=>{

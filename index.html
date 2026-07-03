@@ -371,9 +371,9 @@ td.b{font-weight:700}
 .perf-tbl .pr-driver b{color:var(--txt)}
 .perf-tbl .pr-driver .pr-plate{font-size:calc(10.5px*var(--fs));color:var(--muted);font-family:var(--mono),Consolas;margin-top:1px}
 .perf-tbl .pr-drive{position:relative;min-width:200px}
-.perf-tbl .pr-bar{position:relative;height:18px;background:var(--panel2);border-radius:6px;overflow:hidden}
-.perf-tbl .pr-bar-fill{position:absolute;top:0;left:0;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:6px;transition:width .3s}
-.perf-tbl .pr-bar-txt{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:calc(11px*var(--fs));font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.4);white-space:nowrap}
+.perf-tbl .pr-bar{position:relative;height:20px;background:#FFE3EF;border-radius:6px;overflow:hidden;border:1px solid rgba(230,0,126,.12)}
+.perf-tbl .pr-bar-fill{position:absolute;top:0;left:0;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:5px;transition:width .3s}
+.perf-tbl .pr-bar-txt{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:calc(11.5px*var(--fs));font-weight:900;color:var(--accent);text-shadow:1px 0 #fff,-1px 0 #fff,0 1px #fff,0 -1px #fff,1px 1px #fff,-1px -1px #fff,1px -1px #fff,-1px 1px #fff;letter-spacing:.3px;white-space:nowrap;font-family:var(--mono),Consolas,monospace}
 .perf-tbl .pr-pct{display:inline-block;padding:3px 9px;border-radius:7px;font-weight:800;font-size:calc(11.5px*var(--fs))}
 .perf-tbl .pr-pct.pr-ok{background:rgba(71,182,90,.18);color:#15a85c}
 .perf-tbl .pr-pct.pr-warn{background:rgba(240,164,10,.18);color:#a36400}
@@ -1825,7 +1825,16 @@ function renderIdleDriver(){
   $('#idleBack2').onclick=()=>{idleSel={branch:br,plate:null};renderIdle();};
 }
 function parseIdleAOA(aoa){
-  const hi=aoa.findIndex(r=>r&&r.some(c=>txt(c)==='分公司')&&r.some(c=>txt(c).includes('持續')));
+  // 加強辨識：怠速表除了 分公司+持續 之外，不應含有 超速時間 / 道路速限 / 當時時速 這些超速專屬欄位
+  const hi=aoa.findIndex(r=>{
+    if(!r)return false;
+    const cells=r.map(c=>txt(c));
+    const hasBranch=cells.some(c=>c==='分公司');
+    const hasDur=cells.some(c=>c.includes('持續'));
+    if(!hasBranch||!hasDur)return false;
+    const isSpeed=cells.some(c=>c.includes('超速時間'))||cells.some(c=>c.includes('道路速限'))||cells.some(c=>c.includes('當時時速'));
+    return !isSpeed;
+  });
   if(hi<0)return null;
   const hdr=aoa[hi].map(txt),ci=n=>hdr.indexOf(n),cf=fn=>{for(let i=0;i<hdr.length;i++)if(fn(hdr[i]))return i;return -1;};
   const iB=ci('分公司'),iP=ci('車號'),iD=ci('駕駛'),iDur=cf(x=>x.includes('持續')),iE=cf(x=>x.includes('迄')),iS=cf(x=>x.includes('起')),iL=cf(x=>x.includes('位置'));

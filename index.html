@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<meta name="build-version" content="20260703-B">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -465,6 +469,7 @@ td.b{font-weight:700}
       <button class="btn" id="refreshBtn" title="重新抓取最新資料"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-2.6-6.4M21 4v5h-5"/></svg>更新</button>
       <button class="btn primary" id="importBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0-12l-4 4m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>匯入 Excel</button>
       <button class="btn ghost" id="stationMgrBtn" type="button" title="管理站所主檔與課/組歸屬">⚙ 站所管理</button>
+      <button class="btn ghost" id="forceReloadBtn" type="button" title="遇到匯入問題或看板行為異常時，可強制清除瀏覽器快取重載入最新版">🔄 強制更新</button>
       <button class="btn ghost danger" id="clearBtn">清除全部</button>
       <input type="file" id="fileInput" accept=".xlsx,.xls" multiple hidden>
     </div>
@@ -2122,7 +2127,9 @@ async function saveAllEdits(){
 function renderFoot(){
   const dates=sortedDates();
   const mode=ONLINE?'資料儲存於 Google 試算表（後台），所有開啟者看到同一份累積資料。':'目前為本機預覽模式：資料只存在你的瀏覽器，不會與他人共享。請依 README 設定 GAS_URL 開啟共享。';
-  $('#footnote').innerHTML=mode+(dates.length?('　目前涵蓋 '+dates.length+' 天（'+dates[0]+' ~ '+dates[dates.length-1]+'）'):'')+'<br>每日匯入新的一天統計表即可持續累積；同一天重複匯入會以最新內容覆蓋，異常明細自動去重。';
+  const ver=document.querySelector('meta[name="build-version"]')?.content||'';
+  $('#footnote').innerHTML=mode+(dates.length?('　目前涵蓋 '+dates.length+' 天（'+dates[0]+' ~ '+dates[dates.length-1]+'）'):'')+'<br>每日匯入新的一天統計表即可持續累積；同一天重複匯入會以最新內容覆蓋，異常明細自動去重。'+
+    (ver?'<div style="margin-top:8px;font-size:calc(11px*var(--fs));color:var(--muted);text-align:right"><span style="background:var(--panel2);padding:3px 9px;border-radius:6px;font-family:var(--mono),Consolas;letter-spacing:.4px">版本 '+esc(ver)+'</span></div>':'');
 }
 // ---------- 站所異常統計（超速）----------
 let bpRows=[];
@@ -2388,6 +2395,13 @@ function openAddStationDialog(){
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 // 綁定按鈕
 $('#stationMgrBtn').onclick=openStationManager;
+$('#forceReloadBtn').onclick=()=>{
+  if(!confirm('強制重新載入會清除瀏覽器對本頁的快取(不影響雲端資料、也不影響站所管理設定)，載入完成後可能需要重新選擇時間範圍。\n\n確定要繼續嗎？'))return;
+  // 嘗試清 service worker cache
+  if('caches' in window){caches.keys().then(ks=>Promise.all(ks.map(k=>caches.delete(k)))).catch(()=>{});}
+  // 用時間戳當 query，繞過瀏覽器快取
+  const u=new URL(location.href);u.searchParams.set('v',Date.now());location.replace(u.toString());
+};
 
 
 const BACKUP_KEY='fleet_clear_backup_v1';

@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-B">
+<meta name="build-version" content="20260703-C">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -854,10 +854,14 @@ async function handleFiles(files){
   }
   try{
     if(ONLINE){
-      setBusy(true,'上傳中…');
+      const totalRows=dailySnake.length+anomSnake.length;
+      setBusy(true,'上傳中…(共 '+totalRows+' 筆變動)');
       if(dailySnake.length)await gasPost({type:'daily',rows:dailySnake,dates:[...dateSet]});
       if(anomSnake.length)await gasPost({type:'anom',rows:anomSnake});
-      await loadAll();
+      // 註：不再呼叫 loadAll() 重新下載雲端全量資料。
+      // 本地 DAILY/ANOM 在解析階段已同步更新，跟剛推上去的雲端內容一致。
+      // 若其他人同時有變更，AUTO_REFRESH_SEC 秒後的自動同步會處理。
+      // 這步省下 5-10 分鐘等待時間（尤其資料量大時）。
     }else{ saveLocal(); }
   }catch(e){ toast('上傳失敗',String(e.message||e)+'（請檢查 GAS 部署/網址）','err'); setBusy(false); renderAll(); return; }
   setBusy(false);

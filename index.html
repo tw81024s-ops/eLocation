@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-L">
+<meta name="build-version" content="20260703-M">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -939,6 +939,8 @@ function sevOf(it){
 }
 function effDisposal(it){const v=txt(it.disposal);return (v&&v!=='-')?v:'';}
 function effDisc(it){const v=txt(it.disc);return (v&&v!=='-')?v:'';}
+// 待處理判定:未設定 disposal/disc 且非輕度(輕度免處理,不列入待處理)
+function isPending(r){if(effDisposal(r)||effDisc(r))return false;return sevOf(r).text!=='輕度';}
 const toDailySnake=(b,date)=>({date,branch:b.branch,grade:b.grade,rank:b.rank,score:b.score,vehicles:b.vehicles,km:b.km,count:b.count,speed_g:b.speedG,speed_r:b.speedR,turn_g:b.turnG,turn_r:b.turnR,decel_g:b.decelG,decel_r:b.decelR,accel_g:b.accelG,accel_r:b.accelR});
 const toAnomSnake=x=>({uniq:anomUniq(x),date:x.date,branch:x.branch,plate:x.plate,driver:x.driver,behavior:x.behavior,level:x.level,time:x.time,max_speed:x.maxSpeed,location:x.location,legal:x.legal,over_km:x.over,deg_text:x.degText,deg_code:x.degCode,disposal:x.disposal,disc:x.disc});
 
@@ -2102,7 +2104,10 @@ function renderDetail(){
     b.items.push(r);b.people.add(r.driver);const sv=(r.behavior&&r.behavior.includes('超速'))?sevOf(r).text:txt(r.degText);if(b.sev[sv]!=null)b.sev[sv]++;
     const isSpd=r.behavior&&r.behavior.includes('超速');
     const disp=isSpd?effDisposal(r):txt(r.disposal);const disc=isSpd?effDisc(r):txt(r.disc);
-    const done=(disp&&disp!=='-')||(disc&&disc!=='-');if(done)b.handled++;else b.unhandled++;});
+    const done=(disp&&disp!=='-')||(disc&&disc!=='-');
+    if(done)b.handled++;
+    else if(sv!=='輕度')b.unhandled++;
+    /* 輕度未處理者視為免處理,不列入 handled 也不列入 unhandled */});
   const branches=Object.keys(byBranch).sort((a,b)=>byBranch[b].items.length-byBranch[a].items.length);
   let html='<thead>'+dashHdrLbl(10)+'<tr class="data-cols"><th></th><th>站所</th><th class="num">異常筆數</th><th class="num">人數</th><th class="num">輕度</th><th class="num">中度</th><th class="num">重度</th><th class="num">嚴重</th><th class="num">已處理</th><th class="num">待處理</th></tr></thead><tbody>';
   // 依課分組
@@ -2141,7 +2146,7 @@ function renderDetail(){
       // 套用篩選
       const filtered=b.items.filter(r=>{
         if(sf.sev){const s=(r.behavior&&r.behavior.includes('超速'))?sevOf(r).text:txt(r.degText);if(s!==sf.sev)return false;}
-        if(sf.status){const disp=txt(r.disposal),disc=txt(r.disc);const done=(disp&&disp!=='-')||(disc&&disc!=='-');if(sf.status==='done'&&!done)return false;if(sf.status==='pending'&&done)return false;}
+        if(sf.status){const disp=txt(r.disposal),disc=txt(r.disc);const done=(disp&&disp!=='-')||(disc&&disc!=='-');const isSpd=r.behavior&&r.behavior.includes('超速');const sv=isSpd?sevOf(r).text:txt(r.degText);if(sf.status==='done'&&!done)return false;if(sf.status==='pending'&&(done||sv==='輕度'))return false;}
         return true;
       });
       const filtMark=(sf.sev||sf.status)?(' · 篩選後 '+filtered.length+' / '+b.items.length+' 筆'):'';
@@ -2238,13 +2243,13 @@ function openCardModal(card,br,cell){
       people.map(p=>'<tr><td class="b">'+esc(p.branch)+'</td><td>'+esc(p.driver)+'</td><td class="num b">'+fi(p.count)+'</td><td class="num">'+fi(p.max)+' km/hr</td></tr>').join('')+'</tbody></table></div>';
     openModal('涉及駕駛（'+people.length+' 人）',html);return;
   }
-  else if(card==='unhandled'){title='待處理事件';list=recs.filter(r=>!isHandled(r));}
+  else if(card==='unhandled'){title='待處理事件（不含輕度）';list=recs.filter(r=>isPending(r));}
   else if(card==='worst'){title='最需關注站所：'+br;list=recs.filter(r=>r.branch===br);}
   else if(card==='cell'){
     list=recs.filter(r=>r.branch===br);
     const sevList=['輕度','中度','重度','嚴重'];
     if(cell==='all')title=br+'：全部超速';
-    else if(cell==='待處理'){title=br+'：待處理';list=list.filter(r=>!isHandled(r));}
+    else if(cell==='待處理'){title=br+'：待處理（不含輕度）';list=list.filter(r=>isPending(r));}
     else if(cell==='未歸類'){title=br+'：未歸類（程度無法判定）';list=list.filter(r=>!sevList.includes(sevOf(r).text));}
     else {title=br+'：'+cell;list=list.filter(r=>sevOf(r).text===cell);}
   }
@@ -2561,7 +2566,9 @@ function bpData(){
     const disp=txt(r.disposal),disc=txt(r.disc);
     const hasDisp=disp&&disp!=='-',hasDisc=disc&&disc!=='-';
     if(hasDisp)p.disp.push(disp);if(hasDisc)p.disc.push(disc);
-    if(hasDisp||hasDisc)b.handled++;else b.unhandled++;
+    if(hasDisp||hasDisc)b.handled++;
+    else if(sv!=='輕度')b.unhandled++;
+    /* 輕度未處理者視為免處理,不列入 handled 也不列入 unhandled */
   });
   return branches;
 }
@@ -2581,7 +2588,7 @@ function renderBranchPpl(){
   const sumCards=[
     {lbl:'超速事件',val:fi(totalEvents),ex:'累積總筆數 · 點擊查看',cls:'c1',card:'all'},
     {lbl:'涉及駕駛',val:fi(totalPeople.size),ex:keys.length+' 個站所 · 點擊查看',cls:'c2',card:'people'},
-    {lbl:'待處理',val:fi(totalUnhandled),ex:(totalUnhandled?'尚未設定處置/懲處':'已全部處理')+' · 點擊查看',cls:totalUnhandled?'c3':'c4',card:'unhandled'},
+    {lbl:'待處理',val:fi(totalUnhandled),ex:(totalUnhandled?'尚未設定處置/懲處(不含輕度)':'已全部處理')+' · 點擊查看',cls:totalUnhandled?'c3':'c4',card:'unhandled'},
     {lbl:'最需關注站所',val:worst?worst.branch:'–',ex:(worst?('重度+嚴重 '+(worst.sev.重度+worst.sev.嚴重)+' 件'):'')+' · 點擊查看',cls:'c5',card:'worst',br:worst?worst.branch:''},
   ];
   if(IDLE.length){const ia=idleAgg(null);sumCards.push({lbl:'怠速事件',val:fi(ia.total),ex:'中度 '+ia.B+' 人 / 重度 '+ia.C+' 人 · 看明細',cls:'c3',card:'idletab'});}

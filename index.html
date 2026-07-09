@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-G">
+<meta name="build-version" content="20260703-H">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -463,7 +463,11 @@ td.b{font-weight:700}
 .rules-edit-bar{position:sticky;bottom:12px;background:#fff;padding:14px 18px;border-radius:12px;box-shadow:0 -4px 20px rgba(230,0,126,.18);border:2px solid var(--accent);display:flex;gap:10px;justify-content:flex-end;align-items:center;margin-top:20px;z-index:5}
 .rules-edit-msg{margin-right:auto;color:#a36400;font-size:calc(12.5px*var(--fs));font-weight:700}
 /* 課分區標題列(站所異常統計、超速名單分類 等) */
-tr.course-hdr td{background:linear-gradient(90deg,rgba(230,0,126,.14),rgba(230,0,126,.02));border-top:2px solid var(--accent);border-bottom:1px solid var(--line);padding:9px 14px !important;letter-spacing:.3px}
+tr.course-hdr td{background:linear-gradient(90deg,rgba(230,0,126,.14),rgba(230,0,126,.02));border-top:2px solid var(--accent);border-bottom:1px solid var(--line);padding:9px 14px !important;letter-spacing:.3px;cursor:pointer;user-select:none;transition:background .12s}
+tr.course-hdr:hover td{background:linear-gradient(90deg,rgba(230,0,126,.24),rgba(230,0,126,.06))}
+tr.course-hdr.single td{cursor:default}
+tr.course-hdr.single:hover td{background:linear-gradient(90deg,rgba(230,0,126,.14),rgba(230,0,126,.02))}
+tr.course-hdr .chdr-toggle{display:inline-block;width:16px;font-weight:800;color:var(--accent);font-size:calc(12px*var(--fs));margin-right:2px}
 tr.course-hdr .chdr-name{font-weight:800;color:var(--accent);font-size:calc(14px*var(--fs));margin-right:14px}
 tr.course-hdr .chdr-stats{font-size:calc(12px*var(--fs));color:var(--muted);font-weight:600}
 tr.course-hdr .chdr-stats b{color:var(--bad)}
@@ -1878,16 +1882,19 @@ function renderIdle(){
     const cRows=_idlByCrs[cName];
     const cSum={events:0,people:0,sumMin:0,A:0,B:0,C:0};
     cRows.forEach(o=>{cSum.events+=o.a.events;cSum.people+=o.a.people;cSum.sumMin+=o.a.sumMin;cSum.A+=o.a.A;cSum.B+=o.a.B;cSum.C+=o.a.C;});
-    h+='<tr class="course-hdr"><td colspan="9">'+
+    const isOnly=_idlCrsKeys.length===1;const isOpen=isOnly||!!crsExpanded[cName];
+    h+='<tr class="course-hdr'+(isOnly?' single':'')+'" data-crs="'+esc2(cName)+'"><td colspan="9">'+
+      '<span class="chdr-toggle">'+(isOnly?'':(isOpen?'▼':'▶'))+'</span>'+
       '<span class="chdr-name">📁 '+cName+'</span>'+
       '<span class="chdr-stats">'+cRows.length+' 站 · '+cSum.people+' 人 · 累計 '+idleFmt(cSum.sumMin)+' · '+cSum.events+' 件'+(cSum.C?(' · 重度 <b>'+cSum.C+' 人</b>'):(cSum.B?(' · 中度 '+cSum.B+' 人'):''))+'</span>'+
       '</td></tr>';
-    cRows.forEach((o,i)=>{h+='<tr class="idle-br" data-br="'+o.branch+'" style="cursor:pointer"><td class="num">'+(i+1)+'</td><td class="b">'+o.branch+'</td>'+
+    if(isOpen)cRows.forEach((o,i)=>{h+='<tr class="idle-br" data-br="'+o.branch+'" style="cursor:pointer"><td class="num">'+(i+1)+'</td><td class="b">'+o.branch+'</td>'+
       '<td class="num b">'+o.a.people+'</td><td class="num" style="font-family:var(--mono)">'+idleFmt(o.a.sumMin)+'</td><td class="num">'+o.a.events+'</td>'+
       '<td class="num" style="color:var(--t-light)">'+(o.a.A||'')+'</td><td class="num" style="color:var(--t-mod)">'+(o.a.B||'')+'</td><td class="num" style="color:var(--t-severe)">'+(o.a.C||'')+'</td>'+
       '<td style="min-width:120px">'+idleStack(o.a)+'</td></tr>';});
   });
   h+='</tbody></table></div></div>';box.innerHTML=h;
+  box.querySelectorAll('tr.course-hdr:not(.single)').forEach(tr=>tr.onclick=()=>{crsExpanded[tr.dataset.crs]=!crsExpanded[tr.dataset.crs];renderIdle();});
   box.querySelectorAll('tr.idle-br').forEach(el=>el.onclick=()=>{idleSel={branch:el.dataset.br,plate:null};renderIdle();});
 }
 // 怠速搜尋：跨站所，依關鍵字比對 駕駛／車號／站所，列出符合的駕駛累計
@@ -1999,6 +2006,7 @@ function fillDetailFilters(){
 }
 function filteredAnom(){const b=$('#dfBranch').value,be=$('#dfBehavior').value,de=$('#dfDegree').value,q=$('#dfSearch').value.trim();return anomView().filter(r=>r.behavior!=='怠速'&&(!b||r.branch===b)&&(!be||r.behavior===be)&&(!de||r.degText===de)&&(!q||(r.driver+r.plate+r.location).includes(q)));}
 const detailExpanded={};
+const crsExpanded={};  // 課的展開狀態(預設全部收合;點擊 course-hdr 切換)
 let detailSubSort={key:'over',dir:-1};
 let detailSubFilter={sev:'',status:''};
 function renderDetail(){
@@ -2025,11 +2033,13 @@ function renderDetail(){
     const cSum={items:0,handled:0,unhandled:0,sev:{輕度:0,中度:0,重度:0,嚴重:0}};
     const cSumPpl=new Set();
     cBranches.forEach(bk=>{const bb=byBranch[bk];cSum.items+=bb.items.length;bb.items.forEach(r=>cSumPpl.add(bb.branch+'|'+r.driver));cSum.handled+=bb.handled;cSum.unhandled+=bb.unhandled;Object.keys(bb.sev).forEach(s=>cSum.sev[s]+=bb.sev[s]);});
-    html+='<tr class="course-hdr"><td colspan="10">'+
+    const isOnly=_dtCrsKeys.length===1;const isOpen=isOnly||!!crsExpanded[cName];
+    html+='<tr class="course-hdr'+(isOnly?' single':'')+'" data-crs="'+esc2(cName)+'"><td colspan="10">'+
+      '<span class="chdr-toggle">'+(isOnly?'':(isOpen?'▼':'▶'))+'</span>'+
       '<span class="chdr-name">📁 '+cName+'</span>'+
       '<span class="chdr-stats">'+cBranches.length+' 站 · '+fi(cSumPpl.size)+' 人 · 異常 '+fi(cSum.items)+' 件'+(cSum.unhandled?(' · 待處理 <b>'+fi(cSum.unhandled)+'</b>'):(' · <span style="color:var(--good)">已全部處理</span>'))+'</span>'+
       '</td></tr>';
-    cBranches.forEach(bk=>{const b=byBranch[bk];const open=!!detailExpanded[bk];
+    if(isOpen)cBranches.forEach(bk=>{const b=byBranch[bk];const open=!!detailExpanded[bk];
     html+='<tr class="grp-row" data-br="'+bk+'"><td class="exp">'+(open?'▼':'▶')+'</td><td class="b">'+bk+'</td>'+
       '<td class="num b">'+fi(b.items.length)+'</td><td class="num">'+fi(b.people.size)+'</td>'+
       '<td class="num" style="color:var(--blue)">'+(b.sev.輕度||'')+'</td>'+
@@ -2096,6 +2106,7 @@ function renderDetail(){
     });
   });
   t.innerHTML=html+'</tbody>';
+  t.querySelectorAll('tr.course-hdr:not(.single)').forEach(tr=>tr.onclick=()=>{crsExpanded[tr.dataset.crs]=!crsExpanded[tr.dataset.crs];renderDetail();});
   t.querySelectorAll('tr.grp-row').forEach(tr=>tr.onclick=()=>{const bk=tr.dataset.br;detailExpanded[bk]=!detailExpanded[bk];renderDetail();});
   t.querySelectorAll('tr.jump-row').forEach(tr=>tr.onclick=()=>{jumpToSpeed(decodeURIComponent(tr.dataset.u));});
   // 子表排序 / 篩選
@@ -2206,11 +2217,13 @@ function renderSpeed(){
     const cSev={輕度:0,中度:0,重度:0,嚴重:0};cRecs.forEach(r=>{const t=sevOf(r).text;if(cSev[t]!==undefined)cSev[t]++;});
     const cDrivers=new Set(cRecs.map(r=>r.branch+'|'+r.driver)).size;
     const cStations=new Set(cRecs.map(r=>r.branch)).size;
-    html+='<tr class="course-hdr"><td colspan="'+_spCol+'">'+
+    const isOnly=_spCrsKeys.length===1;const isOpen=isOnly||!!crsExpanded[cName];
+    html+='<tr class="course-hdr'+(isOnly?' single':'')+'" data-crs="'+esc2(cName)+'"><td colspan="'+_spCol+'">'+
+      '<span class="chdr-toggle">'+(isOnly?'':(isOpen?'▼':'▶'))+'</span>'+
       '<span class="chdr-name">📁 '+cName+'</span>'+
       '<span class="chdr-stats">'+cStations+' 站 · '+cDrivers+' 人 · 超速 '+fi(cRecs.length)+' 件'+(cSev.嚴重?(' · 嚴重 <b>'+cSev.嚴重+'</b>'):'')+(cSev.重度?(' · 重度 '+cSev.重度):'')+'</span>'+
       '</td></tr>';
-    cRecs.forEach(it=>{
+    if(isOpen)cRecs.forEach(it=>{
       const idx=speedRows.push(it)-1;const sv=sevOf(it);const over=num(it.over);
       const overCls=sv.text?(' over-cell over-'+sv.text):'';
       const sevCell=sv.text?'<span class="sev sev-'+sv.text+'">'+sv.text+(sv.code?'（'+sv.code+'）':'')+'</span>':'';
@@ -2234,6 +2247,7 @@ function renderSpeed(){
     });
   });
   box.innerHTML='<div class="card"><div class="tablewrap"><table class="speedtbl">'+html+'</tbody></table></div></div>';
+  box.querySelectorAll('tr.course-hdr:not(.single)').forEach(tr=>tr.onclick=()=>{crsExpanded[tr.dataset.crs]=!crsExpanded[tr.dataset.crs];renderSpeed();});
   box.querySelectorAll('th.sortable').forEach(th=>th.onclick=()=>{const key=th.dataset.k;if(speedSort.key===key)speedSort.dir*=-1;else{speedSort.key=key;speedSort.dir=1;}renderSpeed();});
   box.querySelectorAll('select.esel').forEach(sel=>{
     sel.dataset.prev=sel.value;
@@ -2498,11 +2512,13 @@ function renderBranchPpl(){
       const csum={total:0,uncl:0,handled:0,unhandled:0,輕度:0,中度:0,重度:0,嚴重:0};
       const csumPpl=new Set();
       cBranches.forEach(b=>{csum.total+=b.total;csum.uncl+=b.uncl;csum.handled+=b.handled;csum.unhandled+=b.unhandled;['輕度','中度','重度','嚴重'].forEach(s=>csum[s]+=b.sev[s]);Object.keys(b.people).forEach(p=>csumPpl.add(b.branch+'|'+p));});
-      html+='<tr class="course-hdr"><td colspan="'+_colCnt+'">'+
+      const isOnly=_crsKeys.length===1;const isOpen=isOnly||!!crsExpanded[cName];
+      html+='<tr class="course-hdr'+(isOnly?' single':'')+'" data-crs="'+esc2(cName)+'"><td colspan="'+_colCnt+'">'+
+        '<span class="chdr-toggle">'+(isOnly?'':(isOpen?'▼':'▶'))+'</span>'+
         '<span class="chdr-name">📁 '+cName+'</span>'+
         '<span class="chdr-stats">'+cBranches.length+' 站 · '+fi(csumPpl.size)+' 人 · 超速 '+fi(csum.total)+' 件'+(csum.unhandled?(' · 待處理 <b style="color:var(--bad)">'+fi(csum.unhandled)+'</b>'):(' · <span style="color:var(--good)">已全部處理</span>'))+'</span>'+
         '</td></tr>';
-      cBranches.forEach(b=>{const ppl=Object.keys(b.people).length;const bIdle=IDLE.length?idleAgg(r=>r[0]===b.branch):null;
+      if(isOpen)cBranches.forEach(b=>{const ppl=Object.keys(b.people).length;const bIdle=IDLE.length?idleAgg(r=>r[0]===b.branch):null;
         bpRows.push({站所:b.branch,超速人數:ppl,超速次數:b.total,怠速:bIdle?bIdle.total:'',輕度:b.sev.輕度,中度:b.sev.中度,重度:b.sev.重度,嚴重:b.sev.嚴重,未歸類:b.uncl,已處理:b.handled,待處理:b.unhandled});
         const tot=b.total||1;const seg=(n,col)=>n?'<span style="display:inline-block;height:100%;width:'+(n/tot*100)+'%;background:'+col+'"></span>':'';
         const bar='<div class="sevbar">'+seg(b.sev.輕度,'var(--blue)')+seg(b.sev.中度,'var(--warn)')+seg(b.sev.重度,'var(--orange)')+seg(b.sev.嚴重,'var(--bad)')+seg(b.uncl,'var(--dim)')+'</div>';
@@ -2522,6 +2538,7 @@ function renderBranchPpl(){
     });
     t.innerHTML=html+'</tbody>';
     wireSort();
+    t.querySelectorAll('tr.course-hdr:not(.single)').forEach(tr=>tr.onclick=()=>{crsExpanded[tr.dataset.crs]=!crsExpanded[tr.dataset.crs];renderBranchPpl();});
     t.querySelectorAll('td.idlejump').forEach(td=>td.onclick=e=>{e.stopPropagation();idleSel={branch:td.dataset.br,plate:null};gotoTab('idle');});
     t.querySelectorAll('td.cellclick').forEach(td=>td.onclick=e=>{e.stopPropagation();openCardModal('cell',td.dataset.br,td.dataset.cell);});
   }else{
@@ -2540,11 +2557,13 @@ function renderBranchPpl(){
       const cTotal=cPeople.reduce((a,p)=>a+p.count,0);
       const cMax=cPeople.reduce((a,p)=>Math.max(a,p.max||0),0);
       const cStations=new Set(cPeople.map(p=>p.branch)).size;
-      html+='<tr class="course-hdr"><td colspan="'+_colCnt2+'">'+
+      const isOnly=_crsKeys2.length===1;const isOpen=isOnly||!!crsExpanded[cName];
+      html+='<tr class="course-hdr'+(isOnly?' single':'')+'" data-crs="'+esc2(cName)+'"><td colspan="'+_colCnt2+'">'+
+        '<span class="chdr-toggle">'+(isOnly?'':(isOpen?'▼':'▶'))+'</span>'+
         '<span class="chdr-name">📁 '+cName+'</span>'+
         '<span class="chdr-stats">'+cStations+' 站 · '+cPeople.length+' 人 · 超速 '+fi(cTotal)+' 件 · 最高 '+cMax+' km/hr</span>'+
         '</td></tr>';
-      cPeople.forEach(p=>{const worst=p.worst>=0?ord[p.worst]:'';const dist=ord.map(s=>sevBadge(s,p.sev[s])).join('');
+      if(isOpen)cPeople.forEach(p=>{const worst=p.worst>=0?ord[p.worst]:'';const dist=ord.map(s=>sevBadge(s,p.sev[s])).join('');
         const pIdle=IDLE.length?idleAgg(r=>r[0]===p.branch&&r[2]===p.driver):null;
         bpRows.push({站所:p.branch,駕駛:p.driver,超速次數:p.count,怠速:pIdle?pIdle.total:'',最高時速:p.max,最嚴重程度:worst,處置紀錄:uniq(p.disp).join('、'),懲處紀錄:uniq(p.disc).join('、')});
         const idleTd=pIdle?('<td class="num" style="color:'+(pIdle.total?'var(--t-mod)':'var(--dim)')+';font-weight:'+(pIdle.total?700:400)+'">'+(pIdle.total||'')+(pIdle.C?(' <span style="color:var(--t-severe);font-size:.82em">(重'+pIdle.C+'人)</span>'):'')+'</td>'):'<td class="num" style="color:var(--dim)">–</td>';
@@ -2556,6 +2575,7 @@ function renderBranchPpl(){
     });
     t.innerHTML=html+'</tbody>';
     wireSort();
+    t.querySelectorAll('tr.course-hdr:not(.single)').forEach(tr=>tr.onclick=()=>{crsExpanded[tr.dataset.crs]=!crsExpanded[tr.dataset.crs];renderBranchPpl();});
   }
 }
 function renderAll(){renderPeriodBar();renderLatestData();refreshIdle();renderKpis();renderRank();renderTrend();fillDetailFilters();renderDetail();renderSpeed();renderBranchPpl();renderIdle();renderPerf();renderRules();renderFoot();}

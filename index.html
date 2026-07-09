@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-D">
+<meta name="build-version" content="20260703-E">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -573,6 +573,7 @@ td.b{font-weight:700}
   <section class="panel" id="p-speed">
     <div class="toolbar">
       <div class="field"><label>日期</label><select id="spDate"><option value="">全部（累積）</option></select></div>
+      <div class="field"><label>課</label><select id="spCourse"><option value="">全部</option></select></div>
       <div class="field"><label>站所</label><select id="spBranch"><option value="">全部站所</option></select></div>
       <div class="field"><label>最低程度</label><select id="spSev"><option value="">全部</option><option value="中度">中度以上</option><option value="重度">重度以上</option><option value="嚴重">僅嚴重</option></select></div>
       <div class="field"><label>&nbsp;</label><label class="chkbox"><input type="checkbox" id="spDisc"> 只看已設定處置／懲處</label></div>
@@ -580,17 +581,7 @@ td.b{font-weight:700}
     </div>
     <details class="rulebox" open>
       <summary>超速懲處罰則對照（參考；系統不再自動帶入，請依此自行判定）</summary>
-      <div class="rulewrap">
-        <table class="ruletbl">
-          <thead><tr><th>程度</th><th>行為處置</th><th>行政懲處</th><th class="num">限速 40/50/60 超過</th><th class="num">限速 70/80/90 超過</th><th class="num">限速 100/110 超過</th></tr></thead>
-          <tbody>
-            <tr><td><span class="sev sev-輕度">輕度（A）</span></td><td>提醒注意</td><td>—</td><td class="num">≤ 14</td><td class="num">≤ 10</td><td class="num">≤ 10</td></tr>
-            <tr><td><span class="sev sev-中度">中度（B）</span></td><td>面談單</td><td>申誡</td><td class="num">15 ~ 24</td><td class="num">11 ~ 20</td><td class="num">11 ~ 15</td></tr>
-            <tr><td><span class="sev sev-重度">重度（C）</span></td><td>改善單</td><td>記過</td><td class="num">25 ~ 34</td><td class="num">21 ~ 30</td><td class="num">16 ~ 20</td></tr>
-            <tr><td><span class="sev sev-嚴重">嚴重（D）</span></td><td>/扣牌</td><td>大過+</td><td class="num">≥ 35</td><td class="num">≥ 31</td><td class="num">≥ 21</td></tr>
-          </tbody>
-        </table>
-      </div>
+      <div class="rulewrap" id="speedRuleRefBox"><!-- 由 renderSpeedRuleRef() 依 SPEED_RULES 動態產生 --></div>
     </details>
     <div id="speedGroups" class="groups"></div>
   </section>
@@ -1982,7 +1973,10 @@ function fillDetailFilters(){
   anomView().forEach(r=>{if(r.behavior==='怠速')return;if(r.branch)br.add(r.branch);if(r.behavior)be.add(r.behavior);if(r.degText)de.add(r.degText);});
   setOpts('#dfBranch',[...br].sort());setOpts('#dfBehavior',[...be].sort());
   const ord=['輕度','中度','重度','嚴重'];setOpts('#dfDegree',[...de].sort((a,b)=>ord.indexOf(a)-ord.indexOf(b)));
-  setOpts('#spBranch',[...br].sort(),'全部站所');
+  setOpts('#spCourse',COURSE_ORDER,'全部');
+  const crsF=$('#spCourse')?$('#spCourse').value:'';
+  const spBrList=crsF?[...br].filter(b=>courseOf(b)===crsF):[...br];
+  setOpts('#spBranch',spBrList.sort(),'全部站所');
   const dates=[...new Set(anomView().filter(r=>r.behavior&&r.behavior.includes('超速')).map(r=>r.date).filter(Boolean))].sort().reverse();
   setOpts('#spDate',dates,'全部（累積）');setOpts('#bpDate',dates,'全部（累積）');
 }
@@ -2148,13 +2142,16 @@ function optsHtml(cur,opts){
 }
 let speedSort={key:'branch',dir:1};
 function renderSpeed(){
+  renderSpeedRuleRef();
   const box=$('#speedGroups');const ord=['輕度','中度','重度','嚴重'];
   const onlyDisc=$('#spDisc')&&$('#spDisc').checked;
   const minSev=$('#spSev').value,brF=$('#spBranch').value,mi=minSev?ord.indexOf(minSev):-1;
+  const crsF=$('#spCourse')?$('#spCourse').value:'';
   const dF=$('#spDate')?$('#spDate').value:'';
   const sevFilter=it=>{const t=sevOf(it).text;if(minSev==='嚴重')return t==='嚴重';if(mi>=0)return ord.indexOf(t)>=mi;return true;};
   let recs=anomView().filter(r=>r.behavior&&r.behavior.includes('超速'));
   if(dF)recs=recs.filter(r=>r.date===dF);
+  if(crsF)recs=recs.filter(r=>courseOf(r.branch)===crsF);
   if(brF)recs=recs.filter(r=>r.branch===brF);
   recs=recs.filter(sevFilter);
   if(onlyDisc){const has=v=>{v=txt(v);return v&&v!=='-';};recs=recs.filter(r=>has(r.disposal)||has(r.disc));}
@@ -2229,6 +2226,34 @@ async function saveAllEdits(){
   if(fail){toast('部分儲存失敗','成功 '+ok+'／失敗 '+fail+'（請確認後台為最新版 Code.gs）','err');}
   else{toast('已儲存 ✓',ok+' 筆處置／懲處已更新');}
   lastSig=signature();renderSpeed();renderDetail();updateSaveBtn();updateDetailSaveBtn();
+}
+/* 動態產生「超速懲處罰則對照」參考表(在超速名單分類頁籤上方) */
+function renderSpeedRuleRef(){
+  const box=document.getElementById('speedRuleRefBox');if(!box)return;
+  const rt=r=>{
+    if(r.hi===null||r.hi===undefined)return '≥ '+r.lo;
+    if(r.lo===0)return '≤ '+r.hi;
+    return r.lo+' ~ '+r.hi;
+  };
+  const R=SPEED_RULES;
+  let h='<table class="ruletbl"><thead><tr>'
+    +'<th>程度</th><th>行為處置</th><th>行政懲處</th>'
+    +'<th class="num">限速 '+R.city.limits.join('/')+' 超過</th>'
+    +'<th class="num">限速 '+R.fast.limits.join('/')+' 超過</th>'
+    +'<th class="num">限速 '+R.hwy.limits.join('/')+' 超過</th>'
+    +'</tr></thead><tbody>';
+  for(let i=0;i<4;i++){
+    const cr=R.city.rows[i],fr=R.fast.rows[i],hr=R.hwy.rows[i];
+    h+='<tr>'
+      +'<td><span class="sev sev-'+cr.name+'">'+cr.name+'（'+cr.code+'）</span></td>'
+      +'<td>'+esc(cr.proc)+'</td>'
+      +'<td>'+esc(cr.disc==='-'?'—':cr.disc)+'</td>'
+      +'<td class="num">'+rt(cr)+'</td>'
+      +'<td class="num">'+rt(fr)+'</td>'
+      +'<td class="num">'+rt(hr)+'</td>'
+      +'</tr>';
+  }
+  box.innerHTML=h+'</tbody></table>';
 }
 /* ===== 分級規則頁籤 ===== */
 let _rulesEditing=false, _rulesEditBuf=null;
@@ -2782,6 +2807,13 @@ $('#idleExport').onclick=()=>{refreshIdle();if(!IDLE.length){toast('無資料可
 ['#dfBranch','#dfBehavior','#dfDegree'].forEach(s=>$(s).onchange=renderDetail);
 $('#dfSearch').oninput=renderDetail;
 ['#spBranch','#spSev','#spDate'].forEach(s=>$(s).onchange=renderSpeed);
+if($('#spCourse'))$('#spCourse').onchange=()=>{
+  const crs=$('#spCourse').value;
+  const br=new Set();anomView().forEach(r=>{if(r.behavior==='怠速')return;if(r.branch)br.add(r.branch);});
+  const list=crs?[...br].filter(b=>courseOf(b)===crs):[...br];
+  setOpts('#spBranch',list.sort(),'全部站所');
+  renderSpeed();
+};
 $('#spDisc').onchange=renderSpeed;
 $('#spSave').onclick=saveAllEdits;
 window.addEventListener('beforeunload',e=>{if(pendingCount()>0){e.preventDefault();e.returnValue='';}});

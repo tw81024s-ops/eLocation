@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-J">
+<meta name="build-version" content="20260703-L">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -494,8 +494,24 @@ tr.course-hdr.single:hover td{background:linear-gradient(90deg,rgba(230,0,126,.1
 .chdr-chip.c{color:#e6541a;background:rgba(230,84,26,.12);border-color:rgba(230,84,26,.32)}
 .chdr-chip.d{color:var(--bad);background:rgba(224,39,73,.14);border-color:rgba(224,39,73,.4);font-weight:900;box-shadow:0 0 0 2px rgba(224,39,73,.08)}
 .chdr-chip.d .cc-c{opacity:.85}
-/* 全部課收合時,隱藏詳細欄位標題(避免和儀表板列視覺錯位) */
-table.crs-all-collapsed>thead{display:none}
+/* 全部課收合時 → 隱藏詳細欄位標題,顯示簡單的說明列 */
+table.crs-all-collapsed>thead>tr.data-cols{display:none}
+table:not(.crs-all-collapsed)>thead>tr.dash-lbl{display:none}
+tr.dash-lbl th{background:var(--panel);color:var(--accent);font-weight:800;text-align:left;padding:9px 18px !important;letter-spacing:.4px;font-size:calc(12.5px*var(--fs));border-bottom:1px solid var(--line)}
+tr.dash-lbl .lbl-hint{color:var(--muted);font-weight:600;margin-left:8px;letter-spacing:.2px}
+/* 超速懲處罰則對照 · 三小表並排 */
+.rule-mini-wrap{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.rule-mini{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 1px 6px rgba(230,0,126,.04)}
+.rule-mini-h{padding:9px 14px;background:linear-gradient(90deg,#FFE3EF,#FFF7FB);border-bottom:1px solid var(--line);display:flex;align-items:baseline;gap:10px}
+.rule-mini-h .rmh-t{font-weight:800;color:var(--accent);font-size:calc(13.5px*var(--fs))}
+.rule-mini-h .rmh-s{font-size:calc(11.5px*var(--fs));color:var(--muted);font-weight:600;font-family:var(--mono),Consolas}
+.rule-mini .ruletbl{width:100%;border-collapse:collapse;font-size:calc(12.5px*var(--fs))}
+.rule-mini .ruletbl th{background:var(--panel2);color:var(--muted);font-weight:700;padding:6px 10px;text-align:left;border-bottom:1px solid var(--line);font-size:calc(11px*var(--fs));letter-spacing:.3px}
+.rule-mini .ruletbl th.num{text-align:right}
+.rule-mini .ruletbl td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+.rule-mini .ruletbl tr:last-child td{border-bottom:none}
+.rule-mini .ruletbl td.num{font-family:var(--mono),Consolas;font-weight:800;text-align:right;white-space:nowrap}
+@media(max-width:900px){.rule-mini-wrap{grid-template-columns:1fr}}
 .scard .rk{position:absolute;top:4px;right:14px;font-family:var(--mono);font-weight:800;font-size:calc(40px*var(--fs));color:#ffdcec;line-height:1}
 .scard-h{display:flex;align-items:center;gap:13px;margin-bottom:10px}
 .scard-h .gb{width:calc(56px*var(--fs));height:calc(56px*var(--fs));border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-family:var(--mono);font-weight:800;font-size:calc(27px*var(--fs))}
@@ -876,22 +892,22 @@ const SPEED_RULES_KEY='fleet_speed_rules_v1';
 const SPEED_RULES_DEFAULT={
   ts:0,
   city:{limits:[40,50,60],rows:[
-    {code:'A',name:'輕度',lo:0, hi:19,  proc:'提醒注意',disc:'-',   rule:'-'},
-    {code:'B',name:'中度',lo:20,hi:29,  proc:'面談單',  disc:'申誡',rule:'第45條第3項'},
-    {code:'C',name:'重度',lo:30,hi:39,  proc:'改善單',  disc:'記過',rule:'第46條第1項'},
-    {code:'D',name:'嚴重',lo:40,hi:null,proc:'/扣牌',   disc:'大過+',rule:'第47條第4項'}
+    {code:'A',name:'輕度',lo:0, hi:19,  proc:'提醒注意', disc:'-',    rule:'-'},
+    {code:'B',name:'中度',lo:20,hi:29,  proc:'面談單',   disc:'申誡', rule:'第45條第3項'},
+    {code:'C',name:'重度',lo:30,hi:39,  proc:'改善單',   disc:'記過', rule:'第46條第1項'},
+    {code:'D',name:'嚴重',lo:40,hi:null,proc:'/扣牌',    disc:'大過+',rule:'第47條第4項'}
   ]},
   fast:{limits:[70,80,90],rows:[
-    {code:'A',name:'輕度',lo:0, hi:19,  proc:'提醒注意',disc:'-',   rule:'-'},
-    {code:'B',name:'中度',lo:20,hi:29,  proc:'面談單',  disc:'申誡',rule:'第45條第3項'},
-    {code:'C',name:'重度',lo:30,hi:39,  proc:'改善單',  disc:'記過',rule:'第46條第1項'},
-    {code:'D',name:'嚴重',lo:40,hi:null,proc:'/扣牌',   disc:'大過+',rule:'第47條第4項'}
+    {code:'A',name:'輕度',lo:0, hi:10,  proc:'提醒注意',    disc:'-',    rule:'-'},
+    {code:'B',name:'中度',lo:11,hi:20,  proc:'面談單',      disc:'申誡', rule:'第45條第3項'},
+    {code:'C',name:'重度',lo:21,hi:30,  proc:'改善單',      disc:'記過', rule:'第46條第1項'},
+    {code:'D',name:'嚴重',lo:31,hi:null,proc:'改善單/扣牌', disc:'大過+',rule:'第47條第4項'}
   ]},
   hwy:{limits:[100,110],rows:[
-    {code:'A',name:'輕度',lo:0, hi:19,  proc:'提醒注意',disc:'-',   rule:'-'},
-    {code:'B',name:'中度',lo:20,hi:29,  proc:'面談單',  disc:'申誡',rule:'第45條第3項'},
-    {code:'C',name:'重度',lo:30,hi:39,  proc:'改善單',  disc:'記過',rule:'第46條第1項'},
-    {code:'D',name:'嚴重',lo:40,hi:null,proc:'/扣牌',   disc:'大過+',rule:'第47條第4項'}
+    {code:'A',name:'輕度',lo:0, hi:10,  proc:'提醒注意',    disc:'-',    rule:'-'},
+    {code:'B',name:'中度',lo:11,hi:15,  proc:'面談單',      disc:'申誡', rule:'第45條第3項'},
+    {code:'C',name:'重度',lo:16,hi:20,  proc:'改善單',      disc:'記過', rule:'第46條第1項'},
+    {code:'D',name:'嚴重',lo:21,hi:null,proc:'改善單/扣牌', disc:'大過+',rule:'第47條第4項'}
   ]}
 };
 let SPEED_RULES=JSON.parse(JSON.stringify(SPEED_RULES_DEFAULT));
@@ -1899,7 +1915,7 @@ function renderIdle(){
   const brs={};IDLE.forEach(r=>{brs[r[0]]=1;});
   const rows=Object.keys(brs).map(b=>({branch:b,a:idleAgg(r=>r[0]===b)})).sort((x,y)=>y.a.C-x.a.C||y.a.sumMin-x.a.sumMin);
   h+='<div class="sc-ttl" style="margin:6px 2px 10px;font-size:calc(15px*var(--fs));color:var(--txt);font-weight:800">站所怠速排行（依課分區塊；點擊站所看駕駛累計）</div>';
-  h+='<div class="card"><div class="tablewrap"><table><thead><tr><th>#</th><th>站所</th><th class="num">駕駛數</th><th class="num">累計時數</th><th class="num">事件</th><th class="num">輕度</th><th class="num">中度</th><th class="num">重度</th><th>分布(人數)</th></tr></thead><tbody>';
+  h+='<div class="card"><div class="tablewrap"><table><thead>'+dashHdrLbl(9)+'<tr class="data-cols"><th>#</th><th>站所</th><th class="num">駕駛數</th><th class="num">累計時數</th><th class="num">事件</th><th class="num">輕度</th><th class="num">中度</th><th class="num">重度</th><th>分布(人數)</th></tr></thead><tbody>';
   // 依課分組
   const _idlByCrs={};rows.forEach(o=>{const c=courseOf(o.branch)||'未分類';(_idlByCrs[c]=_idlByCrs[c]||[]).push(o);});
   const _idlCrsKeys=COURSE_ORDER.filter(c=>_idlByCrs[c]&&_idlByCrs[c].length).concat(Object.keys(_idlByCrs).filter(c=>!COURSE_ORDER.includes(c)));
@@ -2041,6 +2057,10 @@ function fillDetailFilters(){
 function filteredAnom(){const b=$('#dfBranch').value,be=$('#dfBehavior').value,de=$('#dfDegree').value,q=$('#dfSearch').value.trim();return anomView().filter(r=>r.behavior!=='怠速'&&(!b||r.branch===b)&&(!be||r.behavior===be)&&(!de||r.degText===de)&&(!q||(r.driver+r.plate+r.location).includes(q)));}
 const detailExpanded={};
 const crsExpanded={};  // 課的展開狀態(預設全部收合;點擊 course-hdr 切換)
+/* 收合狀態顯示的說明列(取代原本詳細欄位標題) */
+function dashHdrLbl(colSpan){
+  return '<tr class="dash-lbl"><th colspan="'+colSpan+'">📊 各課概況<span class="lbl-hint">左起:課別 · 站/人 · 主要指標 · 相對比較 · 分級分佈(點擊任一列展開站所明細)</span></th></tr>';
+}
 /* 儀表板風的課列 helper
    opts: {cName, isOnly, isOpen, colSpan,
           meta:'3 站 · 5 人',
@@ -2084,7 +2104,7 @@ function renderDetail(){
     const disp=isSpd?effDisposal(r):txt(r.disposal);const disc=isSpd?effDisc(r):txt(r.disc);
     const done=(disp&&disp!=='-')||(disc&&disc!=='-');if(done)b.handled++;else b.unhandled++;});
   const branches=Object.keys(byBranch).sort((a,b)=>byBranch[b].items.length-byBranch[a].items.length);
-  let html='<thead><tr><th></th><th>站所</th><th class="num">異常筆數</th><th class="num">人數</th><th class="num">輕度</th><th class="num">中度</th><th class="num">重度</th><th class="num">嚴重</th><th class="num">已處理</th><th class="num">待處理</th></tr></thead><tbody>';
+  let html='<thead>'+dashHdrLbl(10)+'<tr class="data-cols"><th></th><th>站所</th><th class="num">異常筆數</th><th class="num">人數</th><th class="num">輕度</th><th class="num">中度</th><th class="num">重度</th><th class="num">嚴重</th><th class="num">已處理</th><th class="num">待處理</th></tr></thead><tbody>';
   // 依課分組
   const _dtByCrs={};branches.forEach(bk=>{const c=courseOf(bk)||'未分類';(_dtByCrs[c]=_dtByCrs[c]||[]).push(bk);});
   const _dtCrsKeys=COURSE_ORDER.filter(c=>_dtByCrs[c]&&_dtByCrs[c].length).concat(Object.keys(_dtByCrs).filter(c=>!COURSE_ORDER.includes(c)));
@@ -2274,7 +2294,7 @@ function renderSpeed(){
   speedRows=[];
   const cols=[['date','日期'],['branch','站所'],['driver','駕駛'],['cnt','本人次數'],['plate','車號'],['time','時間'],['maxSpeed','最高'],['legal','法定'],['over','超過km'],['sev','程度'],['location','地點'],['disposal','處置'],['disc','懲處']];
   const arrow=key=>speedSort.key===key?(speedSort.dir>0?' ▲':' ▼'):'';
-  let html='<thead><tr>'+cols.map(c=>'<th class="sortable" data-k="'+c[0]+'">'+c[1]+arrow(c[0])+'</th>').join('')+'</tr></thead><tbody>';
+  let html='<thead>'+dashHdrLbl(cols.length)+'<tr class="data-cols">'+cols.map(c=>'<th class="sortable" data-k="'+c[0]+'">'+c[1]+arrow(c[0])+'</th>').join('')+'</tr></thead><tbody>';
   // 依課分組
   const _spByCrs={};recs.forEach(r=>{const c=courseOf(r.branch)||'未分類';(_spByCrs[c]=_spByCrs[c]||[]).push(r);});
   const _spCrsKeys=COURSE_ORDER.filter(c=>_spByCrs[c]&&_spByCrs[c].length).concat(Object.keys(_spByCrs).filter(c=>!COURSE_ORDER.includes(c)));
@@ -2357,7 +2377,8 @@ async function saveAllEdits(){
   else{toast('已儲存 ✓',ok+' 筆處置／懲處已更新');}
   lastSig=signature();renderSpeed();renderDetail();updateSaveBtn();updateDetailSaveBtn();
 }
-/* 動態產生「超速懲處罰則對照」參考表(在超速名單分類頁籤上方) */
+/* 動態產生「超速懲處罰則對照」參考表(在超速名單分類頁籤上方)
+   三個範圍(市區/快速/高速)因為 D 級處置不同,改成三個小表並排 */
 function renderSpeedRuleRef(){
   const box=document.getElementById('speedRuleRefBox');if(!box)return;
   const rt=r=>{
@@ -2365,25 +2386,29 @@ function renderSpeedRuleRef(){
     if(r.lo===0)return '≤ '+r.hi;
     return r.lo+' ~ '+r.hi;
   };
-  const R=SPEED_RULES;
-  let h='<table class="ruletbl"><thead><tr>'
-    +'<th>程度</th><th>行為處置</th><th>行政懲處</th>'
-    +'<th class="num">限速 '+R.city.limits.join('/')+' 超過</th>'
-    +'<th class="num">限速 '+R.fast.limits.join('/')+' 超過</th>'
-    +'<th class="num">限速 '+R.hwy.limits.join('/')+' 超過</th>'
-    +'</tr></thead><tbody>';
-  for(let i=0;i<4;i++){
-    const cr=R.city.rows[i],fr=R.fast.rows[i],hr=R.hwy.rows[i];
-    h+='<tr>'
-      +'<td><span class="sev sev-'+cr.name+'">'+cr.name+'（'+cr.code+'）</span></td>'
-      +'<td>'+esc(cr.proc)+'</td>'
-      +'<td>'+esc(cr.disc==='-'?'—':cr.disc)+'</td>'
-      +'<td class="num">'+rt(cr)+'</td>'
-      +'<td class="num">'+rt(fr)+'</td>'
-      +'<td class="num">'+rt(hr)+'</td>'
-      +'</tr>';
-  }
-  box.innerHTML=h+'</tbody></table>';
+  const groups=[
+    {key:'city',title:'市區道路',subtitle:'限速 40 / 50 / 60',data:SPEED_RULES.city},
+    {key:'fast',title:'快速道路',subtitle:'限速 70 / 80 / 90',data:SPEED_RULES.fast},
+    {key:'hwy', title:'高速公路',subtitle:'限速 100 / 110',    data:SPEED_RULES.hwy}
+  ];
+  const tbls=groups.map(g=>{
+    let t='<div class="rule-mini">';
+    t+='<div class="rule-mini-h"><span class="rmh-t">'+g.title+'</span><span class="rmh-s">'+g.subtitle+'</span></div>';
+    t+='<table class="ruletbl"><thead><tr>';
+    t+='<th>程度</th><th class="num">超過 km</th><th>處置</th><th>懲處</th>';
+    t+='</tr></thead><tbody>';
+    for(const r of g.data.rows){
+      t+='<tr>';
+      t+='<td><span class="sev sev-'+r.name+'">'+r.name+'（'+r.code+'）</span></td>';
+      t+='<td class="num">'+rt(r)+'</td>';
+      t+='<td>'+esc(r.proc)+'</td>';
+      t+='<td>'+esc(r.disc==='-'?'—':r.disc)+'</td>';
+      t+='</tr>';
+    }
+    t+='</tbody></table></div>';
+    return t;
+  }).join('');
+  box.innerHTML='<div class="rule-mini-wrap">'+tbls+'</div>';
 }
 /* ===== 分級規則頁籤 ===== */
 let _rulesEditing=false, _rulesEditBuf=null;
@@ -2573,7 +2598,7 @@ function renderBranchPpl(){
     const kv=(b,k)=>{if(k==='branch')return b.branch;if(k==='people')return Object.keys(b.people).length;if(k==='total')return b.total;if(k==='idle')return IDLE.length?idleAgg(r=>r[0]===b.branch).total:0;if(k==='unhandled')return b.unhandled;if(k==='handled')return b.handled;if(k==='uncl')return b.uncl;return b.sev[k]||0;};
     list.sort((a,b)=>{const x=kv(a,sortState.key),y=kv(b,sortState.key);if(typeof x==='number')return (x-y)*sortState.dir;return String(x).localeCompare(String(y),'zh-Hant')*sortState.dir;});
     const cols=[['branch','站所'],['people','超速人數'],['total','超速次數'],['idle','怠速'],['dist','程度分佈'],['輕度','輕度'],['中度','中度'],['重度','重度'],['嚴重','嚴重'],['uncl','未歸類'],['handled','已處理'],['unhandled','待處理']];
-    let html='<thead><tr>'+cols.map((c,i)=>{const noSort=c[0]==='dist';return '<th class="'+(noSort?'':'sortable ')+(['people','total','idle','輕度','中度','重度','嚴重','uncl','handled','unhandled'].includes(c[0])?'num':'')+'" '+(noSort?'':'data-k="'+c[0]+'"')+'>'+c[1]+(noSort?'':arrow(c[0]))+'</th>';}).join('')+'</tr></thead><tbody>';
+    let html='<thead>'+dashHdrLbl(cols.length)+'<tr class="data-cols">'+cols.map((c,i)=>{const noSort=c[0]==='dist';return '<th class="'+(noSort?'':'sortable ')+(['people','total','idle','輕度','中度','重度','嚴重','uncl','handled','unhandled'].includes(c[0])?'num':'')+'" '+(noSort?'':'data-k="'+c[0]+'"')+'>'+c[1]+(noSort?'':arrow(c[0]))+'</th>';}).join('')+'</tr></thead><tbody>';
     // 依課分組
     const _byCrs={};list.forEach(b=>{const c=courseOf(b.branch)||'未分類';(_byCrs[c]=_byCrs[c]||[]).push(b);});
     const _crsKeys=COURSE_ORDER.filter(c=>_byCrs[c]&&_byCrs[c].length).concat(Object.keys(_byCrs).filter(c=>!COURSE_ORDER.includes(c)));
@@ -2623,7 +2648,7 @@ function renderBranchPpl(){
     const kv=(p,k)=>{if(k==='branch')return p.branch;if(k==='driver')return p.driver;if(k==='count')return p.count;if(k==='max')return p.max;if(k==='worst')return p.worst;if(k==='idle')return IDLE.length?idleAgg(r=>r[0]===p.branch&&r[2]===p.driver).total:0;return 0;};
     people.sort((a,b)=>{const x=kv(a,sortState.key),y=kv(b,sortState.key);if(typeof x==='number')return (x-y)*sortState.dir||(b.count-a.count);return String(x).localeCompare(String(y),'zh-Hant')*sortState.dir;});
     const cols=[['branch','站所'],['driver','駕駛'],['count','超速次數'],['idle','怠速'],['max','最高時速'],['worst','最嚴重程度'],['dist','程度分佈'],['disp','處置紀錄'],['disc','懲處紀錄']];
-    let html='<thead><tr>'+cols.map((c)=>'<th class="'+(['count','idle','max'].includes(c[0])?'num ':'')+(['count','idle','max','worst','branch','driver'].includes(c[0])?'sortable':'')+'" data-k="'+c[0]+'">'+c[1]+(['dist','disp','disc'].includes(c[0])?'':arrow(c[0]))+'</th>').join('')+'</tr></thead><tbody>';
+    let html='<thead>'+dashHdrLbl(cols.length)+'<tr class="data-cols">'+cols.map((c)=>'<th class="'+(['count','idle','max'].includes(c[0])?'num ':'')+(['count','idle','max','worst','branch','driver'].includes(c[0])?'sortable':'')+'" data-k="'+c[0]+'">'+c[1]+(['dist','disp','disc'].includes(c[0])?'':arrow(c[0]))+'</th>').join('')+'</tr></thead><tbody>';
     const uniq=a=>[...new Set(a)];
     // 依課分組
     const _byCrs2={};people.forEach(p=>{const c=courseOf(p.branch)||'未分類';(_byCrs2[c]=_byCrs2[c]||[]).push(p);});

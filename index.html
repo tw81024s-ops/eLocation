@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-H">
+<meta name="build-version" content="20260703-I">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -463,14 +463,37 @@ td.b{font-weight:700}
 .rules-edit-bar{position:sticky;bottom:12px;background:#fff;padding:14px 18px;border-radius:12px;box-shadow:0 -4px 20px rgba(230,0,126,.18);border:2px solid var(--accent);display:flex;gap:10px;justify-content:flex-end;align-items:center;margin-top:20px;z-index:5}
 .rules-edit-msg{margin-right:auto;color:#a36400;font-size:calc(12.5px*var(--fs));font-weight:700}
 /* 課分區標題列(站所異常統計、超速名單分類 等) */
-tr.course-hdr td{background:linear-gradient(90deg,rgba(230,0,126,.14),rgba(230,0,126,.02));border-top:2px solid var(--accent);border-bottom:1px solid var(--line);padding:9px 14px !important;letter-spacing:.3px;cursor:pointer;user-select:none;transition:background .12s}
+tr.course-hdr td{background:linear-gradient(90deg,rgba(230,0,126,.14),rgba(230,0,126,.02));border-top:2px solid var(--accent);border-bottom:1px solid var(--line);padding:10px 16px !important;letter-spacing:.3px;cursor:pointer;user-select:none;transition:background .12s}
 tr.course-hdr:hover td{background:linear-gradient(90deg,rgba(230,0,126,.24),rgba(230,0,126,.06))}
 tr.course-hdr.single td{cursor:default}
 tr.course-hdr.single:hover td{background:linear-gradient(90deg,rgba(230,0,126,.14),rgba(230,0,126,.02))}
-tr.course-hdr .chdr-toggle{display:inline-block;width:16px;font-weight:800;color:var(--accent);font-size:calc(12px*var(--fs));margin-right:2px}
-tr.course-hdr .chdr-name{font-weight:800;color:var(--accent);font-size:calc(14px*var(--fs));margin-right:14px}
-tr.course-hdr .chdr-stats{font-size:calc(12px*var(--fs));color:var(--muted);font-weight:600}
-tr.course-hdr .chdr-stats b{color:var(--bad)}
+/* 課列儀表板版面 */
+.chdr-dash{display:flex;align-items:center;gap:14px;flex-wrap:nowrap;min-height:36px}
+.chdr-title{display:flex;align-items:center;gap:6px;min-width:140px;font-weight:800;color:var(--accent);font-size:calc(14.5px*var(--fs));flex-shrink:0}
+.chdr-toggle{display:inline-block;width:14px;color:var(--accent);font-weight:800;font-size:calc(11px*var(--fs))}
+.chdr-meta{font-size:calc(12px*var(--fs));color:var(--muted);font-weight:600;min-width:88px;flex-shrink:0}
+.chdr-kpi{display:flex;align-items:baseline;gap:3px;padding:2px 10px;background:rgba(255,255,255,.55);border-radius:8px;flex-shrink:0}
+.chdr-kpi-val{font-family:var(--mono),Consolas;font-size:calc(15px*var(--fs));font-weight:900;color:var(--txt);letter-spacing:-.3px}
+.chdr-kpi-val.bad{color:var(--bad)}
+.chdr-kpi-val.warn{color:#c88800}
+.chdr-kpi-val.good{color:var(--good)}
+.chdr-kpi-lbl{font-size:calc(10.5px*var(--fs));color:var(--muted);font-weight:700;letter-spacing:.3px}
+.chdr-bar-wrap{flex:1;display:flex;align-items:center;gap:8px;min-width:100px;max-width:260px}
+.chdr-bar{flex:1;height:8px;background:rgba(230,0,126,.08);border-radius:4px;overflow:hidden;position:relative}
+.chdr-bar-fill{height:100%;background:linear-gradient(90deg,#ffa6d0,#e6007e);border-radius:4px;transition:width .3s ease}
+.chdr-bar-fill.warn{background:linear-gradient(90deg,#ffcf7a,#e6a10a)}
+.chdr-bar-fill.bad{background:linear-gradient(90deg,#ff8a9d,#e02749)}
+.chdr-bar-lbl{font-size:calc(10.5px*var(--fs));color:var(--muted);font-weight:700;white-space:nowrap;min-width:36px;text-align:right}
+.chdr-chips{display:flex;gap:4px;flex-shrink:0;margin-left:auto}
+.chdr-chip{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:10px;font-size:calc(11px*var(--fs));font-weight:800;border:1px solid transparent;min-width:34px;justify-content:center;font-family:'微軟正黑體',sans-serif}
+.chdr-chip .cc-c{opacity:.65;font-size:calc(10px*var(--fs));font-weight:700}
+.chdr-chip .cc-v{font-family:var(--mono),Consolas}
+.chdr-chip.z{color:var(--dim);background:rgba(0,0,0,.02);border-color:rgba(0,0,0,.05)}
+.chdr-chip.a{color:var(--good);background:rgba(21,168,92,.10);border-color:rgba(21,168,92,.28)}
+.chdr-chip.b{color:#c88800;background:rgba(240,164,10,.12);border-color:rgba(240,164,10,.32)}
+.chdr-chip.c{color:#e6541a;background:rgba(230,84,26,.12);border-color:rgba(230,84,26,.32)}
+.chdr-chip.d{color:var(--bad);background:rgba(224,39,73,.14);border-color:rgba(224,39,73,.4);font-weight:900;box-shadow:0 0 0 2px rgba(224,39,73,.08)}
+.chdr-chip.d .cc-c{opacity:.85}
 .scard .rk{position:absolute;top:4px;right:14px;font-family:var(--mono);font-weight:800;font-size:calc(40px*var(--fs));color:#ffdcec;line-height:1}
 .scard-h{display:flex;align-items:center;gap:13px;margin-bottom:10px}
 .scard-h .gb{width:calc(56px*var(--fs));height:calc(56px*var(--fs));border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-family:var(--mono);font-weight:800;font-size:calc(27px*var(--fs))}
@@ -1878,16 +1901,22 @@ function renderIdle(){
   // 依課分組
   const _idlByCrs={};rows.forEach(o=>{const c=courseOf(o.branch)||'未分類';(_idlByCrs[c]=_idlByCrs[c]||[]).push(o);});
   const _idlCrsKeys=COURSE_ORDER.filter(c=>_idlByCrs[c]&&_idlByCrs[c].length).concat(Object.keys(_idlByCrs).filter(c=>!COURSE_ORDER.includes(c)));
+  // 各課摘要(先算全部,才知道最大值以繪橫條)
+  const _idlCsum={};let _idlMaxMin=0,_idlMaxEv=0;
+  _idlCrsKeys.forEach(cName=>{const s={events:0,people:0,sumMin:0,A:0,B:0,C:0};_idlByCrs[cName].forEach(o=>{s.events+=o.a.events;s.people+=o.a.people;s.sumMin+=o.a.sumMin;s.A+=o.a.A;s.B+=o.a.B;s.C+=o.a.C;});_idlCsum[cName]=s;if(s.sumMin>_idlMaxMin)_idlMaxMin=s.sumMin;if(s.events>_idlMaxEv)_idlMaxEv=s.events;});
   _idlCrsKeys.forEach(cName=>{
-    const cRows=_idlByCrs[cName];
-    const cSum={events:0,people:0,sumMin:0,A:0,B:0,C:0};
-    cRows.forEach(o=>{cSum.events+=o.a.events;cSum.people+=o.a.people;cSum.sumMin+=o.a.sumMin;cSum.A+=o.a.A;cSum.B+=o.a.B;cSum.C+=o.a.C;});
+    const cRows=_idlByCrs[cName];const cSum=_idlCsum[cName];
     const isOnly=_idlCrsKeys.length===1;const isOpen=isOnly||!!crsExpanded[cName];
-    h+='<tr class="course-hdr'+(isOnly?' single':'')+'" data-crs="'+esc2(cName)+'"><td colspan="9">'+
-      '<span class="chdr-toggle">'+(isOnly?'':(isOpen?'▼':'▶'))+'</span>'+
-      '<span class="chdr-name">📁 '+cName+'</span>'+
-      '<span class="chdr-stats">'+cRows.length+' 站 · '+cSum.people+' 人 · 累計 '+idleFmt(cSum.sumMin)+' · '+cSum.events+' 件'+(cSum.C?(' · 重度 <b>'+cSum.C+' 人</b>'):(cSum.B?(' · 中度 '+cSum.B+' 人'):''))+'</span>'+
-      '</td></tr>';
+    h+=courseHdrDash({
+      cName:cName,isOnly:isOnly,isOpen:isOpen,colSpan:9,
+      meta:cRows.length+' 站 · '+cSum.people+' 人',
+      kpis:[
+        {val:fi(cSum.events),lbl:'件',tone:''},
+        {val:idleFmt(cSum.sumMin),lbl:'累計',tone:cSum.C?'bad':(cSum.B?'warn':'')}
+      ],
+      bar:{val:cSum.sumMin,max:_idlMaxMin,lbl:idleFmt(cSum.sumMin),tone:cSum.C?'bad':(cSum.B?'warn':''),title:'累計怠速時數(佔本次最大值比例)'},
+      chips:[{code:'A',count:cSum.A},{code:'B',count:cSum.B},{code:'C',count:cSum.C}]
+    });
     if(isOpen)cRows.forEach((o,i)=>{h+='<tr class="idle-br" data-br="'+o.branch+'" style="cursor:pointer"><td class="num">'+(i+1)+'</td><td class="b">'+o.branch+'</td>'+
       '<td class="num b">'+o.a.people+'</td><td class="num" style="font-family:var(--mono)">'+idleFmt(o.a.sumMin)+'</td><td class="num">'+o.a.events+'</td>'+
       '<td class="num" style="color:var(--t-light)">'+(o.a.A||'')+'</td><td class="num" style="color:var(--t-mod)">'+(o.a.B||'')+'</td><td class="num" style="color:var(--t-severe)">'+(o.a.C||'')+'</td>'+
@@ -2007,6 +2036,32 @@ function fillDetailFilters(){
 function filteredAnom(){const b=$('#dfBranch').value,be=$('#dfBehavior').value,de=$('#dfDegree').value,q=$('#dfSearch').value.trim();return anomView().filter(r=>r.behavior!=='怠速'&&(!b||r.branch===b)&&(!be||r.behavior===be)&&(!de||r.degText===de)&&(!q||(r.driver+r.plate+r.location).includes(q)));}
 const detailExpanded={};
 const crsExpanded={};  // 課的展開狀態(預設全部收合;點擊 course-hdr 切換)
+/* 儀表板風的課列 helper
+   opts: {cName, isOnly, isOpen, colSpan,
+          meta:'3 站 · 5 人',
+          kpis:[{val,lbl,tone}],       // 大字 KPI (至多 2 個)
+          bar:{val, max, lbl, tone},   // 相對比較橫條(tone: '', 'warn', 'bad')
+          chips:[{code,name,count}]}   // 嚴重度晶片(可含 D 級)
+*/
+function courseHdrDash(o){
+  const arrow=o.isOnly?'':(o.isOpen?'▼':'▶');
+  const meta=o.meta?'<div class="chdr-meta">'+o.meta+'</div>':'';
+  const kpisHtml=(o.kpis||[]).map(k=>'<div class="chdr-kpi"><span class="chdr-kpi-val'+(k.tone?' '+k.tone:'')+'">'+k.val+'</span><span class="chdr-kpi-lbl">'+k.lbl+'</span></div>').join('');
+  let barHtml='';
+  if(o.bar){
+    const pct=o.bar.max>0?Math.max(2,Math.round(o.bar.val/o.bar.max*100)):0;
+    barHtml='<div class="chdr-bar-wrap" title="'+(o.bar.title||'相對最大值')+'"><div class="chdr-bar"><div class="chdr-bar-fill'+(o.bar.tone?' '+o.bar.tone:'')+'" style="width:'+pct+'%"></div></div><span class="chdr-bar-lbl">'+(o.bar.lbl||'')+'</span></div>';
+  }
+  let chipsHtml='';
+  if(o.chips&&o.chips.length){
+    chipsHtml='<div class="chdr-chips">'+o.chips.map(c=>{const cls=(c.count>0?c.code.toLowerCase():'z');return '<span class="chdr-chip '+cls+'"><span class="cc-c">'+c.code+'</span><span class="cc-v">'+(c.count||0)+'</span></span>';}).join('')+'</div>';
+  }
+  return '<tr class="course-hdr'+(o.isOnly?' single':'')+'" data-crs="'+esc2(o.cName)+'"><td colspan="'+o.colSpan+'">'+
+    '<div class="chdr-dash">'+
+      '<div class="chdr-title"><span class="chdr-toggle">'+arrow+'</span>📁 '+o.cName+'</div>'+
+      meta+kpisHtml+barHtml+chipsHtml+
+    '</div></td></tr>';
+}
 let detailSubSort={key:'over',dir:-1};
 let detailSubFilter={sev:'',status:''};
 function renderDetail(){
@@ -2028,17 +2083,22 @@ function renderDetail(){
   // 依課分組
   const _dtByCrs={};branches.forEach(bk=>{const c=courseOf(bk)||'未分類';(_dtByCrs[c]=_dtByCrs[c]||[]).push(bk);});
   const _dtCrsKeys=COURSE_ORDER.filter(c=>_dtByCrs[c]&&_dtByCrs[c].length).concat(Object.keys(_dtByCrs).filter(c=>!COURSE_ORDER.includes(c)));
+  // 先算摘要 + 最大件數
+  const _dtCsum={};let _dtMax=0;
+  _dtCrsKeys.forEach(cName=>{const bks=_dtByCrs[cName];const s={items:0,handled:0,unhandled:0,A:0,B:0,C:0,D:0,ppl:new Set()};bks.forEach(bk=>{const bb=byBranch[bk];s.items+=bb.items.length;bb.items.forEach(r=>s.ppl.add(bb.branch+'|'+r.driver));s.handled+=bb.handled;s.unhandled+=bb.unhandled;s.A+=bb.sev.輕度;s.B+=bb.sev.中度;s.C+=bb.sev.重度;s.D+=bb.sev.嚴重;});_dtCsum[cName]=s;if(s.items>_dtMax)_dtMax=s.items;});
   _dtCrsKeys.forEach(cName=>{
-    const cBranches=_dtByCrs[cName];
-    const cSum={items:0,handled:0,unhandled:0,sev:{輕度:0,中度:0,重度:0,嚴重:0}};
-    const cSumPpl=new Set();
-    cBranches.forEach(bk=>{const bb=byBranch[bk];cSum.items+=bb.items.length;bb.items.forEach(r=>cSumPpl.add(bb.branch+'|'+r.driver));cSum.handled+=bb.handled;cSum.unhandled+=bb.unhandled;Object.keys(bb.sev).forEach(s=>cSum.sev[s]+=bb.sev[s]);});
+    const cBranches=_dtByCrs[cName];const s=_dtCsum[cName];
     const isOnly=_dtCrsKeys.length===1;const isOpen=isOnly||!!crsExpanded[cName];
-    html+='<tr class="course-hdr'+(isOnly?' single':'')+'" data-crs="'+esc2(cName)+'"><td colspan="10">'+
-      '<span class="chdr-toggle">'+(isOnly?'':(isOpen?'▼':'▶'))+'</span>'+
-      '<span class="chdr-name">📁 '+cName+'</span>'+
-      '<span class="chdr-stats">'+cBranches.length+' 站 · '+fi(cSumPpl.size)+' 人 · 異常 '+fi(cSum.items)+' 件'+(cSum.unhandled?(' · 待處理 <b>'+fi(cSum.unhandled)+'</b>'):(' · <span style="color:var(--good)">已全部處理</span>'))+'</span>'+
-      '</td></tr>';
+    const kpis=[{val:fi(s.items),lbl:'件',tone:s.D?'bad':''}];
+    if(s.unhandled)kpis.push({val:fi(s.unhandled),lbl:'待處理',tone:'bad'});
+    else kpis.push({val:'✓',lbl:'已全處理',tone:'good'});
+    html+=courseHdrDash({
+      cName:cName,isOnly:isOnly,isOpen:isOpen,colSpan:10,
+      meta:cBranches.length+' 站 · '+fi(s.ppl.size)+' 人',
+      kpis:kpis,
+      bar:{val:s.items,max:_dtMax,lbl:fi(s.items),tone:s.D?'bad':(s.C?'warn':''),title:'異常件數(佔本次最大值比例)'},
+      chips:[{code:'A',count:s.A},{code:'B',count:s.B},{code:'C',count:s.C},{code:'D',count:s.D}]
+    });
     if(isOpen)cBranches.forEach(bk=>{const b=byBranch[bk];const open=!!detailExpanded[bk];
     html+='<tr class="grp-row" data-br="'+bk+'"><td class="exp">'+(open?'▼':'▶')+'</td><td class="b">'+bk+'</td>'+
       '<td class="num b">'+fi(b.items.length)+'</td><td class="num">'+fi(b.people.size)+'</td>'+
@@ -2212,17 +2272,19 @@ function renderSpeed(){
   const _spByCrs={};recs.forEach(r=>{const c=courseOf(r.branch)||'未分類';(_spByCrs[c]=_spByCrs[c]||[]).push(r);});
   const _spCrsKeys=COURSE_ORDER.filter(c=>_spByCrs[c]&&_spByCrs[c].length).concat(Object.keys(_spByCrs).filter(c=>!COURSE_ORDER.includes(c)));
   const _spCol=cols.length;
+  // 先算各課摘要 + 最大件數
+  const _spCsum={};let _spMax=0;
+  _spCrsKeys.forEach(cName=>{const rs=_spByCrs[cName];const s={n:rs.length,A:0,B:0,C:0,D:0,drv:new Set(),st:new Set()};rs.forEach(r=>{const t=sevOf(r).text;if(t==='輕度')s.A++;else if(t==='中度')s.B++;else if(t==='重度')s.C++;else if(t==='嚴重')s.D++;s.drv.add(r.branch+'|'+r.driver);s.st.add(r.branch);});_spCsum[cName]=s;if(rs.length>_spMax)_spMax=rs.length;});
   _spCrsKeys.forEach(cName=>{
-    const cRecs=_spByCrs[cName];
-    const cSev={輕度:0,中度:0,重度:0,嚴重:0};cRecs.forEach(r=>{const t=sevOf(r).text;if(cSev[t]!==undefined)cSev[t]++;});
-    const cDrivers=new Set(cRecs.map(r=>r.branch+'|'+r.driver)).size;
-    const cStations=new Set(cRecs.map(r=>r.branch)).size;
+    const cRecs=_spByCrs[cName];const cSum=_spCsum[cName];
     const isOnly=_spCrsKeys.length===1;const isOpen=isOnly||!!crsExpanded[cName];
-    html+='<tr class="course-hdr'+(isOnly?' single':'')+'" data-crs="'+esc2(cName)+'"><td colspan="'+_spCol+'">'+
-      '<span class="chdr-toggle">'+(isOnly?'':(isOpen?'▼':'▶'))+'</span>'+
-      '<span class="chdr-name">📁 '+cName+'</span>'+
-      '<span class="chdr-stats">'+cStations+' 站 · '+cDrivers+' 人 · 超速 '+fi(cRecs.length)+' 件'+(cSev.嚴重?(' · 嚴重 <b>'+cSev.嚴重+'</b>'):'')+(cSev.重度?(' · 重度 '+cSev.重度):'')+'</span>'+
-      '</td></tr>';
+    html+=courseHdrDash({
+      cName:cName,isOnly:isOnly,isOpen:isOpen,colSpan:_spCol,
+      meta:cSum.st.size+' 站 · '+cSum.drv.size+' 人',
+      kpis:[{val:fi(cRecs.length),lbl:'件',tone:cSum.D?'bad':''}],
+      bar:{val:cRecs.length,max:_spMax,lbl:fi(cRecs.length),tone:cSum.D?'bad':(cSum.C?'warn':''),title:'超速件數(佔本次最大值比例)'},
+      chips:[{code:'A',count:cSum.A},{code:'B',count:cSum.B},{code:'C',count:cSum.C},{code:'D',count:cSum.D}]
+    });
     if(isOpen)cRecs.forEach(it=>{
       const idx=speedRows.push(it)-1;const sv=sevOf(it);const over=num(it.over);
       const overCls=sv.text?(' over-cell over-'+sv.text):'';
@@ -2506,18 +2568,21 @@ function renderBranchPpl(){
     const _byCrs={};list.forEach(b=>{const c=courseOf(b.branch)||'未分類';(_byCrs[c]=_byCrs[c]||[]).push(b);});
     const _crsKeys=COURSE_ORDER.filter(c=>_byCrs[c]&&_byCrs[c].length).concat(Object.keys(_byCrs).filter(c=>!COURSE_ORDER.includes(c)));
     const _colCnt=cols.length;
+    // 先算全部,取最大值
+    const _csumAll={};let _bpMax=0;
+    _crsKeys.forEach(cName=>{const bs=_byCrs[cName];const s={total:0,uncl:0,handled:0,unhandled:0,A:0,B:0,C:0,D:0,ppl:new Set()};bs.forEach(b=>{s.total+=b.total;s.uncl+=b.uncl;s.handled+=b.handled;s.unhandled+=b.unhandled;s.A+=b.sev.輕度;s.B+=b.sev.中度;s.C+=b.sev.重度;s.D+=b.sev.嚴重;Object.keys(b.people).forEach(p=>s.ppl.add(b.branch+'|'+p));});_csumAll[cName]=s;if(s.total>_bpMax)_bpMax=s.total;});
     _crsKeys.forEach(cName=>{
-      const cBranches=_byCrs[cName];
-      // 課的摘要
-      const csum={total:0,uncl:0,handled:0,unhandled:0,輕度:0,中度:0,重度:0,嚴重:0};
-      const csumPpl=new Set();
-      cBranches.forEach(b=>{csum.total+=b.total;csum.uncl+=b.uncl;csum.handled+=b.handled;csum.unhandled+=b.unhandled;['輕度','中度','重度','嚴重'].forEach(s=>csum[s]+=b.sev[s]);Object.keys(b.people).forEach(p=>csumPpl.add(b.branch+'|'+p));});
+      const cBranches=_byCrs[cName];const s=_csumAll[cName];
       const isOnly=_crsKeys.length===1;const isOpen=isOnly||!!crsExpanded[cName];
-      html+='<tr class="course-hdr'+(isOnly?' single':'')+'" data-crs="'+esc2(cName)+'"><td colspan="'+_colCnt+'">'+
-        '<span class="chdr-toggle">'+(isOnly?'':(isOpen?'▼':'▶'))+'</span>'+
-        '<span class="chdr-name">📁 '+cName+'</span>'+
-        '<span class="chdr-stats">'+cBranches.length+' 站 · '+fi(csumPpl.size)+' 人 · 超速 '+fi(csum.total)+' 件'+(csum.unhandled?(' · 待處理 <b style="color:var(--bad)">'+fi(csum.unhandled)+'</b>'):(' · <span style="color:var(--good)">已全部處理</span>'))+'</span>'+
-        '</td></tr>';
+      const kpis=[{val:fi(s.total),lbl:'件',tone:s.D?'bad':''}];
+      if(s.unhandled)kpis.push({val:fi(s.unhandled),lbl:'待處理',tone:'bad'});
+      html+=courseHdrDash({
+        cName:cName,isOnly:isOnly,isOpen:isOpen,colSpan:_colCnt,
+        meta:cBranches.length+' 站 · '+fi(s.ppl.size)+' 人',
+        kpis:kpis,
+        bar:{val:s.total,max:_bpMax,lbl:fi(s.total),tone:s.D?'bad':(s.C?'warn':''),title:'超速件數(佔本次最大值比例)'},
+        chips:[{code:'A',count:s.A},{code:'B',count:s.B},{code:'C',count:s.C},{code:'D',count:s.D}]
+      });
       if(isOpen)cBranches.forEach(b=>{const ppl=Object.keys(b.people).length;const bIdle=IDLE.length?idleAgg(r=>r[0]===b.branch):null;
         bpRows.push({站所:b.branch,超速人數:ppl,超速次數:b.total,怠速:bIdle?bIdle.total:'',輕度:b.sev.輕度,中度:b.sev.中度,重度:b.sev.重度,嚴重:b.sev.嚴重,未歸類:b.uncl,已處理:b.handled,待處理:b.unhandled});
         const tot=b.total||1;const seg=(n,col)=>n?'<span style="display:inline-block;height:100%;width:'+(n/tot*100)+'%;background:'+col+'"></span>':'';
@@ -2552,17 +2617,19 @@ function renderBranchPpl(){
     const _byCrs2={};people.forEach(p=>{const c=courseOf(p.branch)||'未分類';(_byCrs2[c]=_byCrs2[c]||[]).push(p);});
     const _crsKeys2=COURSE_ORDER.filter(c=>_byCrs2[c]&&_byCrs2[c].length).concat(Object.keys(_byCrs2).filter(c=>!COURSE_ORDER.includes(c)));
     const _colCnt2=cols.length;
+    // 先算摘要 + 最大件數
+    const _csumP={};let _bpMax2=0;
+    _crsKeys2.forEach(cName=>{const ps=_byCrs2[cName];const s={total:0,max:0,A:0,B:0,C:0,D:0,st:new Set()};ps.forEach(p=>{s.total+=p.count;if(p.max>s.max)s.max=p.max;s.A+=p.sev.輕度||0;s.B+=p.sev.中度||0;s.C+=p.sev.重度||0;s.D+=p.sev.嚴重||0;s.st.add(p.branch);});_csumP[cName]=s;if(s.total>_bpMax2)_bpMax2=s.total;});
     _crsKeys2.forEach(cName=>{
-      const cPeople=_byCrs2[cName];
-      const cTotal=cPeople.reduce((a,p)=>a+p.count,0);
-      const cMax=cPeople.reduce((a,p)=>Math.max(a,p.max||0),0);
-      const cStations=new Set(cPeople.map(p=>p.branch)).size;
+      const cPeople=_byCrs2[cName];const s=_csumP[cName];
       const isOnly=_crsKeys2.length===1;const isOpen=isOnly||!!crsExpanded[cName];
-      html+='<tr class="course-hdr'+(isOnly?' single':'')+'" data-crs="'+esc2(cName)+'"><td colspan="'+_colCnt2+'">'+
-        '<span class="chdr-toggle">'+(isOnly?'':(isOpen?'▼':'▶'))+'</span>'+
-        '<span class="chdr-name">📁 '+cName+'</span>'+
-        '<span class="chdr-stats">'+cStations+' 站 · '+cPeople.length+' 人 · 超速 '+fi(cTotal)+' 件 · 最高 '+cMax+' km/hr</span>'+
-        '</td></tr>';
+      html+=courseHdrDash({
+        cName:cName,isOnly:isOnly,isOpen:isOpen,colSpan:_colCnt2,
+        meta:s.st.size+' 站 · '+cPeople.length+' 人',
+        kpis:[{val:fi(s.total),lbl:'件',tone:s.D?'bad':''},{val:s.max,lbl:'最高km',tone:s.max>=100?'bad':(s.max>=80?'warn':'')}],
+        bar:{val:s.total,max:_bpMax2,lbl:fi(s.total),tone:s.D?'bad':(s.C?'warn':''),title:'超速件數(佔本次最大值比例)'},
+        chips:[{code:'A',count:s.A},{code:'B',count:s.B},{code:'C',count:s.C},{code:'D',count:s.D}]
+      });
       if(isOpen)cPeople.forEach(p=>{const worst=p.worst>=0?ord[p.worst]:'';const dist=ord.map(s=>sevBadge(s,p.sev[s])).join('');
         const pIdle=IDLE.length?idleAgg(r=>r[0]===p.branch&&r[2]===p.driver):null;
         bpRows.push({站所:p.branch,駕駛:p.driver,超速次數:p.count,怠速:pIdle?pIdle.total:'',最高時速:p.max,最嚴重程度:worst,處置紀錄:uniq(p.disp).join('、'),懲處紀錄:uniq(p.disc).join('、')});

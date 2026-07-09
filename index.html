@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-C">
+<meta name="build-version" content="20260703-D">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -417,6 +417,51 @@ td.b{font-weight:700}
 .pdc-cell-bad .pdc-val{color:var(--bad)}
 .pdc-cell-ok .pdc-val{color:#15a85c}
 .pdc-sub{font-size:calc(11px*var(--fs));color:var(--muted);margin-top:4px;font-weight:600}
+/* === 分級規則頁籤 === */
+.rules-hint{padding:11px 14px;margin-bottom:14px;border-radius:10px;font-size:calc(13px*var(--fs));font-weight:700}
+.rules-hint-view{background:rgba(230,0,126,.06);border:1px dashed var(--accent);color:var(--accent)}
+.rules-hint-edit{background:rgba(240,164,10,.10);border:1px solid #F0A500;color:#a36400}
+#rulesCards .rule-card{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:16px;box-shadow:0 2px 10px rgba(230,0,126,.05)}
+#rulesCards .rule-h{display:flex;align-items:center;gap:10px;padding:12px 18px;background:linear-gradient(90deg,#FFE3EF 0%,#FFF7FB 100%);border-bottom:1px solid var(--line);font-weight:800;color:var(--accent);font-size:calc(15px*var(--fs))}
+#rulesCards .rh-limits{margin-left:auto;font-size:calc(12px*var(--fs));font-weight:700;color:var(--muted);background:#fff;padding:3px 10px;border-radius:6px;border:1px solid var(--line)}
+#rulesCards .rule-body{display:grid;grid-template-columns:1fr auto;gap:0;align-items:stretch}
+#rulesCards .rb-left{padding:0;display:flex;flex-direction:column}
+#rulesCards .rb-left>table{flex:1;border-collapse:collapse}
+#rulesCards .rb-left>table>tbody{height:100%}
+#rulesCards .rb-left>table>tbody>tr{height:1px}
+#rulesCards .rb-left>table>tbody>tr>td{height:inherit}
+#rulesCards .rb-right{padding:14px 18px 14px 0;border-left:1px dashed var(--line);background:linear-gradient(180deg,#fff,#FFF7FB);min-width:340px;display:flex;flex-direction:column}
+#rulesCards .rb-right-h{font-size:calc(11.5px*var(--fs));color:var(--accent);font-weight:800;letter-spacing:.4px;padding-left:16px;padding-top:4px;margin-bottom:6px;text-transform:uppercase}
+#rulesCards .rule-tbl{width:100%;border-collapse:collapse;font-size:calc(13.5px*var(--fs))}
+#rulesCards .rule-tbl thead th{background:var(--panel2);color:var(--muted);font-weight:700;padding:9px 12px;text-align:left;letter-spacing:.3px;border-bottom:1px solid var(--line);font-size:calc(12px*var(--fs));white-space:nowrap}
+#rulesCards .rule-tbl td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+#rulesCards .rule-tbl tr:last-child td{border-bottom:none}
+#rulesCards .rule-tbl .lvl{width:80px;font-weight:900;font-size:calc(14px*var(--fs));letter-spacing:.5px;padding-left:16px;white-space:nowrap}
+#rulesCards .rule-tbl .lvl-A{color:var(--good);border-left:5px solid var(--good)}
+#rulesCards .rule-tbl .lvl-B{color:#c88800;border-left:5px solid #F0A500}
+#rulesCards .rule-tbl .lvl-C{color:#e6541a;border-left:5px solid #e6541a}
+#rulesCards .rule-tbl .lvl-D{color:var(--bad);border-left:5px solid var(--bad)}
+#rulesCards .rule-tbl .range{font-family:var(--mono),Consolas;font-weight:800;font-size:calc(14px*var(--fs));color:var(--txt);width:110px;text-align:center}
+#rulesCards .rule-tbl .range.range-D{color:var(--bad)}
+#rulesCards .rule-tbl input{padding:5px 8px;border:1px solid var(--line);border-radius:6px;font-size:calc(13px*var(--fs));font-family:inherit;background:#fffbef;width:80px}
+#rulesCards .rule-tbl input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(230,0,126,.15)}
+#rulesCards .rule-tbl input.wide{width:130px}
+#rulesCards .rule-tbl input.small{width:50px}
+#rulesCards .spd-tbl{border-collapse:collapse;font-family:var(--mono),Consolas;font-size:calc(12.5px*var(--fs))}
+#rulesCards .spd-tbl th{background:transparent;color:var(--muted);font-weight:800;padding:5px 12px;text-align:center;border-bottom:1px solid var(--line);letter-spacing:.4px;font-size:calc(11px*var(--fs))}
+#rulesCards .spd-tbl td{padding:7px 12px;text-align:center;border-bottom:1px solid var(--line);font-weight:800;font-size:calc(13px*var(--fs))}
+#rulesCards .spd-tbl tr:last-child td{border-bottom:none}
+#rulesCards .spd-tbl .lv{width:40px;font-family:'微軟正黑體',sans-serif;color:var(--muted);font-size:calc(11.5px*var(--fs))}
+#rulesCards .spd-tbl .lv-A{color:var(--good)}
+#rulesCards .spd-tbl .lv-B{color:#c88800}
+#rulesCards .spd-tbl .lv-C{color:#e6541a}
+#rulesCards .spd-tbl .lv-D{color:var(--bad)}
+#rulesCards .spd-tbl .val{color:var(--txt);min-width:64px}
+#rulesCards .spd-tbl .val-D{color:var(--bad)}
+.rules-info{padding:14px 16px;background:linear-gradient(90deg,#FFF7FB,#fff);border:1px solid var(--line);border-radius:10px;margin-top:14px;font-size:calc(12.5px*var(--fs));color:var(--muted);line-height:1.8}
+.rules-info b{color:var(--accent)}
+.rules-edit-bar{position:sticky;bottom:12px;background:#fff;padding:14px 18px;border-radius:12px;box-shadow:0 -4px 20px rgba(230,0,126,.18);border:2px solid var(--accent);display:flex;gap:10px;justify-content:flex-end;align-items:center;margin-top:20px;z-index:5}
+.rules-edit-msg{margin-right:auto;color:#a36400;font-size:calc(12.5px*var(--fs));font-weight:700}
 .scard .rk{position:absolute;top:4px;right:14px;font-family:var(--mono);font-weight:800;font-size:calc(40px*var(--fs));color:#ffdcec;line-height:1}
 .scard-h{display:flex;align-items:center;gap:13px;margin-bottom:10px}
 .scard-h .gb{width:calc(56px*var(--fs));height:calc(56px*var(--fs));border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-family:var(--mono);font-weight:800;font-size:calc(27px*var(--fs))}
@@ -489,6 +534,7 @@ td.b{font-weight:700}
     <div class="tab" data-tab="speed">超速名單分類</div>
     <div class="tab" data-tab="idle">怠速查看</div>
     <div class="tab" data-tab="perf">駕駛績效</div>
+    <div class="tab" data-tab="rules">分級規則</div>
   </div>
 
   <section class="panel" id="p-rank">
@@ -595,6 +641,27 @@ td.b{font-weight:700}
     <div id="perfKpis" class="perf-kpis"></div>
     <div id="perfBody"></div>
     <input type="file" id="perfFileInput" accept=".xlsx,.xls" multiple hidden>
+  </section>
+
+  <section class="panel" id="p-rules">
+    <div class="toolbar">
+      <span style="font-weight:800;color:var(--accent);font-size:calc(13px*var(--fs));margin-right:4px">顯示模式</span>
+      <button class="btn active" id="rulesViewBtn" type="button">👁 檢視</button>
+      <button class="btn" id="rulesEditBtn" type="button">✏ 編輯</button>
+      <button class="btn ghost danger" id="rulesResetBtn" type="button" title="還原為系統預設的分級規則">↺ 還原預設</button>
+      <span class="meta" id="rulesMeta" style="margin-left:auto"></span>
+    </div>
+    <div id="rulesHint" class="rules-hint rules-hint-view">👁 檢視模式 · 唯讀。要修改請按上方「✏ 編輯」</div>
+    <div id="rulesCards"></div>
+    <div class="rules-info">
+      ℹ️ <b>兩張表的分工</b>:左邊「政策表」定義規則(超過多少 → 什麼等級 → 什麼處置)。右邊「車速對照」則是把「超過 km」加上該範圍的限速,列出對應的實際車速,方便執行時快速對照。
+      <br>&nbsp;&nbsp;<b>此規則會作用於「站所排行榜」的評等、「超速名單分類」的分級、以及「嚴重(D)粉紅警示」。修改後所有頁籤即時重算,不會刪除歷史資料。設定儲存在你這台電腦的瀏覽器裡(localStorage)。</b>
+    </div>
+    <div id="rulesEditBar" class="rules-edit-bar" style="display:none">
+      <span class="rules-edit-msg">✏ 編輯中,尚未儲存 — 記得按「儲存規則」才會生效</span>
+      <button class="btn" id="rulesCancelBtn" type="button">取消</button>
+      <button class="btn primary" id="rulesSaveBtn" type="button">💾 儲存規則</button>
+    </div>
   </section>
 
   <div class="note" id="footnote"></div>
@@ -779,12 +846,47 @@ loadPerf();
 const SEV_CODE={正常:'',輕度:'A',中度:'B',重度:'C',嚴重:'D'};
 const SUGGEST_DISP={正常:'',輕度:'',中度:'面談單',重度:'改善單',嚴重:'/扣牌'};
 const SUGGEST_DISC={正常:'',輕度:'',中度:'申誡',重度:'記過',嚴重:'大過+'};
+/* === 超速分級規則(可透過「分級規則」頁籤自訂,存 localStorage) === */
+const SPEED_RULES_KEY='fleet_speed_rules_v1';
+const SPEED_RULES_DEFAULT={
+  ts:0,
+  city:{limits:[40,50,60],rows:[
+    {code:'A',name:'輕度',lo:0, hi:19,  proc:'提醒注意',disc:'-',   rule:'-'},
+    {code:'B',name:'中度',lo:20,hi:29,  proc:'面談單',  disc:'申誡',rule:'第45條第3項'},
+    {code:'C',name:'重度',lo:30,hi:39,  proc:'改善單',  disc:'記過',rule:'第46條第1項'},
+    {code:'D',name:'嚴重',lo:40,hi:null,proc:'/扣牌',   disc:'大過+',rule:'第47條第4項'}
+  ]},
+  fast:{limits:[70,80,90],rows:[
+    {code:'A',name:'輕度',lo:0, hi:19,  proc:'提醒注意',disc:'-',   rule:'-'},
+    {code:'B',name:'中度',lo:20,hi:29,  proc:'面談單',  disc:'申誡',rule:'第45條第3項'},
+    {code:'C',name:'重度',lo:30,hi:39,  proc:'改善單',  disc:'記過',rule:'第46條第1項'},
+    {code:'D',name:'嚴重',lo:40,hi:null,proc:'/扣牌',   disc:'大過+',rule:'第47條第4項'}
+  ]},
+  hwy:{limits:[100,110],rows:[
+    {code:'A',name:'輕度',lo:0, hi:19,  proc:'提醒注意',disc:'-',   rule:'-'},
+    {code:'B',name:'中度',lo:20,hi:29,  proc:'面談單',  disc:'申誡',rule:'第45條第3項'},
+    {code:'C',name:'重度',lo:30,hi:39,  proc:'改善單',  disc:'記過',rule:'第46條第1項'},
+    {code:'D',name:'嚴重',lo:40,hi:null,proc:'/扣牌',   disc:'大過+',rule:'第47條第4項'}
+  ]}
+};
+let SPEED_RULES=JSON.parse(JSON.stringify(SPEED_RULES_DEFAULT));
+function loadSpeedRules(){try{const s=localStorage.getItem(SPEED_RULES_KEY);if(s){const o=JSON.parse(s);if(o&&o.city&&o.fast&&o.hwy)SPEED_RULES=o;}}catch(e){}}
+function saveSpeedRules(){try{SPEED_RULES.ts=Date.now();localStorage.setItem(SPEED_RULES_KEY,JSON.stringify(SPEED_RULES));}catch(e){toast('儲存失敗','瀏覽器空間不足','warn');}}
+function resetSpeedRules(){SPEED_RULES=JSON.parse(JSON.stringify(SPEED_RULES_DEFAULT));try{localStorage.removeItem(SPEED_RULES_KEY);}catch(e){}}
+loadSpeedRules();
 function classifySpeed(legal,over){
   const k=num(legal),L=num(over);
   if(L<=0)return '正常';
-  if(k===40||k===50||k===60)return L<=14?'輕度':L<=24?'中度':L<=34?'重度':'嚴重';
-  if(k===70||k===80||k===90)return L<=10?'輕度':L<=20?'中度':L<=30?'重度':'嚴重';
-  if(k===100||k===110)return L<=10?'輕度':L<=15?'中度':L<=20?'重度':'嚴重';
+  for(const key of ['city','fast','hwy']){
+    const g=SPEED_RULES[key];
+    if(g&&g.limits&&g.limits.indexOf(k)>=0){
+      for(const row of g.rows){
+        if(row.hi===null||row.hi===undefined){if(L>=row.lo)return row.name;}
+        else if(L>=row.lo&&L<=row.hi)return row.name;
+      }
+      return '';
+    }
+  }
   return '';  // 未定義速限 → 用匯入原值
 }
 // 取得一筆超速事件的「程度／代碼／建議處置／建議懲處」（公式優先，無法判定才用匯入值）
@@ -2128,6 +2230,133 @@ async function saveAllEdits(){
   else{toast('已儲存 ✓',ok+' 筆處置／懲處已更新');}
   lastSig=signature();renderSpeed();renderDetail();updateSaveBtn();updateDetailSaveBtn();
 }
+/* ===== 分級規則頁籤 ===== */
+let _rulesEditing=false, _rulesEditBuf=null;
+const _RULES_TITLE={city:'市區道路',fast:'快速道路',hwy:'高速公路'};
+const _RULES_ICON={city:'🏙',fast:'🛣',hwy:'🚗'};
+function renderRules(){
+  const box=document.getElementById('rulesCards');if(!box)return;
+  const data=_rulesEditing?_rulesEditBuf:SPEED_RULES;
+  const html=['city','fast','hwy'].map(key=>{
+    const g=data[key];
+    const limits=g.limits;
+    const rows=g.rows;
+    // 左邊政策表
+    const policyRows=rows.map((r,i)=>_rulesPolicyRow(key,r,i,_rulesEditing)).join('');
+    // 右邊車速對照
+    const spdHeader='<tr><th class="lv">等級</th>'+limits.map(L=>'<th>限速 '+L+'</th>').join('')+'</tr>';
+    const spdBody=rows.map((r,i)=>{
+      const cells=limits.map(L=>{
+        const v=_rulesSpeedText(L,r.lo,r.hi);
+        return '<td class="val'+(r.code==='D'?' val-D':'')+'" data-spd="'+key+':'+i+':'+L+'">'+v+'</td>';
+      }).join('');
+      return '<tr><td class="lv lv-'+r.code+'">'+r.code+' '+r.name+'</td>'+cells+'</tr>';
+    }).join('');
+    return '<div class="rule-card">'+
+      '<div class="rule-h">'+_RULES_ICON[key]+' '+_RULES_TITLE[key]+
+        '<span class="rh-limits">限速 '+limits.join(' / ')+' km/h</span></div>'+
+      '<div class="rule-body">'+
+        '<div class="rb-left"><table class="rule-tbl">'+
+          '<thead><tr><th style="width:80px">等級</th><th style="width:110px;text-align:center">超過 km</th><th>行為處置</th><th>行政懲處</th><th>工作規則</th></tr></thead>'+
+          '<tbody>'+policyRows+'</tbody></table></div>'+
+        '<div class="rb-right"><div class="rb-right-h">🚗 車速對照(依限速自動計算)</div>'+
+          '<table class="spd-tbl"><thead>'+spdHeader+'</thead><tbody>'+spdBody+'</tbody></table></div>'+
+      '</div></div>';
+  }).join('');
+  box.innerHTML=html;
+  // 編輯模式綁定 input
+  if(_rulesEditing){
+    box.querySelectorAll('input[data-r]').forEach(inp=>{
+      inp.oninput=()=>{
+        const parts=inp.dataset.r.split(':');const key=parts[0],idx=+parts[1],field=parts[2];
+        let v=inp.value.trim();
+        if(field==='lo'||field==='hi'){
+          if(v==='+'||v===''||v==='∞')v=null;
+          else{const n=parseInt(v);v=isNaN(n)?0:n;}
+        }
+        _rulesEditBuf[key].rows[idx][field]=v;
+        // 即時更新右邊車速對照該列
+        if(field==='lo'||field==='hi')_rulesUpdateSpeedRow(key,idx);
+      };
+    });
+  }
+  // meta
+  const meta=document.getElementById('rulesMeta');
+  if(meta){
+    const isCustom=SPEED_RULES.ts>0;
+    meta.innerHTML=isCustom
+      ?'✅ 已自訂 · 最後修改 '+new Date(SPEED_RULES.ts).toLocaleString()+' <span style="color:var(--muted)">(本機瀏覽器)</span>'
+      :'📌 目前使用系統預設規則';
+  }
+}
+function _rulesSpeedText(L,lo,hi){
+  if(hi===null||hi===undefined)return '≥ '+(L+lo);
+  if(lo===0)return '≤ '+(L+hi);
+  return (L+lo)+' ~ '+(L+hi);
+}
+function _rulesPolicyRow(key,r,idx,editable){
+  const rangeText=r.hi===null||r.hi===undefined?('≥ '+r.lo):(r.lo+' ~ '+r.hi);
+  if(!editable){
+    return '<tr>'+
+      '<td class="lvl lvl-'+r.code+'">'+r.code+' '+r.name+'</td>'+
+      '<td class="range'+(r.code==='D'?' range-D':'')+'">'+rangeText+'</td>'+
+      '<td>'+esc(r.proc)+'</td>'+
+      '<td>'+esc(r.disc)+'</td>'+
+      '<td>'+esc(r.rule)+'</td>'+
+    '</tr>';
+  }
+  const hiDisp=r.hi===null||r.hi===undefined?'+':r.hi;
+  return '<tr>'+
+    '<td class="lvl lvl-'+r.code+'">'+r.code+' '+r.name+'</td>'+
+    '<td class="range" style="text-align:center">'+
+      '<input class="small" data-r="'+key+':'+idx+':lo" value="'+r.lo+'">'+
+      '<span style="margin:0 2px">~</span>'+
+      '<input class="small" data-r="'+key+':'+idx+':hi" value="'+hiDisp+'">'+
+    '</td>'+
+    '<td><input data-r="'+key+':'+idx+':proc" value="'+esc(r.proc)+'"></td>'+
+    '<td><input data-r="'+key+':'+idx+':disc" value="'+esc(r.disc)+'"></td>'+
+    '<td><input class="wide" data-r="'+key+':'+idx+':rule" value="'+esc(r.rule)+'"></td>'+
+  '</tr>';
+}
+function _rulesUpdateSpeedRow(key,idx){
+  const r=_rulesEditBuf[key].rows[idx];
+  _rulesEditBuf[key].limits.forEach(L=>{
+    const cell=document.querySelector('td[data-spd="'+key+':'+idx+':'+L+'"]');
+    if(cell)cell.textContent=_rulesSpeedText(L,r.lo,r.hi);
+  });
+}
+function rulesEnterEdit(){
+  _rulesEditing=true;
+  _rulesEditBuf=JSON.parse(JSON.stringify(SPEED_RULES));
+  document.getElementById('rulesViewBtn').classList.remove('active');
+  document.getElementById('rulesEditBtn').classList.add('active');
+  const hint=document.getElementById('rulesHint');
+  hint.className='rules-hint rules-hint-edit';
+  hint.textContent='✏ 編輯模式 · 改左邊「政策表」,右邊「車速對照」會即時算,最後按「💾 儲存規則」才會套用';
+  document.getElementById('rulesEditBar').style.display='flex';
+  renderRules();
+}
+function rulesExitEdit(save){
+  if(save){
+    SPEED_RULES=_rulesEditBuf;
+    saveSpeedRules();
+    toast('分級規則已儲存 ✓','所有頁籤已重新分類');
+  }
+  _rulesEditing=false;_rulesEditBuf=null;
+  document.getElementById('rulesEditBtn').classList.remove('active');
+  document.getElementById('rulesViewBtn').classList.add('active');
+  const hint=document.getElementById('rulesHint');
+  hint.className='rules-hint rules-hint-view';
+  hint.textContent='👁 檢視模式 · 唯讀。要修改請按上方「✏ 編輯」';
+  document.getElementById('rulesEditBar').style.display='none';
+  if(save)renderAll();else renderRules();
+}
+function rulesResetToDefault(){
+  if(!confirm('確定把分級規則還原為系統預設嗎?\n\n你目前的所有自訂改動會被清除,所有頁籤會依預設規則重新分類。'))return;
+  resetSpeedRules();
+  toast('已還原預設分級規則 ✓','');
+  renderAll();
+}
 function renderFoot(){
   const dates=sortedDates();
   const mode=ONLINE?'資料儲存於 Google 試算表（後台），所有開啟者看到同一份累積資料。':'目前為本機預覽模式：資料只存在你的瀏覽器，不會與他人共享。請依 README 設定 GAS_URL 開啟共享。';
@@ -2230,7 +2459,7 @@ function renderBranchPpl(){
     wireSort();
   }
 }
-function renderAll(){renderPeriodBar();renderLatestData();refreshIdle();renderKpis();renderRank();renderTrend();fillDetailFilters();renderDetail();renderSpeed();renderBranchPpl();renderIdle();renderPerf();renderFoot();}
+function renderAll(){renderPeriodBar();renderLatestData();refreshIdle();renderKpis();renderRank();renderTrend();fillDetailFilters();renderDetail();renderSpeed();renderBranchPpl();renderIdle();renderPerf();renderRules();renderFoot();}
 function renderLatestData(){
   const el=document.getElementById('latestData');if(!el)return;
   // 取所有資料來源中最大的日期(不受時間範圍篩選影響)
@@ -2531,6 +2760,12 @@ $('#perfExport').onclick=()=>{
   const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;a.download='績效_'+m+'.csv';a.click();URL.revokeObjectURL(url);
 };
+/* 分級規則頁籤 事件 */
+$('#rulesViewBtn').onclick=()=>{if(_rulesEditing){if(confirm('目前正在編輯,離開會捨棄未儲存的改動,確定?'))rulesExitEdit(false);}};
+$('#rulesEditBtn').onclick=()=>{if(!_rulesEditing)rulesEnterEdit();};
+$('#rulesCancelBtn').onclick=()=>rulesExitEdit(false);
+$('#rulesSaveBtn').onclick=()=>rulesExitEdit(true);
+$('#rulesResetBtn').onclick=rulesResetToDefault;
 /* 怠速匯入 / 清除 / 匯出 事件 */
 $('#idleImportBtn').onclick=()=>{if(!busy)$('#idleFileInput').click();};
 $('#idleSearch').oninput=()=>{idleSel={branch:null,plate:null};renderIdle();};

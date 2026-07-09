@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-I">
+<meta name="build-version" content="20260703-J">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -494,6 +494,8 @@ tr.course-hdr.single:hover td{background:linear-gradient(90deg,rgba(230,0,126,.1
 .chdr-chip.c{color:#e6541a;background:rgba(230,84,26,.12);border-color:rgba(230,84,26,.32)}
 .chdr-chip.d{color:var(--bad);background:rgba(224,39,73,.14);border-color:rgba(224,39,73,.4);font-weight:900;box-shadow:0 0 0 2px rgba(224,39,73,.08)}
 .chdr-chip.d .cc-c{opacity:.85}
+/* 全部課收合時,隱藏詳細欄位標題(避免和儀表板列視覺錯位) */
+table.crs-all-collapsed>thead{display:none}
 .scard .rk{position:absolute;top:4px;right:14px;font-family:var(--mono);font-weight:800;font-size:calc(40px*var(--fs));color:#ffdcec;line-height:1}
 .scard-h{display:flex;align-items:center;gap:13px;margin-bottom:10px}
 .scard-h .gb{width:calc(56px*var(--fs));height:calc(56px*var(--fs));border-radius:50%;flex:none;display:grid;place-items:center;color:#fff;font-family:var(--mono);font-weight:800;font-size:calc(27px*var(--fs))}
@@ -1923,6 +1925,9 @@ function renderIdle(){
       '<td style="min-width:120px">'+idleStack(o.a)+'</td></tr>';});
   });
   h+='</tbody></table></div></div>';box.innerHTML=h;
+  const _idlAnyOpen=_idlCrsKeys.length===1||_idlCrsKeys.some(c=>crsExpanded[c]);
+  const _idlTbl=box.querySelector('.card table');
+  if(_idlTbl)_idlTbl.classList.toggle('crs-all-collapsed',!_idlAnyOpen);
   box.querySelectorAll('tr.course-hdr:not(.single)').forEach(tr=>tr.onclick=()=>{crsExpanded[tr.dataset.crs]=!crsExpanded[tr.dataset.crs];renderIdle();});
   box.querySelectorAll('tr.idle-br').forEach(el=>el.onclick=()=>{idleSel={branch:el.dataset.br,plate:null};renderIdle();});
 }
@@ -2166,6 +2171,8 @@ function renderDetail(){
     });
   });
   t.innerHTML=html+'</tbody>';
+  const _dtAnyOpen=_dtCrsKeys.length===1||_dtCrsKeys.some(c=>crsExpanded[c]);
+  t.classList.toggle('crs-all-collapsed',!_dtAnyOpen);
   t.querySelectorAll('tr.course-hdr:not(.single)').forEach(tr=>tr.onclick=()=>{crsExpanded[tr.dataset.crs]=!crsExpanded[tr.dataset.crs];renderDetail();});
   t.querySelectorAll('tr.grp-row').forEach(tr=>tr.onclick=()=>{const bk=tr.dataset.br;detailExpanded[bk]=!detailExpanded[bk];renderDetail();});
   t.querySelectorAll('tr.jump-row').forEach(tr=>tr.onclick=()=>{jumpToSpeed(decodeURIComponent(tr.dataset.u));});
@@ -2309,6 +2316,9 @@ function renderSpeed(){
     });
   });
   box.innerHTML='<div class="card"><div class="tablewrap"><table class="speedtbl">'+html+'</tbody></table></div></div>';
+  const _spAnyOpen=_spCrsKeys.length===1||_spCrsKeys.some(c=>crsExpanded[c]);
+  const _spTbl=box.querySelector('table.speedtbl');
+  if(_spTbl)_spTbl.classList.toggle('crs-all-collapsed',!_spAnyOpen);
   box.querySelectorAll('tr.course-hdr:not(.single)').forEach(tr=>tr.onclick=()=>{crsExpanded[tr.dataset.crs]=!crsExpanded[tr.dataset.crs];renderSpeed();});
   box.querySelectorAll('th.sortable').forEach(th=>th.onclick=()=>{const key=th.dataset.k;if(speedSort.key===key)speedSort.dir*=-1;else{speedSort.key=key;speedSort.dir=1;}renderSpeed();});
   box.querySelectorAll('select.esel').forEach(sel=>{
@@ -2602,6 +2612,8 @@ function renderBranchPpl(){
           dcell(b.unhandled,'待處理','var(--bad)',true)+'</tr>';});
     });
     t.innerHTML=html+'</tbody>';
+    const _bpAnyOpen=_crsKeys.length===1||_crsKeys.some(c=>crsExpanded[c]);
+    t.classList.toggle('crs-all-collapsed',!_bpAnyOpen);
     wireSort();
     t.querySelectorAll('tr.course-hdr:not(.single)').forEach(tr=>tr.onclick=()=>{crsExpanded[tr.dataset.crs]=!crsExpanded[tr.dataset.crs];renderBranchPpl();});
     t.querySelectorAll('td.idlejump').forEach(td=>td.onclick=e=>{e.stopPropagation();idleSel={branch:td.dataset.br,plate:null};gotoTab('idle');});
@@ -2641,6 +2653,8 @@ function renderBranchPpl(){
       });
     });
     t.innerHTML=html+'</tbody>';
+    const _bpAnyOpen2=_crsKeys2.length===1||_crsKeys2.some(c=>crsExpanded[c]);
+    t.classList.toggle('crs-all-collapsed',!_bpAnyOpen2);
     wireSort();
     t.querySelectorAll('tr.course-hdr:not(.single)').forEach(tr=>tr.onclick=()=>{crsExpanded[tr.dataset.crs]=!crsExpanded[tr.dataset.crs];renderBranchPpl();});
   }

@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-F">
+<meta name="build-version" content="20260703-G">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1869,12 +1869,24 @@ function renderIdle(){
   // 站所排行（依累計時數 / 重度人數）
   const brs={};IDLE.forEach(r=>{brs[r[0]]=1;});
   const rows=Object.keys(brs).map(b=>({branch:b,a:idleAgg(r=>r[0]===b)})).sort((x,y)=>y.a.C-x.a.C||y.a.sumMin-x.a.sumMin);
-  h+='<div class="sc-ttl" style="margin:6px 2px 10px;font-size:calc(15px*var(--fs));color:var(--txt);font-weight:800">站所怠速排行（點擊站所看駕駛累計）</div>';
+  h+='<div class="sc-ttl" style="margin:6px 2px 10px;font-size:calc(15px*var(--fs));color:var(--txt);font-weight:800">站所怠速排行（依課分區塊；點擊站所看駕駛累計）</div>';
   h+='<div class="card"><div class="tablewrap"><table><thead><tr><th>#</th><th>站所</th><th class="num">駕駛數</th><th class="num">累計時數</th><th class="num">事件</th><th class="num">輕度</th><th class="num">中度</th><th class="num">重度</th><th>分布(人數)</th></tr></thead><tbody>';
-  rows.forEach((o,i)=>{h+='<tr class="idle-br" data-br="'+o.branch+'" style="cursor:pointer"><td class="num">'+(i+1)+'</td><td class="b">'+o.branch+'</td>'+
-    '<td class="num b">'+o.a.people+'</td><td class="num" style="font-family:var(--mono)">'+idleFmt(o.a.sumMin)+'</td><td class="num">'+o.a.events+'</td>'+
-    '<td class="num" style="color:var(--t-light)">'+(o.a.A||'')+'</td><td class="num" style="color:var(--t-mod)">'+(o.a.B||'')+'</td><td class="num" style="color:var(--t-severe)">'+(o.a.C||'')+'</td>'+
-    '<td style="min-width:120px">'+idleStack(o.a)+'</td></tr>';});
+  // 依課分組
+  const _idlByCrs={};rows.forEach(o=>{const c=courseOf(o.branch)||'未分類';(_idlByCrs[c]=_idlByCrs[c]||[]).push(o);});
+  const _idlCrsKeys=COURSE_ORDER.filter(c=>_idlByCrs[c]&&_idlByCrs[c].length).concat(Object.keys(_idlByCrs).filter(c=>!COURSE_ORDER.includes(c)));
+  _idlCrsKeys.forEach(cName=>{
+    const cRows=_idlByCrs[cName];
+    const cSum={events:0,people:0,sumMin:0,A:0,B:0,C:0};
+    cRows.forEach(o=>{cSum.events+=o.a.events;cSum.people+=o.a.people;cSum.sumMin+=o.a.sumMin;cSum.A+=o.a.A;cSum.B+=o.a.B;cSum.C+=o.a.C;});
+    h+='<tr class="course-hdr"><td colspan="9">'+
+      '<span class="chdr-name">📁 '+cName+'</span>'+
+      '<span class="chdr-stats">'+cRows.length+' 站 · '+cSum.people+' 人 · 累計 '+idleFmt(cSum.sumMin)+' · '+cSum.events+' 件'+(cSum.C?(' · 重度 <b>'+cSum.C+' 人</b>'):(cSum.B?(' · 中度 '+cSum.B+' 人'):''))+'</span>'+
+      '</td></tr>';
+    cRows.forEach((o,i)=>{h+='<tr class="idle-br" data-br="'+o.branch+'" style="cursor:pointer"><td class="num">'+(i+1)+'</td><td class="b">'+o.branch+'</td>'+
+      '<td class="num b">'+o.a.people+'</td><td class="num" style="font-family:var(--mono)">'+idleFmt(o.a.sumMin)+'</td><td class="num">'+o.a.events+'</td>'+
+      '<td class="num" style="color:var(--t-light)">'+(o.a.A||'')+'</td><td class="num" style="color:var(--t-mod)">'+(o.a.B||'')+'</td><td class="num" style="color:var(--t-severe)">'+(o.a.C||'')+'</td>'+
+      '<td style="min-width:120px">'+idleStack(o.a)+'</td></tr>';});
+  });
   h+='</tbody></table></div></div>';box.innerHTML=h;
   box.querySelectorAll('tr.idle-br').forEach(el=>el.onclick=()=>{idleSel={branch:el.dataset.br,plate:null};renderIdle();});
 }
@@ -2005,7 +2017,19 @@ function renderDetail(){
     const done=(disp&&disp!=='-')||(disc&&disc!=='-');if(done)b.handled++;else b.unhandled++;});
   const branches=Object.keys(byBranch).sort((a,b)=>byBranch[b].items.length-byBranch[a].items.length);
   let html='<thead><tr><th></th><th>站所</th><th class="num">異常筆數</th><th class="num">人數</th><th class="num">輕度</th><th class="num">中度</th><th class="num">重度</th><th class="num">嚴重</th><th class="num">已處理</th><th class="num">待處理</th></tr></thead><tbody>';
-  branches.forEach(bk=>{const b=byBranch[bk];const open=!!detailExpanded[bk];
+  // 依課分組
+  const _dtByCrs={};branches.forEach(bk=>{const c=courseOf(bk)||'未分類';(_dtByCrs[c]=_dtByCrs[c]||[]).push(bk);});
+  const _dtCrsKeys=COURSE_ORDER.filter(c=>_dtByCrs[c]&&_dtByCrs[c].length).concat(Object.keys(_dtByCrs).filter(c=>!COURSE_ORDER.includes(c)));
+  _dtCrsKeys.forEach(cName=>{
+    const cBranches=_dtByCrs[cName];
+    const cSum={items:0,handled:0,unhandled:0,sev:{輕度:0,中度:0,重度:0,嚴重:0}};
+    const cSumPpl=new Set();
+    cBranches.forEach(bk=>{const bb=byBranch[bk];cSum.items+=bb.items.length;bb.items.forEach(r=>cSumPpl.add(bb.branch+'|'+r.driver));cSum.handled+=bb.handled;cSum.unhandled+=bb.unhandled;Object.keys(bb.sev).forEach(s=>cSum.sev[s]+=bb.sev[s]);});
+    html+='<tr class="course-hdr"><td colspan="10">'+
+      '<span class="chdr-name">📁 '+cName+'</span>'+
+      '<span class="chdr-stats">'+cBranches.length+' 站 · '+fi(cSumPpl.size)+' 人 · 異常 '+fi(cSum.items)+' 件'+(cSum.unhandled?(' · 待處理 <b>'+fi(cSum.unhandled)+'</b>'):(' · <span style="color:var(--good)">已全部處理</span>'))+'</span>'+
+      '</td></tr>';
+    cBranches.forEach(bk=>{const b=byBranch[bk];const open=!!detailExpanded[bk];
     html+='<tr class="grp-row" data-br="'+bk+'"><td class="exp">'+(open?'▼':'▶')+'</td><td class="b">'+bk+'</td>'+
       '<td class="num b">'+fi(b.items.length)+'</td><td class="num">'+fi(b.people.size)+'</td>'+
       '<td class="num" style="color:var(--blue)">'+(b.sev.輕度||'')+'</td>'+
@@ -2069,6 +2093,7 @@ function renderDetail(){
       });
       html+='</tbody></table></div></td></tr>';
     }
+    });
   });
   t.innerHTML=html+'</tbody>';
   t.querySelectorAll('tr.grp-row').forEach(tr=>tr.onclick=()=>{const bk=tr.dataset.br;detailExpanded[bk]=!detailExpanded[bk];renderDetail();});

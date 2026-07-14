@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-M">
+<meta name="build-version" content="20260703-N">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -499,6 +499,22 @@ table.crs-all-collapsed>thead>tr.data-cols{display:none}
 table:not(.crs-all-collapsed)>thead>tr.dash-lbl{display:none}
 tr.dash-lbl th{background:var(--panel);color:var(--accent);font-weight:800;text-align:left;padding:9px 18px !important;letter-spacing:.4px;font-size:calc(12.5px*var(--fs));border-bottom:1px solid var(--line)}
 tr.dash-lbl .lbl-hint{color:var(--muted);font-weight:600;margin-left:8px;letter-spacing:.2px}
+/* 多選下拉(課別/站所複選) */
+details.msf{position:relative;display:inline-block}
+details.msf>summary{list-style:none;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;cursor:pointer;font-family:inherit;font-size:calc(13px*var(--fs));font-weight:700;color:var(--txt);min-width:130px;display:flex;align-items:center;gap:6px;user-select:none;transition:border-color .1s}
+details.msf>summary::-webkit-details-marker{display:none}
+details.msf>summary::marker{content:''}
+details.msf>summary:hover{border-color:var(--accent)}
+details.msf .msarr{margin-left:auto;color:var(--muted);font-size:calc(11px*var(--fs))}
+details.msf .msval{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
+details.msf[open]>summary{border-color:var(--accent);box-shadow:0 0 0 2px rgba(230,0,126,.12)}
+details.msf[open]>.mspanel{display:block}
+details.msf>.mspanel{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:999;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.14);padding:6px 4px;min-width:220px;max-height:360px;overflow-y:auto}
+.msopt{display:flex;align-items:center;padding:5px 10px;cursor:pointer;font-size:calc(12.5px*var(--fs));font-weight:500;border-radius:4px;user-select:none;gap:6px;white-space:nowrap}
+.msopt:hover{background:var(--panel)}
+.msopt.msall{font-weight:800;color:var(--accent);border-bottom:1px solid var(--line);margin-bottom:6px;padding-bottom:8px}
+.msopt input{margin:0;vertical-align:middle;flex-shrink:0}
+.msopt .ms-cnt{font-weight:600;color:var(--muted);margin-left:auto;font-size:calc(11px*var(--fs))}
 /* 超速懲處罰則對照 · 三小表並排 */
 .rule-mini-wrap{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
 .rule-mini{background:#fff;border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 1px 6px rgba(230,0,126,.04)}
@@ -611,7 +627,19 @@ tr.dash-lbl .lbl-hint{color:var(--muted);font-weight:600;margin-left:8px;letter-
 
   <section class="panel" id="p-detail">
     <div class="toolbar">
-      <div class="field"><label>站所</label><select id="dfBranch"><option value="">全部</option></select></div>
+      <div class="field"><label>日期</label><select id="dfDate"><option value="">全部（累積）</option></select></div>
+      <div class="field"><label>課別</label>
+        <details class="msf" id="ms-dfCourse">
+          <summary><span class="msval" id="ms-dfCourse-lbl">全部</span><span class="msarr">▾</span></summary>
+          <div class="mspanel" id="ms-dfCourse-panel"></div>
+        </details>
+      </div>
+      <div class="field"><label>站所</label>
+        <details class="msf" id="ms-dfBranch">
+          <summary><span class="msval" id="ms-dfBranch-lbl">全部</span><span class="msarr">▾</span></summary>
+          <div class="mspanel" id="ms-dfBranch-panel"></div>
+        </details>
+      </div>
       <div class="field"><label>行為</label><select id="dfBehavior"><option value="">全部</option></select></div>
       <div class="field"><label>異常程度</label><select id="dfDegree"><option value="">全部</option></select></div>
       <div class="field"><label>搜尋(駕駛/車號/地點)</label><input type="text" id="dfSearch" placeholder="輸入關鍵字…"></div>
@@ -640,7 +668,18 @@ tr.dash-lbl .lbl-hint{color:var(--muted);font-weight:600;margin-left:8px;letter-
     <div class="toolbar">
       <div class="field"><label>檢視</label><select id="bpView"><option value="branch">站所彙總</option><option value="person">人員明細</option></select></div>
       <div class="field"><label>日期</label><select id="bpDate"><option value="">全部（累積）</option></select></div>
-      <div class="field"><label>站所</label><select id="bpBranch"><option value="">全部站所</option></select></div>
+      <div class="field"><label>課別</label>
+        <details class="msf" id="ms-bpCourse">
+          <summary><span class="msval" id="ms-bpCourse-lbl">全部</span><span class="msarr">▾</span></summary>
+          <div class="mspanel" id="ms-bpCourse-panel"></div>
+        </details>
+      </div>
+      <div class="field"><label>站所</label>
+        <details class="msf" id="ms-bpBranch">
+          <summary><span class="msval" id="ms-bpBranch-lbl">全部</span><span class="msarr">▾</span></summary>
+          <div class="mspanel" id="ms-bpBranch-panel"></div>
+        </details>
+      </div>
       <div class="field"><label>&nbsp;</label><button class="btn" id="bpExport">匯出 CSV</button></div>
     </div>
     <div id="bpSummary" class="bpsum"></div>
@@ -2047,7 +2086,7 @@ function setOpts(sel,arr,allLabel){const el=$(sel);const prev=el.value;el.innerH
 function fillDetailFilters(){
   const br=new Set(),be=new Set(),de=new Set();
   anomView().forEach(r=>{if(r.behavior==='怠速')return;if(r.branch)br.add(r.branch);if(r.behavior)be.add(r.behavior);if(r.degText)de.add(r.degText);});
-  setOpts('#dfBranch',[...br].sort());setOpts('#dfBehavior',[...be].sort());
+  setOpts('#dfBehavior',[...be].sort());
   const ord=['輕度','中度','重度','嚴重'];setOpts('#dfDegree',[...de].sort((a,b)=>ord.indexOf(a)-ord.indexOf(b)));
   setOpts('#spCourse',COURSE_ORDER,'全部');
   const crsF=$('#spCourse')?$('#spCourse').value:'';
@@ -2055,14 +2094,94 @@ function fillDetailFilters(){
   setOpts('#spBranch',spBrList.sort(),'全部站所');
   const dates=[...new Set(anomView().filter(r=>r.behavior&&r.behavior.includes('超速')).map(r=>r.date).filter(Boolean))].sort().reverse();
   setOpts('#spDate',dates,'全部（累積）');setOpts('#bpDate',dates,'全部（累積）');
+  // 異常明細查詢:所有異常(不限超速)的日期
+  const allDates=[...new Set(anomView().filter(r=>r.behavior!=='怠速').map(r=>r.date).filter(Boolean))].sort().reverse();
+  setOpts('#dfDate',allDates,'全部（累積）');
+  // 多選:課別 + 站所(依課別勾選過濾)
+  const brSorted=[...br].sort();
+  const crsInData=[...new Set(brSorted.map(courseOf).filter(c=>c&&c!=='未分類'))];
+  const dfCrsList=COURSE_ORDER.filter(c=>crsInData.includes(c)).concat(crsInData.filter(c=>!COURSE_ORDER.includes(c)));
+  msInit('dfCourse',dfCrsList,true);
+  const dfSelCrs=msSelected('dfCourse');
+  const dfBrList=brSorted.filter(b=>dfSelCrs.has(courseOf(b)));
+  msInit('dfBranch',dfBrList,true);
+  // 站所異常統計:同樣的邏輯
+  const bpCrsList=COURSE_ORDER.filter(c=>crsInData.includes(c)).concat(crsInData.filter(c=>!COURSE_ORDER.includes(c)));
+  msInit('bpCourse',bpCrsList,true);
+  const bpSelCrs=msSelected('bpCourse');
+  const bpBrList=brSorted.filter(b=>bpSelCrs.has(courseOf(b)));
+  msInit('bpBranch',bpBrList,true);
 }
-function filteredAnom(){const b=$('#dfBranch').value,be=$('#dfBehavior').value,de=$('#dfDegree').value,q=$('#dfSearch').value.trim();return anomView().filter(r=>r.behavior!=='怠速'&&(!b||r.branch===b)&&(!be||r.behavior===be)&&(!de||r.degText===de)&&(!q||(r.driver+r.plate+r.location).includes(q)));}
+function filteredAnom(){
+  const be=$('#dfBehavior').value,de=$('#dfDegree').value,q=$('#dfSearch').value.trim();
+  const dt=$('#dfDate')?$('#dfDate').value:'';
+  const crsAll=msIsAll('dfCourse'),brAll=msIsAll('dfBranch');
+  const selCrs=msSelected('dfCourse'),selBr=msSelected('dfBranch');
+  return anomView().filter(r=>{
+    if(r.behavior==='怠速')return false;
+    if(dt&&r.date!==dt)return false;
+    if(!crsAll&&!selCrs.has(courseOf(r.branch)))return false;
+    if(!brAll&&!selBr.has(r.branch))return false;
+    if(be&&r.behavior!==be)return false;
+    if(de&&r.degText!==de)return false;
+    if(q&&!(r.driver+r.plate+r.location).includes(q))return false;
+    return true;
+  });
+}
 const detailExpanded={};
 const crsExpanded={};  // 課的展開狀態(預設全部收合;點擊 course-hdr 切換)
 /* 收合狀態顯示的說明列(取代原本詳細欄位標題) */
 function dashHdrLbl(colSpan){
   return '<tr class="dash-lbl"><th colspan="'+colSpan+'">📊 各課概況<span class="lbl-hint">左起:課別 · 站/人 · 主要指標 · 相對比較 · 分級分佈(點擊任一列展開站所明細)</span></th></tr>';
 }
+/* ===== 多選下拉 ===== */
+const msState={};   // id -> Set of selected values
+const msAllOpts={}; // id -> full options list
+function msInit(id,opts,keepPrev){
+  msAllOpts[id]=opts.slice();
+  if(keepPrev&&msState[id]){
+    const kept=new Set([...msState[id]].filter(v=>opts.indexOf(v)>=0));
+    msState[id]=kept.size?kept:new Set(opts);
+  }else{
+    msState[id]=new Set(opts);  // 預設全選
+  }
+  msRender(id);
+}
+function msRender(id){
+  const box=document.getElementById('ms-'+id+'-panel');
+  const lbl=document.getElementById('ms-'+id+'-lbl');
+  if(!box||!lbl)return;
+  const all=msAllOpts[id]||[];
+  const sel=msState[id]||new Set();
+  const isAll=sel.size===all.length&&all.length>0;
+  if(all.length===0)lbl.textContent='(無選項)';
+  else if(isAll)lbl.textContent='全部 ('+all.length+')';
+  else if(sel.size===0)lbl.textContent='未選';
+  else if(sel.size<=2)lbl.textContent=[...sel].join('、');
+  else lbl.textContent='已選 '+sel.size+' / '+all.length;
+  let h='<label class="msopt msall"><input type="checkbox" data-mv="__all"'+(isAll?' checked':'')+'> 全選 <span class="ms-cnt">'+all.length+' 項</span></label>';
+  h+=all.map(v=>'<label class="msopt"><input type="checkbox" data-mv="'+esc2(v)+'"'+(sel.has(v)?' checked':'')+'> '+esc(v)+'</label>').join('');
+  box.innerHTML=h;
+}
+function msBind(id,onChange){
+  const det=document.getElementById('ms-'+id);if(!det)return;
+  if(det._bound)return;det._bound=true;
+  det.addEventListener('change',e=>{
+    const inp=e.target;if(inp.tagName!=='INPUT')return;
+    const v=inp.dataset.mv;const all=msAllOpts[id];
+    let s=msState[id]||new Set(all);
+    if(v==='__all'){s=inp.checked?new Set(all):new Set();}
+    else{if(inp.checked)s.add(v);else s.delete(v);}
+    msState[id]=s;msRender(id);
+    if(onChange)onChange();
+  });
+}
+function msSelected(id){return msState[id]||new Set();}
+function msIsAll(id){const s=msState[id];const all=msAllOpts[id]||[];return !s||s.size===all.length;}
+// 點外面自動關閉打開的下拉
+document.addEventListener('click',e=>{
+  document.querySelectorAll('details.msf[open]').forEach(d=>{if(!d.contains(e.target))d.open=false;});
+});
 /* 儀表板風的課列 helper
    opts: {cName, isOnly, isOpen, colSpan,
           meta:'3 站 · 5 人',
@@ -2577,8 +2696,7 @@ function renderBranchPpl(){
   refreshIdle();
   const t=$("#bpTable");const ord=['輕度','中度','重度','嚴重'];
   const branches=bpData();const keys=Object.keys(branches);
-  if(!keys.length){emptyTable(t,'尚無超速統計','匯入超速明細後，這裡會彙總各站所的人數、次數與程度分佈。');setOpts('#bpBranch',[],'全部站所');return;}
-  setOpts('#bpBranch',keys.sort(),'全部站所');
+  if(!keys.length){emptyTable(t,'尚無超速統計','匯入超速明細後，這裡會彙總各站所的人數、次數與程度分佈。');return;}
   // ---- 摘要卡片 ----
   const allB=Object.values(branches);
   const totalEvents=allB.reduce((a,b)=>a+b.total,0);
@@ -2594,14 +2712,18 @@ function renderBranchPpl(){
   if(IDLE.length){const ia=idleAgg(null);sumCards.push({lbl:'怠速事件',val:fi(ia.total),ex:'中度 '+ia.B+' 人 / 重度 '+ia.C+' 人 · 看明細',cls:'c3',card:'idletab'});}
   $('#bpSummary').innerHTML=sumCards.map(c=>'<div class="bpcard clickable '+c.cls+'" data-card="'+c.card+'"'+(c.br?(' data-br="'+c.br+'"'):'')+'><div class="bplbl">'+c.lbl+'</div><div class="bpval">'+c.val+'</div><div class="bpex">'+c.ex+'</div></div>').join('');
   $('#bpSummary').querySelectorAll('.bpcard.clickable').forEach(el=>el.onclick=()=>{if(el.dataset.card==='idletab'){idleSel={branch:null,plate:null};gotoTab('idle');return;}openCardModal(el.dataset.card,el.dataset.br||'');});
-  const view=$('#bpView').value,brF=$('#bpBranch').value;
+  const view=$('#bpView').value;
+  // 多選過濾:課別 + 站所
+  const bpCrsAll=msIsAll('bpCourse'),bpBrAll=msIsAll('bpBranch');
+  const bpSelCrs=msSelected('bpCourse'),bpSelBr=msSelected('bpBranch');
+  const bpPass=br=>(bpCrsAll||bpSelCrs.has(courseOf(br)))&&(bpBrAll||bpSelBr.has(br));
   const sevBadge=(s,n)=>n?'<span class="sev sev-'+s+'" style="margin-right:4px">'+s+' '+n+'</span>':'';
   bpRows=[];
   const sortState=view==='branch'?bpSort.branch:bpSort.person;
   const arrow=k=>sortState.key===k?(sortState.dir>0?' ▲':' ▼'):'';
   function wireSort(cols){t.querySelectorAll('th.sortable').forEach(th=>th.onclick=()=>{const k=th.dataset.k;if(sortState.key===k)sortState.dir*=-1;else{sortState.key=k;sortState.dir=-1;}renderBranchPpl();});}
   if(view==='branch'){
-    let list=keys.map(k=>branches[k]);if(brF)list=list.filter(b=>b.branch===brF);
+    let list=keys.map(k=>branches[k]).filter(b=>bpPass(b.branch));
     const kv=(b,k)=>{if(k==='branch')return b.branch;if(k==='people')return Object.keys(b.people).length;if(k==='total')return b.total;if(k==='idle')return IDLE.length?idleAgg(r=>r[0]===b.branch).total:0;if(k==='unhandled')return b.unhandled;if(k==='handled')return b.handled;if(k==='uncl')return b.uncl;return b.sev[k]||0;};
     list.sort((a,b)=>{const x=kv(a,sortState.key),y=kv(b,sortState.key);if(typeof x==='number')return (x-y)*sortState.dir;return String(x).localeCompare(String(y),'zh-Hant')*sortState.dir;});
     const cols=[['branch','站所'],['people','超速人數'],['total','超速次數'],['idle','怠速'],['dist','程度分佈'],['輕度','輕度'],['中度','中度'],['重度','重度'],['嚴重','嚴重'],['uncl','未歸類'],['handled','已處理'],['unhandled','待處理']];
@@ -2651,7 +2773,7 @@ function renderBranchPpl(){
     t.querySelectorAll('td.idlejump').forEach(td=>td.onclick=e=>{e.stopPropagation();idleSel={branch:td.dataset.br,plate:null};gotoTab('idle');});
     t.querySelectorAll('td.cellclick').forEach(td=>td.onclick=e=>{e.stopPropagation();openCardModal('cell',td.dataset.br,td.dataset.cell);});
   }else{
-    let people=[];keys.forEach(k=>{if(brF&&k!==brF)return;Object.values(branches[k].people).forEach(p=>people.push(p));});
+    let people=[];keys.forEach(k=>{if(!bpPass(k))return;Object.values(branches[k].people).forEach(p=>people.push(p));});
     const kv=(p,k)=>{if(k==='branch')return p.branch;if(k==='driver')return p.driver;if(k==='count')return p.count;if(k==='max')return p.max;if(k==='worst')return p.worst;if(k==='idle')return IDLE.length?idleAgg(r=>r[0]===p.branch&&r[2]===p.driver).total:0;return 0;};
     people.sort((a,b)=>{const x=kv(a,sortState.key),y=kv(b,sortState.key);if(typeof x==='number')return (x-y)*sortState.dir||(b.count-a.count);return String(x).localeCompare(String(y),'zh-Hant')*sortState.dir;});
     const cols=[['branch','站所'],['driver','駕駛'],['count','超速次數'],['idle','怠速'],['max','最高時速'],['worst','最嚴重程度'],['dist','程度分佈'],['disp','處置紀錄'],['disc','懲處紀錄']];
@@ -3011,7 +3133,17 @@ $('#idleExport').onclick=()=>{refreshIdle();if(!IDLE.length){toast('無資料可
   const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='怠速明細.csv';a.click();toast('已匯出 CSV',IDLE.length+' 筆');};
 ['#rankDate','#rankSort'].forEach(s=>$(s).onchange=()=>{rankSort={key:'__base__',dir:1};renderRank();});
 ['#trendScope','#trendMetric'].forEach(s=>$(s).onchange=renderTrend);
-['#dfBranch','#dfBehavior','#dfDegree'].forEach(s=>$(s).onchange=renderDetail);
+['#dfBehavior','#dfDegree','#dfDate'].forEach(s=>$(s).onchange=renderDetail);
+// 課別多選變更 → 重建站所選項 + 重繪
+msBind('dfCourse',()=>{
+  const br=new Set();anomView().forEach(r=>{if(r.behavior==='怠速')return;if(r.branch)br.add(r.branch);});
+  const brSorted=[...br].sort();
+  const selCrs=msSelected('dfCourse');const isAllCrs=msIsAll('dfCourse');
+  const brList=isAllCrs?brSorted:brSorted.filter(b=>selCrs.has(courseOf(b)));
+  msInit('dfBranch',brList,true);
+  renderDetail();
+});
+msBind('dfBranch',renderDetail);
 $('#dfSearch').oninput=renderDetail;
 ['#spBranch','#spSev','#spDate'].forEach(s=>$(s).onchange=renderSpeed);
 if($('#spCourse'))$('#spCourse').onchange=()=>{
@@ -3024,7 +3156,17 @@ if($('#spCourse'))$('#spCourse').onchange=()=>{
 $('#spDisc').onchange=renderSpeed;
 $('#spSave').onclick=saveAllEdits;
 window.addEventListener('beforeunload',e=>{if(pendingCount()>0){e.preventDefault();e.returnValue='';}});
-['#bpView','#bpBranch','#bpDate'].forEach(s=>$(s).onchange=renderBranchPpl);
+['#bpView','#bpDate'].forEach(s=>$(s).onchange=renderBranchPpl);
+// 課別多選變更 → 重建站所選項 + 重繪
+msBind('bpCourse',()=>{
+  const br=new Set();anomView().forEach(r=>{if(r.behavior==='怠速')return;if(r.branch)br.add(r.branch);});
+  const brSorted=[...br].sort();
+  const selCrs=msSelected('bpCourse');const isAllCrs=msIsAll('bpCourse');
+  const brList=isAllCrs?brSorted:brSorted.filter(b=>selCrs.has(courseOf(b)));
+  msInit('bpBranch',brList,true);
+  renderBranchPpl();
+});
+msBind('bpBranch',renderBranchPpl);
 $('#bpExport').onclick=()=>{if(!bpRows.length){toast('無資料可匯出','','warn');return;}
   const head=Object.keys(bpRows[0]);
   const lines=[head.join(',')].concat(bpRows.map(r=>head.map(k=>'"'+String(r[k]==null?'':r[k]).replace(/"/g,'""')+'"').join(',')));

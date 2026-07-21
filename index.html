@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-Q">
+<meta name="build-version" content="20260703-R">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -712,7 +712,7 @@ details.msf>.mspanel{display:none;position:absolute;top:calc(100% + 4px);left:0;
           <div class="mspanel" id="ms-idlBranch-panel"></div>
         </details>
       </div>
-      <div class="field"><label>最低程度</label><select id="idlSev"><option value="">全部</option><option value="中度">中度以上</option><option value="重度">僅重度</option></select></div>
+      <div class="field"><label>最低程度</label><select id="idlSev"><option value="">全部（含輕度A）</option><option value="中度" selected>中度以上（B+C）</option><option value="重度">僅重度（C）</option></select></div>
       <div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="idlDisc" style="margin:0">只看已設定處置/懲處</label></div>
       <div class="field"><label>&nbsp;</label><button class="btn primary" id="idlSave" disabled>儲存變更</button></div>
     </div>
@@ -2023,6 +2023,8 @@ function renderIdle(){
 // 怠速搜尋：跨站所，依關鍵字比對 駕駛／車號／站所，列出符合的駕駛累計
 /* ===== 怠速明細清單(可設 處置/懲處,支援全套篩選) ===== */
 let idleDetailRows=[];
+const _idleShowAll={};   // 課別 -> 是否顯示全部(否則預設 100 筆)
+const IDLE_PAGE_SIZE=100;
 function renderIdleDetail(){
   const box=$('#idleView');
   // 拿本期所有怠速原始 ANOM 記錄(不是 IDLE 陣列,因為 IDLE 沒帶 disposal/disc)
@@ -2031,7 +2033,7 @@ function renderIdleDetail(){
   // 上方 KPI 卡(跟原本一樣)
   const agg=idleAgg(null);
   let h='<div class="idkpi">'+bandsHTML(agg)+'</div>';
-  h+='<div class="idsum" style="margin:8px 2px 12px"><b>怠速明細</b> · 資料日期 '+esc(IDLE_DATE)+' · 共 '+fi(allIdle.length)+' 筆事件 · '+fi(agg.people)+' 位駕駛（分級採每人累計怠速時數；設定處置/懲處後按「儲存變更」上傳）</div>';
+  h+='<div class="idsum" id="idlSumMsg" style="margin:8px 2px 12px"></div>';
   // 先算每個駕駛的 tier(基於全部本期怠速累計,不受下方篩選影響 → tier 穩定)
   const drvSum={};
   allIdle.forEach(r=>{const k=r.branch+'|'+r.plate+'|'+r.driver;drvSum[k]=drvSum[k]||{min:0};drvSum[k].min+=num(r.over);});
@@ -2056,7 +2058,23 @@ function renderIdleDetail(){
   });
   // 排序:日期 desc, branch, driver, time
   recs.sort((a,b)=>((b.date||'').localeCompare(a.date||''))||((a.branch||'').localeCompare(b.branch||''))||((a.driver||'').localeCompare(b.driver||''))||((a.time||'').localeCompare(b.time||'')));
-  if(!recs.length){box.innerHTML=h+'<div class="card"><div style="padding:40px;text-align:center;color:var(--muted)">沒有符合篩選條件的資料</div></div>';return;}
+  // 摘要訊息:讓使用者清楚看到「濾掉了多少、剩下多少」
+  const _filteredOut=allIdle.length-recs.length;
+  const _msgParts=['<b>怠速明細</b> · 資料日期 '+esc(IDLE_DATE)+' · 本期共 <b>'+fi(allIdle.length)+'</b> 筆 · <b>'+fi(agg.people)+'</b> 位駕駛'];
+  if(_filteredOut>0){
+    const _reasons=[];
+    if(minSev==='中度')_reasons.push('已濾除輕度');
+    else if(minSev==='重度')_reasons.push('僅重度');
+    if(dt)_reasons.push('限日期');
+    if(!crsAll)_reasons.push('限課別');
+    if(!brAll)_reasons.push('限站所');
+    if(onlyDisc)_reasons.push('僅已設定');
+    if(q)_reasons.push('關鍵字');
+    _msgParts.push('<span style="color:var(--accent);font-weight:700">篩選後顯示 '+fi(recs.length)+' 筆</span>('+_reasons.join(' / ')+')');
+  }
+  h=h.replace('<div class="idsum" id="idlSumMsg" style="margin:8px 2px 12px"></div>',
+    '<div class="idsum" id="idlSumMsg" style="margin:8px 2px 12px">'+_msgParts.join(' · ')+'</div>');
+  if(!recs.length){box.innerHTML=h+'<div class="card"><div style="padding:40px;text-align:center;color:var(--muted)">沒有符合篩選條件的資料 · 試著把「最低程度」改為「全部」或清除其他篩選</div></div>';return;}
   idleDetailRows=[];
   // 依課分組
   const byCrs={};recs.forEach(r=>{const c=courseOf(r.branch)||'未分類';(byCrs[c]=byCrs[c]||[]).push(r);});
@@ -2076,32 +2094,57 @@ function renderIdleDetail(){
       bar:{val:cRecs.length,max:_idMax,lbl:fi(cRecs.length),tone:cSev.C?'bad':(cSev.B?'warn':''),title:'事件數(佔本次最大值比例)'},
       chips:[{code:'A',count:cSev.A},{code:'B',count:cSev.B},{code:'C',count:cSev.C}]
     });
-    if(isOpen)cRecs.forEach(r=>{
-      const idx=idleDetailRows.push(r)-1;
-      const k=r.branch+'|'+r.plate+'|'+r.driver;const tier=drvTier[k];
-      const u=anomUniq(r);const pend=pendingEdits[u];
-      const dispVal=pend?pend.disposal:effDisposal(r);const discVal=pend?pend.disc:effDisc(r);
-      const sevCls=tier.code==='A'?'sev-輕度':(tier.code==='B'?'sev-中度':'sev-重度');
-      const sevName=tier.name;
-      html+='<tr class="idl-row '+(pend?'row-dirty':'')+'" data-u="'+encodeURIComponent(u)+'">'+
-        '<td style="font-family:var(--mono)">'+esc(r.date||'')+'</td>'+
-        '<td class="b">'+esc(r.branch)+'</td>'+
-        '<td>'+esc(r.driver)+'</td>'+
-        '<td style="font-family:var(--mono)">'+esc(r.plate)+'</td>'+
-        '<td class="num" style="font-family:var(--mono);font-weight:700">'+num(r.over)+'</td>'+
-        '<td style="font-family:var(--mono)">'+esc(shortTime(r.time))+'</td>'+
-        '<td><span class="sev '+sevCls+'">'+sevName+'（'+tier.code+'）</span></td>'+
-        '<td class="loc" title="'+esc((r.location||'').replace(/"/g,""))+'">'+esc(r.location||'')+'</td>'+
-        '<td><select class="iesel" data-idx="'+idx+'" data-field="disposal">'+optsHtml(dispVal,DISPOSAL_OPTIONS)+'</select></td>'+
-        '<td><select class="iesel" data-idx="'+idx+'" data-field="disc">'+optsHtml(discVal,DISCIPLINE_OPTIONS)+'</select></td>'+
-      '</tr>';
-    });
+    if(isOpen){
+      const showAll=!!_idleShowAll[cName];
+      const PAGE=100;
+      const showList=showAll?cRecs:cRecs.slice(0,PAGE);
+      showList.forEach(r=>{
+        const idx=idleDetailRows.push(r)-1;
+        const k=r.branch+'|'+r.plate+'|'+r.driver;const tier=drvTier[k];
+        const u=anomUniq(r);const pend=pendingEdits[u];
+        const dispVal=pend?pend.disposal:effDisposal(r);const discVal=pend?pend.disc:effDisc(r);
+        const sevCls=tier.code==='A'?'sev-輕度':(tier.code==='B'?'sev-中度':'sev-重度');
+        const sevName=tier.name;
+        html+='<tr class="idl-row '+(pend?'row-dirty':'')+'" data-u="'+encodeURIComponent(u)+'">'+
+          '<td style="font-family:var(--mono)">'+esc(r.date||'')+'</td>'+
+          '<td class="b">'+esc(r.branch)+'</td>'+
+          '<td>'+esc(r.driver)+'</td>'+
+          '<td style="font-family:var(--mono)">'+esc(r.plate)+'</td>'+
+          '<td class="num" style="font-family:var(--mono);font-weight:700">'+num(r.over)+'</td>'+
+          '<td style="font-family:var(--mono)">'+esc(shortTime(r.time))+'</td>'+
+          '<td><span class="sev '+sevCls+'">'+sevName+'（'+tier.code+'）</span></td>'+
+          '<td class="loc" title="'+esc((r.location||'').replace(/"/g,""))+'">'+esc(r.location||'')+'</td>'+
+          '<td><select class="iesel" data-idx="'+idx+'" data-field="disposal">'+optsHtml(dispVal,DISPOSAL_OPTIONS)+'</select></td>'+
+          '<td><select class="iesel" data-idx="'+idx+'" data-field="disc">'+optsHtml(discVal,DISCIPLINE_OPTIONS)+'</select></td>'+
+        '</tr>';
+      });
+      // 分頁提示列
+      if(!showAll&&cRecs.length>PAGE){
+        html+='<tr class="crs-more" data-crs="'+esc2(cName)+'"><td colspan="'+cols.length+'">'+
+          '⋯ 只顯示前 <b>'+PAGE+'</b> 筆(依日期新到舊) · 還有 <b>'+(cRecs.length-PAGE)+'</b> 筆未載入 '+
+          '<button class="btn crs-more-btn" type="button" data-crs="'+esc2(cName)+'" style="margin-left:10px">📋 顯示全部 '+cRecs.length+' 筆</button>'+
+          '</td></tr>';
+      }else if(showAll&&cRecs.length>PAGE){
+        html+='<tr class="crs-more" data-crs="'+esc2(cName)+'"><td colspan="'+cols.length+'">'+
+          '✅ 已顯示全部 '+cRecs.length+' 筆 '+
+          '<button class="btn crs-more-btn" type="button" data-crs="'+esc2(cName)+'" data-collapse="1" style="margin-left:10px">收起(只看前 '+PAGE+' 筆)</button>'+
+          '</td></tr>';
+      }
+    }
   });
   box.innerHTML=h+'<div class="card"><div class="tablewrap"><table class="speedtbl idltbl">'+html+'</tbody></table></div></div>';
   const _tbl=box.querySelector('table.idltbl');
   const _anyOpen=crsKeys.length===1||crsKeys.some(c=>crsExpanded[c]);
   if(_tbl)_tbl.classList.toggle('crs-all-collapsed',!_anyOpen);
   bindCrsExpand(box,renderIdle);
+  // 分頁按鈕:顯示全部 / 收起
+  box.querySelectorAll('button.crs-more-btn').forEach(btn=>btn.onclick=(e)=>{
+    e.stopPropagation();
+    const c=btn.dataset.crs;
+    if(btn.dataset.collapse){delete _idleShowAll[c];}
+    else{_idleShowAll[c]=true;}
+    renderIdle();
+  });
   box.querySelectorAll('select.iesel').forEach(sel=>{
     sel.dataset.prev=sel.value;
     const rec=idleDetailRows[+sel.dataset.idx];const u=anomUniq(rec);

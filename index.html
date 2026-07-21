@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-P">
+<meta name="build-version" content="20260703-Q">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -698,7 +698,7 @@ details.msf>.mspanel{display:none;position:absolute;top:calc(100% + 4px);left:0;
       </div>
     </div>
     <div class="toolbar" id="idlDetailBar" style="margin-top:8px;display:none">
-      <div class="field"><label>檢視</label><select id="idlView"><option value="rank" selected>站所彙總</option><option value="detail">明細清單</option></select></div>
+      <div class="field"><label>檢視</label><select id="idlView"><option value="rank">站所彙總</option><option value="detail" selected>明細清單</option></select></div>
       <div class="field"><label>日期</label><select id="idlDate"><option value="">全部（累積）</option></select></div>
       <div class="field"><label>課別</label>
         <details class="msf" id="ms-idlCourse">
@@ -717,7 +717,7 @@ details.msf>.mspanel{display:none;position:absolute;top:calc(100% + 4px);left:0;
       <div class="field"><label>&nbsp;</label><button class="btn primary" id="idlSave" disabled>儲存變更</button></div>
     </div>
     <div class="toolbar" id="idlViewBar" style="margin-top:8px">
-      <div class="field"><label>檢視</label><select id="idlView2"><option value="rank" selected>站所彙總</option><option value="detail">明細清單</option></select></div>
+      <div class="field"><label>檢視</label><select id="idlView2"><option value="rank">站所彙總</option><option value="detail" selected>明細清單</option></select></div>
     </div>
     <div id="idleView" class="rankview"></div>
     <input type="file" id="idleFileInput" accept=".xlsx,.xls" multiple hidden>
@@ -1969,8 +1969,8 @@ function renderIdle(){
     box.innerHTML='<div class="card"><div style="text-align:center;padding:54px 24px">'+
       '<div style="font-size:16px;color:var(--txt);font-weight:700;margin-bottom:8px">尚未匯入怠速資料</div>'+
       '<div style="font-size:13px;color:var(--muted);line-height:1.7">點上方「匯入怠速 Excel」載入怠速明細（需含「分公司／車號／駕駛／持續時間」欄位）。匯入後會跟超速一樣<b>上傳到雲端</b>，其他人開啟也看得到。<br>分級依<b>每位駕駛累計怠速時數</b>：輕度（A）≤ 1時30分、中度（B）1時31分~2時24分、重度（C）≥ 2時25分。可一次匯入「依車輛」「依駕駛」兩份，系統自動去重。</div></div></div>';return;}
-  // 檢視模式:rank(彙總) / detail(明細清單)
-  const _idlV=($('#idlView')?$('#idlView').value:null)||($('#idlView2')?$('#idlView2').value:null)||'rank';
+  // 檢視模式:rank(彙總) / detail(明細清單) — 預設 detail
+  const _idlV=($('#idlView')?$('#idlView').value:null)||($('#idlView2')?$('#idlView2').value:null)||'detail';
   if($('#idlView'))$('#idlView').value=_idlV;
   if($('#idlView2'))$('#idlView2').value=_idlV;
   if($('#idlDetailBar'))$('#idlDetailBar').style.display=(_idlV==='detail')?'flex':'none';

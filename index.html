@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-O">
+<meta name="build-version" content="20260703-P">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -698,7 +698,7 @@ details.msf>.mspanel{display:none;position:absolute;top:calc(100% + 4px);left:0;
       </div>
     </div>
     <div class="toolbar" id="idlDetailBar" style="margin-top:8px;display:none">
-      <div class="field"><label>檢視</label><select id="idlView"><option value="rank">站所彙總</option><option value="detail" selected>明細清單</option></select></div>
+      <div class="field"><label>檢視</label><select id="idlView"><option value="rank" selected>站所彙總</option><option value="detail">明細清單</option></select></div>
       <div class="field"><label>日期</label><select id="idlDate"><option value="">全部（累積）</option></select></div>
       <div class="field"><label>課別</label>
         <details class="msf" id="ms-idlCourse">
@@ -2017,7 +2017,7 @@ function renderIdle(){
   const _idlAnyOpen=_idlCrsKeys.length===1||_idlCrsKeys.some(c=>crsExpanded[c]);
   const _idlTbl=box.querySelector('.card table');
   if(_idlTbl)_idlTbl.classList.toggle('crs-all-collapsed',!_idlAnyOpen);
-  box.querySelectorAll('tr.course-hdr:not(.single)').forEach(tr=>tr.onclick=()=>{crsExpanded[tr.dataset.crs]=!crsExpanded[tr.dataset.crs];renderIdle();});
+  bindCrsExpand(box,renderIdle);
   box.querySelectorAll('tr.idle-br').forEach(el=>el.onclick=()=>{idleSel={branch:el.dataset.br,plate:null};renderIdle();});
 }
 // 怠速搜尋：跨站所，依關鍵字比對 駕駛／車號／站所，列出符合的駕駛累計
@@ -2101,7 +2101,7 @@ function renderIdleDetail(){
   const _tbl=box.querySelector('table.idltbl');
   const _anyOpen=crsKeys.length===1||crsKeys.some(c=>crsExpanded[c]);
   if(_tbl)_tbl.classList.toggle('crs-all-collapsed',!_anyOpen);
-  box.querySelectorAll('tr.course-hdr:not(.single)').forEach(tr=>tr.onclick=()=>{crsExpanded[tr.dataset.crs]=!crsExpanded[tr.dataset.crs];renderIdle();});
+  bindCrsExpand(box,renderIdle);
   box.querySelectorAll('select.iesel').forEach(sel=>{
     sel.dataset.prev=sel.value;
     const rec=idleDetailRows[+sel.dataset.idx];const u=anomUniq(rec);
@@ -2275,6 +2275,19 @@ const crsExpanded={};  // 課的展開狀態(預設全部收合;點擊 course-hd
 /* 收合狀態顯示的說明列(取代原本詳細欄位標題) */
 function dashHdrLbl(colSpan){
   return '<tr class="dash-lbl"><th colspan="'+colSpan+'">📊 各課概況<span class="lbl-hint">左起:課別 · 站/人 · 主要指標 · 相對比較 · 分級分佈(點擊任一列展開站所明細)</span></th></tr>';
+}
+/* 課列點擊展開/收合 - 事件委派(避免逐列綁定失效) */
+function bindCrsExpand(container,renderFn){
+  if(!container)return;
+  container.onclick=(e)=>{
+    // 略過表單元素上的點擊(不誤觸 select/input/button)
+    const tag=e.target.tagName;
+    if(tag==='INPUT'||tag==='SELECT'||tag==='BUTTON'||tag==='OPTION'||tag==='A')return;
+    const tr=e.target.closest('tr.course-hdr:not(.single)');
+    if(!tr||!container.contains(tr))return;
+    crsExpanded[tr.dataset.crs]=!crsExpanded[tr.dataset.crs];
+    renderFn();
+  };
 }
 /* ===== 多選下拉 ===== */
 const msState={};   // id -> Set of selected values
@@ -2459,7 +2472,7 @@ function renderDetail(){
   t.innerHTML=html+'</tbody>';
   const _dtAnyOpen=_dtCrsKeys.length===1||_dtCrsKeys.some(c=>crsExpanded[c]);
   t.classList.toggle('crs-all-collapsed',!_dtAnyOpen);
-  t.querySelectorAll('tr.course-hdr:not(.single)').forEach(tr=>tr.onclick=()=>{crsExpanded[tr.dataset.crs]=!crsExpanded[tr.dataset.crs];renderDetail();});
+  bindCrsExpand(t,renderDetail);
   t.querySelectorAll('tr.grp-row').forEach(tr=>tr.onclick=()=>{const bk=tr.dataset.br;detailExpanded[bk]=!detailExpanded[bk];renderDetail();});
   t.querySelectorAll('tr.jump-row').forEach(tr=>tr.onclick=()=>{jumpToSpeed(decodeURIComponent(tr.dataset.u));});
   // 子表排序 / 篩選
@@ -2605,7 +2618,7 @@ function renderSpeed(){
   const _spAnyOpen=_spCrsKeys.length===1||_spCrsKeys.some(c=>crsExpanded[c]);
   const _spTbl=box.querySelector('table.speedtbl');
   if(_spTbl)_spTbl.classList.toggle('crs-all-collapsed',!_spAnyOpen);
-  box.querySelectorAll('tr.course-hdr:not(.single)').forEach(tr=>tr.onclick=()=>{crsExpanded[tr.dataset.crs]=!crsExpanded[tr.dataset.crs];renderSpeed();});
+  bindCrsExpand(box,renderSpeed);
   box.querySelectorAll('th.sortable').forEach(th=>th.onclick=()=>{const key=th.dataset.k;if(speedSort.key===key)speedSort.dir*=-1;else{speedSort.key=key;speedSort.dir=1;}renderSpeed();});
   box.querySelectorAll('select.esel').forEach(sel=>{
     sel.dataset.prev=sel.value;
@@ -2911,7 +2924,7 @@ function renderBranchPpl(){
     const _bpAnyOpen=_crsKeys.length===1||_crsKeys.some(c=>crsExpanded[c]);
     t.classList.toggle('crs-all-collapsed',!_bpAnyOpen);
     wireSort();
-    t.querySelectorAll('tr.course-hdr:not(.single)').forEach(tr=>tr.onclick=()=>{crsExpanded[tr.dataset.crs]=!crsExpanded[tr.dataset.crs];renderBranchPpl();});
+    bindCrsExpand(t,renderBranchPpl);
     t.querySelectorAll('td.idlejump').forEach(td=>td.onclick=e=>{e.stopPropagation();idleSel={branch:td.dataset.br,plate:null};gotoTab('idle');});
     t.querySelectorAll('td.cellclick').forEach(td=>td.onclick=e=>{e.stopPropagation();openCardModal('cell',td.dataset.br,td.dataset.cell);});
   }else{
@@ -2952,7 +2965,7 @@ function renderBranchPpl(){
     const _bpAnyOpen2=_crsKeys2.length===1||_crsKeys2.some(c=>crsExpanded[c]);
     t.classList.toggle('crs-all-collapsed',!_bpAnyOpen2);
     wireSort();
-    t.querySelectorAll('tr.course-hdr:not(.single)').forEach(tr=>tr.onclick=()=>{crsExpanded[tr.dataset.crs]=!crsExpanded[tr.dataset.crs];renderBranchPpl();});
+    bindCrsExpand(t,renderBranchPpl);
   }
 }
 function renderAll(){renderPeriodBar();renderLatestData();refreshIdle();renderKpis();renderRank();renderTrend();fillDetailFilters();renderDetail();renderSpeed();renderBranchPpl();renderIdle();renderPerf();renderRules();renderFoot();}

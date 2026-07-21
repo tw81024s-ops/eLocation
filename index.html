@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-N">
+<meta name="build-version" content="20260703-O">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -696,6 +696,28 @@ details.msf>.mspanel{display:none;position:absolute;top:calc(100% + 4px);left:0;
         <span><span class="dot" style="background:var(--t-mod)"></span>中度(B) 1時31分~2時24分</span>
         <span><span class="dot" style="background:var(--t-severe)"></span>重度(C) ≥2時25分</span>
       </div>
+    </div>
+    <div class="toolbar" id="idlDetailBar" style="margin-top:8px;display:none">
+      <div class="field"><label>檢視</label><select id="idlView"><option value="rank">站所彙總</option><option value="detail" selected>明細清單</option></select></div>
+      <div class="field"><label>日期</label><select id="idlDate"><option value="">全部（累積）</option></select></div>
+      <div class="field"><label>課別</label>
+        <details class="msf" id="ms-idlCourse">
+          <summary><span class="msval" id="ms-idlCourse-lbl">全部</span><span class="msarr">▾</span></summary>
+          <div class="mspanel" id="ms-idlCourse-panel"></div>
+        </details>
+      </div>
+      <div class="field"><label>站所</label>
+        <details class="msf" id="ms-idlBranch">
+          <summary><span class="msval" id="ms-idlBranch-lbl">全部</span><span class="msarr">▾</span></summary>
+          <div class="mspanel" id="ms-idlBranch-panel"></div>
+        </details>
+      </div>
+      <div class="field"><label>最低程度</label><select id="idlSev"><option value="">全部</option><option value="中度">中度以上</option><option value="重度">僅重度</option></select></div>
+      <div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="idlDisc" style="margin:0">只看已設定處置/懲處</label></div>
+      <div class="field"><label>&nbsp;</label><button class="btn primary" id="idlSave" disabled>儲存變更</button></div>
+    </div>
+    <div class="toolbar" id="idlViewBar" style="margin-top:8px">
+      <div class="field"><label>檢視</label><select id="idlView2"><option value="rank" selected>站所彙總</option><option value="detail">明細清單</option></select></div>
     </div>
     <div id="idleView" class="rankview"></div>
     <input type="file" id="idleFileInput" accept=".xlsx,.xls" multiple hidden>
@@ -1941,9 +1963,19 @@ function renderIdle(){
   refreshIdle();
   $('#idleExport').style.display=IDLE.length?'':'none';
   if(!IDLE.length){idleSel={branch:null,plate:null};
+    // 沒資料時工具列切換也隱藏
+    if($('#idlDetailBar'))$('#idlDetailBar').style.display='none';
+    if($('#idlViewBar'))$('#idlViewBar').style.display='none';
     box.innerHTML='<div class="card"><div style="text-align:center;padding:54px 24px">'+
       '<div style="font-size:16px;color:var(--txt);font-weight:700;margin-bottom:8px">尚未匯入怠速資料</div>'+
       '<div style="font-size:13px;color:var(--muted);line-height:1.7">點上方「匯入怠速 Excel」載入怠速明細（需含「分公司／車號／駕駛／持續時間」欄位）。匯入後會跟超速一樣<b>上傳到雲端</b>，其他人開啟也看得到。<br>分級依<b>每位駕駛累計怠速時數</b>：輕度（A）≤ 1時30分、中度（B）1時31分~2時24分、重度（C）≥ 2時25分。可一次匯入「依車輛」「依駕駛」兩份，系統自動去重。</div></div></div>';return;}
+  // 檢視模式:rank(彙總) / detail(明細清單)
+  const _idlV=($('#idlView')?$('#idlView').value:null)||($('#idlView2')?$('#idlView2').value:null)||'rank';
+  if($('#idlView'))$('#idlView').value=_idlV;
+  if($('#idlView2'))$('#idlView2').value=_idlV;
+  if($('#idlDetailBar'))$('#idlDetailBar').style.display=(_idlV==='detail')?'flex':'none';
+  if($('#idlViewBar'))$('#idlViewBar').style.display=(_idlV==='detail')?'none':'flex';
+  if(_idlV==='detail')return renderIdleDetail();
   if(idleSel.branch&&idleSel.plate)return renderIdleDriver();
   if(idleSel.branch)return renderIdleStation();
   const q=($('#idleSearch')?$('#idleSearch').value:'').trim();
@@ -1989,6 +2021,105 @@ function renderIdle(){
   box.querySelectorAll('tr.idle-br').forEach(el=>el.onclick=()=>{idleSel={branch:el.dataset.br,plate:null};renderIdle();});
 }
 // 怠速搜尋：跨站所，依關鍵字比對 駕駛／車號／站所，列出符合的駕駛累計
+/* ===== 怠速明細清單(可設 處置/懲處,支援全套篩選) ===== */
+let idleDetailRows=[];
+function renderIdleDetail(){
+  const box=$('#idleView');
+  // 拿本期所有怠速原始 ANOM 記錄(不是 IDLE 陣列,因為 IDLE 沒帶 disposal/disc)
+  const allIdle=anomView().filter(r=>txt(r.behavior)==='怠速');
+  if(!allIdle.length){box.innerHTML='<div class="card"><div style="padding:40px;text-align:center;color:var(--muted)">本期沒有怠速資料</div></div>';return;}
+  // 上方 KPI 卡(跟原本一樣)
+  const agg=idleAgg(null);
+  let h='<div class="idkpi">'+bandsHTML(agg)+'</div>';
+  h+='<div class="idsum" style="margin:8px 2px 12px"><b>怠速明細</b> · 資料日期 '+esc(IDLE_DATE)+' · 共 '+fi(allIdle.length)+' 筆事件 · '+fi(agg.people)+' 位駕駛（分級採每人累計怠速時數；設定處置/懲處後按「儲存變更」上傳）</div>';
+  // 先算每個駕駛的 tier(基於全部本期怠速累計,不受下方篩選影響 → tier 穩定)
+  const drvSum={};
+  allIdle.forEach(r=>{const k=r.branch+'|'+r.plate+'|'+r.driver;drvSum[k]=drvSum[k]||{min:0};drvSum[k].min+=num(r.over);});
+  const drvTier={};Object.keys(drvSum).forEach(k=>drvTier[k]=idleTierByMin(drvSum[k].min));
+  // 篩選
+  const dt=$('#idlDate')?$('#idlDate').value:'';
+  const minSev=$('#idlSev')?$('#idlSev').value:'';
+  const onlyDisc=$('#idlDisc')?$('#idlDisc').checked:false;
+  const q=($('#idleSearch')?$('#idleSearch').value:'').trim();
+  const crsAll=msIsAll('idlCourse'),selCrs=msSelected('idlCourse');
+  const brAll=msIsAll('idlBranch'),selBr=msSelected('idlBranch');
+  const rank={A:1,B:2,C:3};const minRank=minSev==='中度'?2:(minSev==='重度'?3:0);
+  let recs=allIdle.filter(r=>{
+    if(dt&&r.date!==dt)return false;
+    if(!crsAll&&!selCrs.has(courseOf(r.branch)))return false;
+    if(!brAll&&!selBr.has(r.branch))return false;
+    const k=r.branch+'|'+r.plate+'|'+r.driver;const t=drvTier[k];
+    if(minRank&&rank[t.code]<minRank)return false;
+    if(onlyDisc&&!effDisposal(r)&&!effDisc(r))return false;
+    if(q&&!(txt(r.driver)+txt(r.plate)+txt(r.branch)).includes(q))return false;
+    return true;
+  });
+  // 排序:日期 desc, branch, driver, time
+  recs.sort((a,b)=>((b.date||'').localeCompare(a.date||''))||((a.branch||'').localeCompare(b.branch||''))||((a.driver||'').localeCompare(b.driver||''))||((a.time||'').localeCompare(b.time||'')));
+  if(!recs.length){box.innerHTML=h+'<div class="card"><div style="padding:40px;text-align:center;color:var(--muted)">沒有符合篩選條件的資料</div></div>';return;}
+  idleDetailRows=[];
+  // 依課分組
+  const byCrs={};recs.forEach(r=>{const c=courseOf(r.branch)||'未分類';(byCrs[c]=byCrs[c]||[]).push(r);});
+  const crsKeys=COURSE_ORDER.filter(c=>byCrs[c]&&byCrs[c].length).concat(Object.keys(byCrs).filter(c=>!COURSE_ORDER.includes(c)));
+  const _idMax=Math.max(...crsKeys.map(c=>byCrs[c].length),1);
+  const cols=[['date','日期'],['branch','站所'],['driver','駕駛'],['plate','車號'],['dur','持續(分)'],['time','事件時間'],['tier','程度'],['loc','地點'],['disposal','處置'],['disc','懲處']];
+  let html='<thead>'+dashHdrLbl(cols.length)+'<tr class="data-cols">'+cols.map(c=>'<th>'+c[1]+'</th>').join('')+'</tr></thead><tbody>';
+  crsKeys.forEach(cName=>{
+    const cRecs=byCrs[cName];
+    const cSev={A:0,B:0,C:0};const cDrv=new Set();const cSt=new Set();
+    cRecs.forEach(r=>{const k=r.branch+'|'+r.plate+'|'+r.driver;const t=drvTier[k];cSev[t.code]=(cSev[t.code]||0)+1;cDrv.add(k);cSt.add(r.branch);});
+    const isOnly=crsKeys.length===1;const isOpen=isOnly||!!crsExpanded[cName];
+    html+=courseHdrDash({
+      cName:cName,isOnly:isOnly,isOpen:isOpen,colSpan:cols.length,
+      meta:cSt.size+' 站 · '+cDrv.size+' 人',
+      kpis:[{val:fi(cRecs.length),lbl:'件',tone:cSev.C?'bad':''}],
+      bar:{val:cRecs.length,max:_idMax,lbl:fi(cRecs.length),tone:cSev.C?'bad':(cSev.B?'warn':''),title:'事件數(佔本次最大值比例)'},
+      chips:[{code:'A',count:cSev.A},{code:'B',count:cSev.B},{code:'C',count:cSev.C}]
+    });
+    if(isOpen)cRecs.forEach(r=>{
+      const idx=idleDetailRows.push(r)-1;
+      const k=r.branch+'|'+r.plate+'|'+r.driver;const tier=drvTier[k];
+      const u=anomUniq(r);const pend=pendingEdits[u];
+      const dispVal=pend?pend.disposal:effDisposal(r);const discVal=pend?pend.disc:effDisc(r);
+      const sevCls=tier.code==='A'?'sev-輕度':(tier.code==='B'?'sev-中度':'sev-重度');
+      const sevName=tier.name;
+      html+='<tr class="idl-row '+(pend?'row-dirty':'')+'" data-u="'+encodeURIComponent(u)+'">'+
+        '<td style="font-family:var(--mono)">'+esc(r.date||'')+'</td>'+
+        '<td class="b">'+esc(r.branch)+'</td>'+
+        '<td>'+esc(r.driver)+'</td>'+
+        '<td style="font-family:var(--mono)">'+esc(r.plate)+'</td>'+
+        '<td class="num" style="font-family:var(--mono);font-weight:700">'+num(r.over)+'</td>'+
+        '<td style="font-family:var(--mono)">'+esc(shortTime(r.time))+'</td>'+
+        '<td><span class="sev '+sevCls+'">'+sevName+'（'+tier.code+'）</span></td>'+
+        '<td class="loc" title="'+esc((r.location||'').replace(/"/g,""))+'">'+esc(r.location||'')+'</td>'+
+        '<td><select class="iesel" data-idx="'+idx+'" data-field="disposal">'+optsHtml(dispVal,DISPOSAL_OPTIONS)+'</select></td>'+
+        '<td><select class="iesel" data-idx="'+idx+'" data-field="disc">'+optsHtml(discVal,DISCIPLINE_OPTIONS)+'</select></td>'+
+      '</tr>';
+    });
+  });
+  box.innerHTML=h+'<div class="card"><div class="tablewrap"><table class="speedtbl idltbl">'+html+'</tbody></table></div></div>';
+  const _tbl=box.querySelector('table.idltbl');
+  const _anyOpen=crsKeys.length===1||crsKeys.some(c=>crsExpanded[c]);
+  if(_tbl)_tbl.classList.toggle('crs-all-collapsed',!_anyOpen);
+  box.querySelectorAll('tr.course-hdr:not(.single)').forEach(tr=>tr.onclick=()=>{crsExpanded[tr.dataset.crs]=!crsExpanded[tr.dataset.crs];renderIdle();});
+  box.querySelectorAll('select.iesel').forEach(sel=>{
+    sel.dataset.prev=sel.value;
+    const rec=idleDetailRows[+sel.dataset.idx];const u=anomUniq(rec);
+    if(pendingEdits[u])sel.closest('tr').classList.add('row-dirty');
+    sel.onchange=()=>{
+      let val=sel.value;
+      if(val==='__custom__'){const c=prompt('輸入自訂內容：','');if(c==null){sel.value=sel.dataset.prev;return;}val=c.trim();const o=document.createElement('option');o.textContent=val;o.selected=true;sel.insertBefore(o,sel.lastElementChild);}
+      sel.dataset.prev=sel.value;
+      const field=sel.dataset.field;
+      const p=pendingEdits[u]=pendingEdits[u]||{rec:rec,disposal:effDisposal(rec),disc:effDisc(rec)};
+      p[field]=val;
+      sel.closest('tr').classList.add('row-dirty');
+      updateIdleSaveBtn();updateSaveBtn();updateDetailSaveBtn();
+    };
+  });
+  updateIdleSaveBtn();
+}
+function updateIdleSaveBtn(){const b=$('#idlSave');if(!b)return;const n=pendingCount();b.disabled=n===0;b.textContent=n?('儲存變更（'+n+'）'):'儲存變更';}
 function renderIdleSearch(q){
   const box=$('#idleView');const kw=q.toLowerCase();
   const a=idleAgg(r=>{const s=(r[0]+' '+r[1]+' '+r[2]).toLowerCase();return s.includes(kw);});
@@ -2111,6 +2242,17 @@ function fillDetailFilters(){
   const bpSelCrs=msSelected('bpCourse');
   const bpBrList=brSorted.filter(b=>bpSelCrs.has(courseOf(b)));
   msInit('bpBranch',bpBrList,true);
+  // 怠速明細清單:課別 + 站所(依課別勾選過濾) + 日期
+  const idleRecs=anomView().filter(r=>txt(r.behavior)==='怠速');
+  const idleBrList=[...new Set(idleRecs.map(r=>r.branch).filter(Boolean))].sort();
+  const idleCrsInData=[...new Set(idleBrList.map(courseOf).filter(c=>c&&c!=='未分類'))];
+  const idleCrsList=COURSE_ORDER.filter(c=>idleCrsInData.includes(c)).concat(idleCrsInData.filter(c=>!COURSE_ORDER.includes(c)));
+  msInit('idlCourse',idleCrsList,true);
+  const idleSelCrs=msSelected('idlCourse');
+  const idleBrList2=idleBrList.filter(b=>idleSelCrs.has(courseOf(b)));
+  msInit('idlBranch',idleBrList2,true);
+  const idlDates=[...new Set(idleRecs.map(r=>r.date).filter(Boolean))].sort().reverse();
+  setOpts('#idlDate',idlDates,'全部（累積）');
 }
 function filteredAnom(){
   const be=$('#dfBehavior').value,de=$('#dfDegree').value,q=$('#dfSearch').value.trim();
@@ -2499,7 +2641,7 @@ async function saveAllEdits(){
   setBusy(false);
   if(fail){toast('部分儲存失敗','成功 '+ok+'／失敗 '+fail+'（請確認後台為最新版 Code.gs）','err');}
   else{toast('已儲存 ✓',ok+' 筆處置／懲處已更新');}
-  lastSig=signature();renderSpeed();renderDetail();updateSaveBtn();updateDetailSaveBtn();
+  lastSig=signature();renderSpeed();renderDetail();renderIdle();updateSaveBtn();updateDetailSaveBtn();updateIdleSaveBtn();
 }
 /* 動態產生「超速懲處罰則對照」參考表(在超速名單分類頁籤上方)
    三個範圍(市區/快速/高速)因為 D 級處置不同,改成三個小表並排 */
@@ -3124,6 +3266,20 @@ $('#rulesResetBtn').onclick=rulesResetToDefault;
 $('#idleImportBtn').onclick=()=>{if(!busy)$('#idleFileInput').click();};
 $('#idleSearch').oninput=()=>{idleSel={branch:null,plate:null};renderIdle();};
 $('#idleFileInput').onchange=e=>{if(e.target.files.length)handleFiles([...e.target.files]);e.target.value='';};
+/* 怠速檢視切換 + 明細清單篩選 */
+if($('#idlView'))$('#idlView').onchange=()=>renderIdle();
+if($('#idlView2'))$('#idlView2').onchange=()=>renderIdle();
+['#idlDate','#idlSev','#idlDisc'].forEach(s=>{if($(s))$(s).onchange=()=>renderIdle();});
+if($('#idlSave'))$('#idlSave').onclick=saveAllEdits;
+msBind('idlCourse',()=>{
+  const br=new Set();anomView().filter(r=>txt(r.behavior)==='怠速').forEach(r=>{if(r.branch)br.add(r.branch);});
+  const brSorted=[...br].sort();
+  const selCrs=msSelected('idlCourse');const isAllCrs=msIsAll('idlCourse');
+  const brList=isAllCrs?brSorted:brSorted.filter(b=>selCrs.has(courseOf(b)));
+  msInit('idlBranch',brList,true);
+  renderIdle();
+});
+msBind('idlBranch',renderIdle);
 $('#idleExport').onclick=()=>{refreshIdle();if(!IDLE.length){toast('無資料可匯出','','warn');return;}
   // 先算每位駕駛(站所+車號+駕駛)的累計分鐘，再據以分級
   const sum={};IDLE.forEach(r=>{const k=r[0]+'|'+r[1]+'|'+r[2];sum[k]=(sum[k]||0)+r[3];});

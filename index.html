@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-R">
+<meta name="build-version" content="20260703-S">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1002,6 +1002,8 @@ function effDisposal(it){const v=txt(it.disposal);return (v&&v!=='-')?v:'';}
 function effDisc(it){const v=txt(it.disc);return (v&&v!=='-')?v:'';}
 // 待處理判定:未設定 disposal/disc 且非輕度(輕度免處理,不列入待處理)
 function isPending(r){if(effDisposal(r)||effDisc(r))return false;return sevOf(r).text!=='輕度';}
+// 時間縮短格式:"7/2 14:35"(用於超速/怠速明細表格)
+function shortTime(t){if(!t)return '';const m=String(t).match(/(\d{1,2})\/(\d{1,2})\D+(\d{1,2}:\d{2})/);return m?(pad(m[1])+'/'+pad(m[2])+' '+m[3]):String(t);}
 const toDailySnake=(b,date)=>({date,branch:b.branch,grade:b.grade,rank:b.rank,score:b.score,vehicles:b.vehicles,km:b.km,count:b.count,speed_g:b.speedG,speed_r:b.speedR,turn_g:b.turnG,turn_r:b.turnR,decel_g:b.decelG,decel_r:b.decelR,accel_g:b.accelG,accel_r:b.accelR});
 const toAnomSnake=x=>({uniq:anomUniq(x),date:x.date,branch:x.branch,plate:x.plate,driver:x.driver,behavior:x.behavior,level:x.level,time:x.time,max_speed:x.maxSpeed,location:x.location,legal:x.legal,over_km:x.over,deg_text:x.degText,deg_code:x.degCode,disposal:x.disposal,disc:x.disc});
 
@@ -2606,7 +2608,6 @@ function renderSpeed(){
   recs=recs.filter(sevFilter);
   if(onlyDisc){const has=v=>{v=txt(v);return v&&v!=='-';};recs=recs.filter(r=>has(r.disposal)||has(r.disc));}
   if(!recs.length){box.innerHTML='<div class="empty"><h3>無超速資料</h3><p>匯入「異常明細表」後，這裡會以表格列出每筆超速；程度依 Excel 公式自動分類，處置／懲處可在表格內直接設定。</p></div>';return;}
-  const shortTime=t=>{if(!t)return '';const m=String(t).match(/(\d{1,2})\/(\d{1,2})\D+(\d{1,2}:\d{2})/);return m?(pad(m[1])+'/'+pad(m[2])+' '+m[3]):String(t);};
   const sevRank={正常:0,輕度:1,中度:2,重度:3,嚴重:4};
   const drvCount={};recs.forEach(r=>{drvCount[r.branch+'|'+r.driver]=(drvCount[r.branch+'|'+r.driver]||0)+1;});
   // 排序

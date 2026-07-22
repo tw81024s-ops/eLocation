@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-T">
+<meta name="build-version" content="20260703-U">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -805,9 +805,16 @@ async function loadAll(){
   if(ONLINE){
     const d=await gasGet();
     if(!d||d.ok===false)throw new Error(d&&d.error||'load failed');
+    // 讀取時就過濾 SKIP_MONTHS,不放進記憶體(降低整體渲染負擔)
+    const inSkip=r=>SKIP_MONTHS.size>0&&SKIP_MONTHS.has(String(r.date||'').substring(0,7));
     DAILY={dept:DEPT_NAME,days:{}};
-    (d.daily||[]).forEach(r=>{const dt=txt(r.date);if(!dt)return;(DAILY.days[dt]=DAILY.days[dt]||{branches:[]}).branches.push(fromDailyRow(r));});
-    ANOM={records:(d.anom||[]).map(fromAnomRow).filter(x=>x.plate||x.driver)};
+    (d.daily||[]).forEach(r=>{if(inSkip(r))return;const dt=txt(r.date);if(!dt)return;(DAILY.days[dt]=DAILY.days[dt]||{branches:[]}).branches.push(fromDailyRow(r));});
+    ANOM={records:(d.anom||[]).filter(r=>!inSkip(r)).map(fromAnomRow).filter(x=>x.plate||x.driver)};
+    // 統計原始總量 vs 過濾後,提示使用者
+    const skippedCnt=(d.anom||[]).length-ANOM.records.length;
+    if(skippedCnt>0&&SKIP_MONTHS.size>0){
+      console.log('[資料管理] 已跳過 '+SKIP_MONTHS.size+' 個月份,共 '+skippedCnt+' 筆異常沒讀入(釋放效能)');
+    }
   }else{
     const raw=localStorage.getItem(LKEY);
     if(raw){const o=JSON.parse(raw);DAILY=o.DAILY||{dept:DEPT_NAME,days:{}};ANOM=o.ANOM||{records:[]};}
@@ -3144,14 +3151,26 @@ function openDataManager(){
   });
   bodyHtml+='</tbody></table></div>';
   openModal('📦 資料管理 · 選擇要顯示的月份',bodyHtml);
-  document.querySelectorAll('input.dmgr-skip').forEach(cb=>cb.onchange=()=>{
+  document.querySelectorAll('input.dmgr-skip').forEach(cb=>cb.onchange=async ()=>{
     const m=cb.dataset.m;
     if(cb.checked)SKIP_MONTHS.add(m);else SKIP_MONTHS.delete(m);
     saveSkipMonths();
     const tr=cb.closest('tr');
     if(cb.checked){tr.style.background='#FFE3EF';tr.children[2].innerHTML='<span style="color:var(--bad);font-weight:800">已不讀取</span>';}
     else{tr.style.background='';tr.children[2].innerHTML='<span style="color:var(--good);font-weight:700">讀取中</span>';}
-    renderAll();
+    // 勾「不讀取」→ 直接把記憶體那部分清掉(下次重載/refresh 也不會回來)
+    // 取消勾 → 需要重新從雲端拉那個月份
+    if(cb.checked){
+      const before=ANOM.records.length;
+      ANOM.records=ANOM.records.filter(r=>String(r.date||'').substring(0,7)!==m);
+      Object.keys(DAILY.days).forEach(d=>{if(d.substring(0,7)===m)delete DAILY.days[d];});
+      const cleared=before-ANOM.records.length;
+      toast('已釋放 '+m,'清掉 '+fi(cleared)+' 筆(記憶體釋放)','ok');
+      renderAll();
+    }else{
+      // 取消跳過 → 建議重新載入雲端
+      toast('已改為讀取 '+m,'請按「🔄 更新」重新從雲端載入該月份','warn');
+    }
   });
 }
 function openStationManager(){
@@ -3958,6 +3977,13 @@ $('#pptGen').onclick=openWeeklyPicker;
   }
   lastSig=signature();renderAll();
   refreshBackupBanner();
+  // 資料量大時提示使用者可用資料管理釋放效能
+  const _totalAnom=ANOM.records.length;
+  if(_totalAnom>=5000){
+    setTimeout(()=>{
+      toast('資料量偏大('+fi(_totalAnom)+' 筆)','建議按右上「📦 資料管理」把不需要的舊月份設為「不讀取」以加快速度','warn');
+    },600);
+  }
   if(ONLINE&&AUTO_REFRESH_SEC>0){setInterval(async()=>{if(busy||document.hidden||pendingCount()>0)return;try{await loadAll();const s=signature();if(s!==lastSig){lastSig=s;renderAll();toast('已同步最新資料','');setConn('cloud');}}catch(e){setConn('err');}},AUTO_REFRESH_SEC*1000);}
 })();
 </script>

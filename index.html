@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-S">
+<meta name="build-version" content="20260703-T">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -580,6 +580,7 @@ details.msf>.mspanel{display:none;position:absolute;top:calc(100% + 4px);left:0;
       <button class="btn" id="refreshBtn" title="重新抓取最新資料"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-2.6-6.4M21 4v5h-5"/></svg>更新</button>
       <button class="btn primary" id="importBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0-12l-4 4m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>匯入 Excel</button>
       <button class="btn ghost" id="stationMgrBtn" type="button" title="管理站所主檔與課/組歸屬">⚙ 站所管理</button>
+      <button class="btn ghost" id="dataMgrBtn" type="button" title="資料管理:選擇某些月份不讀取(釋放效能)">📦 資料管理</button>
       <button class="btn ghost" id="forceReloadBtn" type="button" title="遇到匯入問題或看板行為異常時，可強制清除瀏覽器快取重載入最新版">🔄 強制更新</button>
       <button class="btn ghost danger" id="clearBtn">清除全部</button>
       <input type="file" id="fileInput" accept=".xlsx,.xls" multiple hidden>
@@ -643,6 +644,7 @@ details.msf>.mspanel{display:none;position:absolute;top:calc(100% + 4px);left:0;
       <div class="field"><label>行為</label><select id="dfBehavior"><option value="">全部</option></select></div>
       <div class="field"><label>異常程度</label><select id="dfDegree"><option value="">全部</option></select></div>
       <div class="field"><label>搜尋(駕駛/車號/地點)</label><input type="text" id="dfSearch" placeholder="輸入關鍵字…"></div>
+      <div class="field"><label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="dfInclIdle" style="margin:0">含怠速</label></div>
       <div class="field"><label>&nbsp;</label><button class="btn" id="dfExport">匯出 CSV</button></div>
     </div>
     <div class="card"><div class="tablewrap"><table id="detailTable"></table></div></div>
@@ -718,6 +720,7 @@ details.msf>.mspanel{display:none;position:absolute;top:calc(100% + 4px);left:0;
     </div>
     <div class="toolbar" id="idlViewBar" style="margin-top:8px">
       <div class="field"><label>檢視</label><select id="idlView2"><option value="rank">站所彙總</option><option value="detail" selected>明細清單</option></select></div>
+      <div class="field"><label>日期</label><select id="idlDateRank"><option value="">全部（累積）</option></select></div>
     </div>
     <div id="idleView" class="rankview"></div>
     <input type="file" id="idleFileInput" accept=".xlsx,.xls" multiple hidden>
@@ -969,10 +972,15 @@ const SPEED_RULES_DEFAULT={
     {code:'B',name:'中度',lo:11,hi:15,  proc:'面談單',      disc:'申誡', rule:'第45條第3項'},
     {code:'C',name:'重度',lo:16,hi:20,  proc:'改善單',      disc:'記過', rule:'第46條第1項'},
     {code:'D',name:'嚴重',lo:21,hi:null,proc:'改善單/扣牌', disc:'大過+',rule:'第47條第4項'}
+  ]},
+  idle:{limits:[],rows:[
+    {code:'A',name:'輕度',lo:0,  hi:90, proc:'口頭告誡',disc:'-',  rule:'-'},
+    {code:'B',name:'中度',lo:91, hi:144,proc:'面談單',  disc:'申誡',rule:'內規'},
+    {code:'C',name:'重度',lo:145,hi:null,proc:'改善單', disc:'記過',rule:'內規'}
   ]}
 };
 let SPEED_RULES=JSON.parse(JSON.stringify(SPEED_RULES_DEFAULT));
-function loadSpeedRules(){try{const s=localStorage.getItem(SPEED_RULES_KEY);if(s){const o=JSON.parse(s);if(o&&o.city&&o.fast&&o.hwy)SPEED_RULES=o;}}catch(e){}}
+function loadSpeedRules(){try{const s=localStorage.getItem(SPEED_RULES_KEY);if(s){const o=JSON.parse(s);if(o&&o.city&&o.fast&&o.hwy){SPEED_RULES=o;if(!SPEED_RULES.idle)SPEED_RULES.idle=JSON.parse(JSON.stringify(SPEED_RULES_DEFAULT.idle));}}}catch(e){}}
 function saveSpeedRules(){try{SPEED_RULES.ts=Date.now();localStorage.setItem(SPEED_RULES_KEY,JSON.stringify(SPEED_RULES));}catch(e){toast('儲存失敗','瀏覽器空間不足','warn');}}
 function resetSpeedRules(){SPEED_RULES=JSON.parse(JSON.stringify(SPEED_RULES_DEFAULT));try{localStorage.removeItem(SPEED_RULES_KEY);}catch(e){}}
 loadSpeedRules();
@@ -1142,7 +1150,18 @@ function inPeriod(d){
   if(PERIOD.type==='range'){return d>=PERIOD.from&&d<=PERIOD.to;}
   return true;
 }
-function anomView(){return ANOM.records.filter(r=>inPeriod(r.date));}
+function anomView(){
+  if(SKIP_MONTHS&&SKIP_MONTHS.size){
+    return ANOM.records.filter(r=>{if(!inPeriod(r.date))return false;const m=String(r.date||'').substring(0,7);return !SKIP_MONTHS.has(m);});
+  }
+  return ANOM.records.filter(r=>inPeriod(r.date));
+}
+/* 月份跳過機制:localStorage 記住哪些月份不讀入,anomView 自動排除 */
+const SKIP_MONTHS_KEY='fleet_skip_months_v1';
+let SKIP_MONTHS=new Set();
+function loadSkipMonths(){try{const s=localStorage.getItem(SKIP_MONTHS_KEY);if(s){const a=JSON.parse(s);if(Array.isArray(a))SKIP_MONTHS=new Set(a);}}catch(e){}}
+function saveSkipMonths(){try{localStorage.setItem(SKIP_MONTHS_KEY,JSON.stringify([...SKIP_MONTHS]));}catch(e){}}
+loadSkipMonths();
 function periodLabel(){
   if(PERIOD.type==='all')return '全部資料';
   if(PERIOD.type==='month')return PERIOD.y+'/'+pad(PERIOD.m);
@@ -1706,14 +1725,21 @@ let IDLE=[]; // 由 ANOM 推導：每筆 [分公司, 車號, 駕駛, 分鐘, 結
 let IDLE_DATE='';
 let idleSel={branch:null,plate:null};
 // 從共用的異常資料抽出怠速，讓所有開啟者看到同一份
-function refreshIdle(){const ir=anomView().filter(r=>txt(r.behavior)==='怠速');IDLE=ir.map(r=>[txt(r.branch),txt(r.plate),txt(r.driver),num(r.over),txt(r.time),txt(r.location)]);const ds=[...new Set(ir.map(r=>txt(r.date)).filter(Boolean))].sort();IDLE_DATE=ds[ds.length-1]||'';}
+function refreshIdle(){const dtF=($('#idlDateRank')?$('#idlDateRank').value:'')||($('#idlDate')?$('#idlDate').value:'');const ir=anomView().filter(r=>txt(r.behavior)==='怠速'&&(!dtF||r.date===dtF));IDLE=ir.map(r=>[txt(r.branch),txt(r.plate),txt(r.driver),num(r.over),txt(r.time),txt(r.location)]);const ds=[...new Set(ir.map(r=>txt(r.date)).filter(Boolean))].sort();IDLE_DATE=ds[ds.length-1]||'';}
 // 怠速分級：依「每位駕駛累計怠速時數」分 A/B/C（單位：分鐘；90=1時30分、145=2時25分）
 const IDLE_RULE=[
   {code:'A',name:'輕度',color:'var(--t-light)',range:'≤ 1時30分',disp:'提醒注意',disc:'—',rule:'—'},
   {code:'B',name:'中度',color:'var(--t-mod)',range:'1時31分 ~ 2時24分',disp:'面談單',disc:'申誡',rule:'第四十五條第三項'},
   {code:'C',name:'重度',color:'var(--t-severe)',range:'≥ 2時25分',disp:'改善單',disc:'記過',rule:'第四十六條第一項'}
 ];
-function idleTierByMin(min){return min<=90?IDLE_RULE[0]:(min<145?IDLE_RULE[1]:IDLE_RULE[2]);}
+function idleTierByMin(min){
+  const rows=(SPEED_RULES&&SPEED_RULES.idle&&SPEED_RULES.idle.rows)||[];
+  for(const r of rows){
+    if(r.hi===null||r.hi===undefined){if(min>=r.lo)return {code:r.code,name:r.name};}
+    else if(min>=r.lo&&min<=r.hi)return {code:r.code,name:r.name};
+  }
+  return {code:'A',name:'輕度'};
+}
 function idleFmt(min){min=Math.round(min);return min<60?(min+' 分'):(Math.floor(min/60)+' 時 '+(min%60)+' 分');}
 function idleDurMin(s){s=String(s||'');const h=/(\d+)時/.exec(s),m=/(\d+)分/.exec(s),sec=/(\d+)秒/.exec(s);return Math.round(((h?+h[1]*60:0)+(m?+m[1]:0)+(sec?+sec[1]/60:0))*10)/10;}
 // 依駕駛(站所+車號+駕駛)累計，回傳人數/累計分鐘/事件數，並依累計時數歸 A/B/C
@@ -2262,7 +2288,8 @@ function setOpts(sel,arr,allLabel){const el=$(sel);const prev=el.value;el.innerH
 function fillDetailFilters(){
   const br=new Set(),be=new Set(),de=new Set();
   anomView().forEach(r=>{if(r.behavior==='怠速')return;if(r.branch)br.add(r.branch);if(r.behavior)be.add(r.behavior);if(r.degText)de.add(r.degText);});
-  setOpts('#dfBehavior',[...be].sort());
+  const beList=[...be].sort();beList.push('怠速');
+  setOpts('#dfBehavior',beList);
   const ord=['輕度','中度','重度','嚴重'];setOpts('#dfDegree',[...de].sort((a,b)=>ord.indexOf(a)-ord.indexOf(b)));
   setOpts('#spCourse',COURSE_ORDER,'全部');
   const crsF=$('#spCourse')?$('#spCourse').value:'';
@@ -2298,14 +2325,16 @@ function fillDetailFilters(){
   msInit('idlBranch',idleBrList2,true);
   const idlDates=[...new Set(idleRecs.map(r=>r.date).filter(Boolean))].sort().reverse();
   setOpts('#idlDate',idlDates,'全部（累積）');
+  setOpts('#idlDateRank',idlDates,'全部（累積）');
 }
 function filteredAnom(){
   const be=$('#dfBehavior').value,de=$('#dfDegree').value,q=$('#dfSearch').value.trim();
   const dt=$('#dfDate')?$('#dfDate').value:'';
+  const includeIdle=$('#dfInclIdle')?$('#dfInclIdle').checked:false;
   const crsAll=msIsAll('dfCourse'),brAll=msIsAll('dfBranch');
   const selCrs=msSelected('dfCourse'),selBr=msSelected('dfBranch');
   return anomView().filter(r=>{
-    if(r.behavior==='怠速')return false;
+    if(r.behavior==='怠速'&&!includeIdle&&be!=='怠速')return false;
     if(dt&&r.date!==dt)return false;
     if(!crsAll&&!selCrs.has(courseOf(r.branch)))return false;
     if(!brAll&&!selBr.has(r.branch))return false;
@@ -2735,13 +2764,26 @@ function renderSpeedRuleRef(){
 }
 /* ===== 分級規則頁籤 ===== */
 let _rulesEditing=false, _rulesEditBuf=null;
-const _RULES_TITLE={city:'市區道路',fast:'快速道路',hwy:'高速公路'};
-const _RULES_ICON={city:'🏙',fast:'🛣',hwy:'🚗'};
+const _RULES_TITLE={city:'市區道路',fast:'快速道路',hwy:'高速公路',idle:'怠速累計'};
+const _RULES_ICON={city:'🏙',fast:'🛣',hwy:'🚗',idle:'⏱'};
 function renderRules(){
   const box=document.getElementById('rulesCards');if(!box)return;
   const data=_rulesEditing?_rulesEditBuf:SPEED_RULES;
-  const html=['city','fast','hwy'].map(key=>{
-    const g=data[key];
+  const html=['city','fast','hwy','idle'].map(key=>{
+    const g=data[key];if(!g)return '';
+    if(key==='idle'){
+      // 怠速用「累計分鐘」而非車速
+      const rows=g.rows;
+      const policyRows=rows.map((r,i)=>_rulesPolicyRowIdle(key,r,i,_rulesEditing)).join('');
+      return '<div class="rule-card">'+
+        '<div class="rule-h">'+_RULES_ICON[key]+' '+_RULES_TITLE[key]+
+          '<span class="rh-limits">每位駕駛累計時數</span></div>'+
+        '<div class="rule-body" style="grid-template-columns:1fr">'+
+          '<div class="rb-left" style="padding:0"><table class="rule-tbl">'+
+            '<thead><tr><th style="width:80px">等級</th><th style="width:170px;text-align:center">累計時數(分)</th><th>行為處置</th><th>行政懲處</th><th>工作規則</th></tr></thead>'+
+            '<tbody>'+policyRows+'</tbody></table></div>'+
+        '</div></div>';
+    }
     const limits=g.limits;
     const rows=g.rows;
     // 左邊政策表
@@ -2796,6 +2838,31 @@ function _rulesSpeedText(L,lo,hi){
   if(hi===null||hi===undefined)return '≥ '+(L+lo);
   if(lo===0)return '≤ '+(L+hi);
   return (L+lo)+' ~ '+(L+hi);
+}
+function _rulesPolicyRowIdle(key,r,idx,editable){
+  const fmt=n=>{const h=Math.floor(n/60),m=n%60;return h?(h+'時'+(m?(m+'分'):'')):(m+'分');};
+  const rangeText=r.hi===null||r.hi===undefined?('≥ '+r.lo+' 分('+fmt(r.lo)+' ↑)'):(r.lo+' ~ '+r.hi+' 分('+fmt(r.lo)+' ~ '+fmt(r.hi)+')');
+  if(!editable){
+    return '<tr>'+
+      '<td class="lvl lvl-'+r.code+'">'+r.code+' '+r.name+'</td>'+
+      '<td class="range">'+rangeText+'</td>'+
+      '<td>'+esc(r.proc)+'</td>'+
+      '<td>'+esc(r.disc==='-'?'—':r.disc)+'</td>'+
+      '<td>'+esc(r.rule)+'</td>'+
+    '</tr>';
+  }
+  const hiDisp=r.hi===null||r.hi===undefined?'+':r.hi;
+  return '<tr>'+
+    '<td class="lvl lvl-'+r.code+'">'+r.code+' '+r.name+'</td>'+
+    '<td class="range" style="text-align:center">'+
+      '<input class="small" data-r="'+key+':'+idx+':lo" value="'+r.lo+'">'+
+      '<span style="margin:0 2px">~</span>'+
+      '<input class="small" data-r="'+key+':'+idx+':hi" value="'+hiDisp+'"> 分'+
+    '</td>'+
+    '<td><input data-r="'+key+':'+idx+':proc" value="'+esc(r.proc)+'"></td>'+
+    '<td><input data-r="'+key+':'+idx+':disc" value="'+esc(r.disc)+'"></td>'+
+    '<td><input class="wide" data-r="'+key+':'+idx+':rule" value="'+esc(r.rule)+'"></td>'+
+  '</tr>';
 }
 function _rulesPolicyRow(key,r,idx,editable){
   const rangeText=r.hi===null||r.hi===undefined?('≥ '+r.lo):(r.lo+' ~ '+r.hi);
@@ -3045,6 +3112,48 @@ $('#fileInput').onchange=e=>{if(e.target.files.length)handleFiles([...e.target.f
 $('#refreshBtn').onclick=async()=>{if(busy)return;if(!ONLINE){toast('本機模式','無雲端後台可更新','warn');return;}setBusy(true,'更新中…');try{await loadAll();lastSig=signature();renderAll();toast('已更新','');}catch(e){setConn('err');toast('更新失敗',String(e.message||e),'err');}setBusy(false);};
 /* ===== 站所管理 UI ===== */
 let _smState={q:'',filter:'all',showInactive:false};
+function openDataManager(){
+  const monCnt={};
+  ANOM.records.forEach(r=>{const m=String(r.date||'').substring(0,7);if(m)monCnt[m]=(monCnt[m]||0)+1;});
+  const months=Object.keys(monCnt).sort().reverse();
+  if(!months.length){openModal('📦 資料管理','<p style="padding:20px;text-align:center;color:var(--muted)">目前沒有已載入的資料</p>');return;}
+  let bodyHtml='<div style="padding:0 4px 16px">'+
+    '<div style="background:#FFF7FB;padding:12px 14px;border-radius:8px;margin-bottom:14px;font-size:13px;color:var(--txt);line-height:1.7">'+
+      '💡 <b>不讀取</b>:勾選的月份會在畫面上隱藏(釋放渲染效能),雲端資料仍保留、隨時可以取消勾選重新看到。<br>'+
+      '💡 若要<b>徹底清除雲端資料</b>,請直接進 Google Sheet 手動刪除相應月份的列。'+
+    '</div>'+
+    '<table style="width:100%;border-collapse:collapse;font-size:13px">'+
+      '<thead><tr style="background:var(--panel2);color:var(--muted);font-size:12px">'+
+        '<th style="padding:8px 10px;text-align:left">月份</th>'+
+        '<th style="padding:8px 10px;text-align:right">筆數</th>'+
+        '<th style="padding:8px 10px;text-align:center">狀態</th>'+
+        '<th style="padding:8px 10px;text-align:center">動作</th>'+
+      '</tr></thead><tbody id="dmgrBody">';
+  months.forEach(m=>{
+    const skipped=SKIP_MONTHS.has(m);
+    bodyHtml+='<tr style="border-bottom:1px solid var(--line)'+(skipped?';background:#FFE3EF':'')+'">'+
+      '<td style="padding:9px 10px;font-family:var(--mono);font-weight:700">'+esc(m)+'</td>'+
+      '<td style="padding:9px 10px;text-align:right;font-family:var(--mono);font-weight:700">'+fi(monCnt[m])+'</td>'+
+      '<td style="padding:9px 10px;text-align:center">'+
+        (skipped?'<span style="color:var(--bad);font-weight:800">已不讀取</span>':'<span style="color:var(--good);font-weight:700">讀取中</span>')+
+      '</td>'+
+      '<td style="padding:9px 10px;text-align:center">'+
+        '<label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none;padding:4px 10px;border-radius:6px;border:1px solid var(--line);background:#fff"><input type="checkbox" class="dmgr-skip" data-m="'+m+'"'+(skipped?' checked':'')+' style="margin:0"> 不讀取</label>'+
+      '</td>'+
+    '</tr>';
+  });
+  bodyHtml+='</tbody></table></div>';
+  openModal('📦 資料管理 · 選擇要顯示的月份',bodyHtml);
+  document.querySelectorAll('input.dmgr-skip').forEach(cb=>cb.onchange=()=>{
+    const m=cb.dataset.m;
+    if(cb.checked)SKIP_MONTHS.add(m);else SKIP_MONTHS.delete(m);
+    saveSkipMonths();
+    const tr=cb.closest('tr');
+    if(cb.checked){tr.style.background='#FFE3EF';tr.children[2].innerHTML='<span style="color:var(--bad);font-weight:800">已不讀取</span>';}
+    else{tr.style.background='';tr.children[2].innerHTML='<span style="color:var(--good);font-weight:700">讀取中</span>';}
+    renderAll();
+  });
+}
 function openStationManager(){
   let m=document.getElementById('stationMgr');
   if(!m){
@@ -3181,6 +3290,7 @@ function openAddStationDialog(){
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 // 綁定按鈕
 $('#stationMgrBtn').onclick=openStationManager;
+$('#dataMgrBtn').onclick=openDataManager;
 $('#forceReloadBtn').onclick=()=>{
   if(!confirm('強制重新載入會清除瀏覽器對本頁的快取(不影響雲端資料、也不影響站所管理設定)，載入完成後可能需要重新選擇時間範圍。\n\n確定要繼續嗎？'))return;
   // 嘗試清 service worker cache
@@ -3326,7 +3436,7 @@ $('#idleFileInput').onchange=e=>{if(e.target.files.length)handleFiles([...e.targ
 /* 怠速檢視切換 + 明細清單篩選 */
 if($('#idlView'))$('#idlView').onchange=()=>renderIdle();
 if($('#idlView2'))$('#idlView2').onchange=()=>renderIdle();
-['#idlDate','#idlSev','#idlDisc'].forEach(s=>{if($(s))$(s).onchange=()=>renderIdle();});
+['#idlDate','#idlSev','#idlDisc','#idlDateRank'].forEach(s=>{if($(s))$(s).onchange=()=>renderIdle();});
 if($('#idlSave'))$('#idlSave').onclick=saveAllEdits;
 msBind('idlCourse',()=>{
   const br=new Set();anomView().filter(r=>txt(r.behavior)==='怠速').forEach(r=>{if(r.branch)br.add(r.branch);});
@@ -3346,7 +3456,7 @@ $('#idleExport').onclick=()=>{refreshIdle();if(!IDLE.length){toast('無資料可
   const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='怠速明細.csv';a.click();toast('已匯出 CSV',IDLE.length+' 筆');};
 ['#rankDate','#rankSort'].forEach(s=>$(s).onchange=()=>{rankSort={key:'__base__',dir:1};renderRank();});
 ['#trendScope','#trendMetric'].forEach(s=>$(s).onchange=renderTrend);
-['#dfBehavior','#dfDegree','#dfDate'].forEach(s=>$(s).onchange=renderDetail);
+['#dfBehavior','#dfDegree','#dfDate','#dfInclIdle'].forEach(s=>$(s).onchange=renderDetail);
 // 課別多選變更 → 重建站所選項 + 重繪
 msBind('dfCourse',()=>{
   const br=new Set();anomView().forEach(r=>{if(r.behavior==='怠速')return;if(r.branch)br.add(r.branch);});

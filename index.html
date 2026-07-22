@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-U">
+<meta name="build-version" content="20260703-W">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -810,6 +810,8 @@ async function loadAll(){
     DAILY={dept:DEPT_NAME,days:{}};
     (d.daily||[]).forEach(r=>{if(inSkip(r))return;const dt=txt(r.date);if(!dt)return;(DAILY.days[dt]=DAILY.days[dt]||{branches:[]}).branches.push(fromDailyRow(r));});
     ANOM={records:(d.anom||[]).filter(r=>!inSkip(r)).map(fromAnomRow).filter(x=>x.plate||x.driver)};
+    // 若開啟自動彙總,雲端拉回後立刻壓縮怠速
+    if(IDLE_COMPRESS){const r=compressIdleRecords();if(r.before>r.after)console.log('[怠速彙總] '+r.before+' 筆 → '+r.after+' 筆');}
     // 統計原始總量 vs 過濾後,提示使用者
     const skippedCnt=(d.anom||[]).length-ANOM.records.length;
     if(skippedCnt>0&&SKIP_MONTHS.size>0){
@@ -1019,6 +1021,19 @@ function effDisc(it){const v=txt(it.disc);return (v&&v!=='-')?v:'';}
 function isPending(r){if(effDisposal(r)||effDisc(r))return false;return sevOf(r).text!=='輕度';}
 // 時間縮短格式:"7/2 14:35"(用於超速/怠速明細表格)
 function shortTime(t){if(!t)return '';const m=String(t).match(/(\d{1,2})\/(\d{1,2})\D+(\d{1,2}:\d{2})/);return m?(pad(m[1])+'/'+pad(m[2])+' '+m[3]):String(t);}
+// 怠速結束時間格式化(統一顯示)
+// 處理多種輸入:"7/17/26"(M/D/YY,無時間) / "2026/07/17 12:50:47" / "2026-07-17" 等
+function normIdleTime(t){
+  if(!t)return '';
+  const s=String(t).trim();
+  let m=s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})[\sT]+(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if(m)return m[1]+'/'+pad(m[2])+'/'+pad(m[3])+' '+pad(m[4])+':'+m[5];
+  m=s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if(m)return m[1]+'/'+pad(m[2])+'/'+pad(m[3])+' (僅日期)';
+  m=s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+  if(m){let y=m[3];if(y.length===2)y='20'+y;return y+'/'+pad(m[1])+'/'+pad(m[2])+' (僅日期)';}
+  return s;
+}
 const toDailySnake=(b,date)=>({date,branch:b.branch,grade:b.grade,rank:b.rank,score:b.score,vehicles:b.vehicles,km:b.km,count:b.count,speed_g:b.speedG,speed_r:b.speedR,turn_g:b.turnG,turn_r:b.turnR,decel_g:b.decelG,decel_r:b.decelR,accel_g:b.accelG,accel_r:b.accelR});
 const toAnomSnake=x=>({uniq:anomUniq(x),date:x.date,branch:x.branch,plate:x.plate,driver:x.driver,behavior:x.behavior,level:x.level,time:x.time,max_speed:x.maxSpeed,location:x.location,legal:x.legal,over_km:x.over,deg_text:x.degText,deg_code:x.degCode,disposal:x.disposal,disc:x.disc});
 
@@ -1169,6 +1184,35 @@ let SKIP_MONTHS=new Set();
 function loadSkipMonths(){try{const s=localStorage.getItem(SKIP_MONTHS_KEY);if(s){const a=JSON.parse(s);if(Array.isArray(a))SKIP_MONTHS=new Set(a);}}catch(e){}}
 function saveSkipMonths(){try{localStorage.setItem(SKIP_MONTHS_KEY,JSON.stringify([...SKIP_MONTHS]));}catch(e){}}
 loadSkipMonths();
+/* 怠速資料自動彙總:每個駕駛每個日期合併為一筆(可大幅減量) */
+const IDLE_COMPRESS_KEY='fleet_idle_compress_v1';
+let IDLE_COMPRESS=(localStorage.getItem(IDLE_COMPRESS_KEY)==='1');
+function saveIdleCompress(){try{localStorage.setItem(IDLE_COMPRESS_KEY,IDLE_COMPRESS?'1':'0');}catch(e){}}
+function compressIdleRecords(){
+  const idleRecs=ANOM.records.filter(r=>txt(r.behavior)==='怠速');
+  if(!idleRecs.length)return{before:0,after:0};
+  const others=ANOM.records.filter(r=>txt(r.behavior)!=='怠速');
+  const groups={};
+  idleRecs.forEach(r=>{
+    const k=txt(r.branch)+'|'+txt(r.plate)+'|'+txt(r.driver)+'|'+txt(r.date);
+    if(!groups[k]){
+      groups[k]={date:r.date,branch:r.branch,plate:r.plate,driver:r.driver,behavior:'怠速',
+        over:0,time:'(彙總)',location:'',disposal:r.disposal||'',disc:r.disc||'',
+        degText:'',degCode:'',legal:'',maxSpeed:'',_cnt:0,_max:0};
+    }
+    const min=num(r.over);
+    groups[k].over+=min;
+    groups[k]._cnt++;
+    if(min>groups[k]._max)groups[k]._max=min;
+    // 保留任一有值的處置/懲處
+    if(r.disposal&&r.disposal!=='-'&&!groups[k].disposal)groups[k].disposal=r.disposal;
+    if(r.disc&&r.disc!=='-'&&!groups[k].disc)groups[k].disc=r.disc;
+  });
+  Object.values(groups).forEach(g=>{g.location=g._cnt+' 筆合併(最長 '+g._max+' 分)';});
+  const before=idleRecs.length;const after=Object.keys(groups).length;
+  ANOM.records=others.concat(Object.values(groups));
+  return{before:before,after:after};
+}
 function periodLabel(){
   if(PERIOD.type==='all')return '全部資料';
   if(PERIOD.type==='month')return PERIOD.y+'/'+pad(PERIOD.m);
@@ -1719,7 +1763,7 @@ function showPersonDetail(branch,plate,driver){
   if(idleRows.length){
     body+='<div class="sc-ttl" style="margin:14px 2px 8px;font-size:calc(14px*var(--fs));font-weight:800">怠速明細（'+idleRows.length+' 筆）</div>';
     body+='<div class="mlist"><table class="mtbl"><thead><tr><th>#</th><th>結束時間</th><th class="num">怠速時長(分)</th><th>怠速位置</th></tr></thead><tbody>';
-    idleRows.forEach((r,i)=>{body+='<tr><td class="num">'+(i+1)+'</td><td style="font-family:var(--mono)">'+esc(r[4])+'</td><td class="num b">'+f1(r[3])+'</td><td style="color:var(--muted)">'+esc(r[5])+'</td></tr>';});
+    idleRows.forEach((r,i)=>{body+='<tr><td class="num">'+(i+1)+'</td><td style="font-family:var(--mono)">'+esc(normIdleTime(r[4]))+'</td><td class="num b">'+f1(r[3])+'</td><td style="color:var(--muted)">'+esc(r[5])+'</td></tr>';});
     body+='</tbody></table></div>';
   }
   if(!anom.length&&!idleRows.length)body='<p class="dim" style="padding:10px">這位駕駛目前沒有可顯示的明細資料。</p>';
@@ -1739,13 +1783,15 @@ const IDLE_RULE=[
   {code:'B',name:'中度',color:'var(--t-mod)',range:'1時31分 ~ 2時24分',disp:'面談單',disc:'申誡',rule:'第四十五條第三項'},
   {code:'C',name:'重度',color:'var(--t-severe)',range:'≥ 2時25分',disp:'改善單',disc:'記過',rule:'第四十六條第一項'}
 ];
+const _IDLE_COLORS={A:'var(--t-light)',B:'var(--t-mod)',C:'var(--t-severe)'};
+const _IDLE_RANGES={A:'≤ 1時30分',B:'1時31分 ~ 2時24分',C:'≥ 2時25分'};
 function idleTierByMin(min){
   const rows=(SPEED_RULES&&SPEED_RULES.idle&&SPEED_RULES.idle.rows)||[];
   for(const r of rows){
-    if(r.hi===null||r.hi===undefined){if(min>=r.lo)return {code:r.code,name:r.name};}
-    else if(min>=r.lo&&min<=r.hi)return {code:r.code,name:r.name};
+    const hit=(r.hi===null||r.hi===undefined)?min>=r.lo:(min>=r.lo&&min<=r.hi);
+    if(hit)return {code:r.code,name:r.name,disp:r.proc,disc:(r.disc==='-'?'—':r.disc),rule:r.rule,color:_IDLE_COLORS[r.code]||'var(--t-light)',range:_IDLE_RANGES[r.code]||''};
   }
-  return {code:'A',name:'輕度'};
+  return {code:'A',name:'輕度',disp:'—',disc:'—',rule:'—',color:'var(--t-light)',range:''};
 }
 function idleFmt(min){min=Math.round(min);return min<60?(min+' 分'):(Math.floor(min/60)+' 時 '+(min%60)+' 分');}
 function idleDurMin(s){s=String(s||'');const h=/(\d+)時/.exec(s),m=/(\d+)分/.exec(s),sec=/(\d+)秒/.exec(s);return Math.round(((h?+h[1]*60:0)+(m?+m[1]:0)+(sec?+sec[1]/60:0))*10)/10;}
@@ -2244,7 +2290,7 @@ function renderIdleDriver(){
     '<div style="border-left:1px solid var(--line);padding-left:24px"><div style="font-size:calc(12px*var(--fs));color:var(--muted)">建議處置 ／ 懲處</div><div style="font-weight:700;font-size:calc(15px*var(--fs))">'+t.disp+'　／　'+t.disc+'</div><div style="font-size:calc(11px*var(--fs));color:var(--dim)">工作規則：'+t.rule+'</div></div>'+
     '</div></div>';
   h+='<div class="card"><div class="tablewrap"><table><thead><tr><th>#</th><th>結束時間</th><th class="num">怠速時長(分)</th><th>怠速位置</th></tr></thead><tbody>';
-  recs.forEach((r,i)=>{h+='<tr><td class="num">'+(i+1)+'</td><td style="font-family:var(--mono)">'+(r[4]||'')+'</td>'+
+  recs.forEach((r,i)=>{h+='<tr><td class="num">'+(i+1)+'</td><td style="font-family:var(--mono)">'+esc(normIdleTime(r[4]))+'</td>'+
     '<td class="num b">'+f1(r[3])+'</td>'+
     '<td style="color:var(--muted)">'+(r[5]||'')+'</td></tr>';});
   h+='</tbody></table></div></div>';box.innerHTML=h;
@@ -3123,9 +3169,24 @@ function openDataManager(){
   const monCnt={};
   ANOM.records.forEach(r=>{const m=String(r.date||'').substring(0,7);if(m)monCnt[m]=(monCnt[m]||0)+1;});
   const months=Object.keys(monCnt).sort().reverse();
-  if(!months.length){openModal('📦 資料管理','<p style="padding:20px;text-align:center;color:var(--muted)">目前沒有已載入的資料</p>');return;}
-  let bodyHtml='<div style="padding:0 4px 16px">'+
-    '<div style="background:#FFF7FB;padding:12px 14px;border-radius:8px;margin-bottom:14px;font-size:13px;color:var(--txt);line-height:1.7">'+
+  // 統計怠速資料量
+  const idleCnt=ANOM.records.filter(r=>txt(r.behavior)==='怠速').length;
+  const idleDrvDayCnt=new Set(ANOM.records.filter(r=>txt(r.behavior)==='怠速').map(r=>r.branch+'|'+r.plate+'|'+r.driver+'|'+r.date)).size;
+  let bodyHtml='<div style="padding:0 4px 16px">';
+  // === 怠速彙總區塊 ===
+  bodyHtml+='<div style="background:linear-gradient(90deg,#FFE3EF,#FFF7FB);padding:14px 16px;border-radius:10px;margin-bottom:14px;border:1px solid var(--accent)">'+
+    '<div style="font-weight:800;color:var(--accent);font-size:14px;margin-bottom:8px">🗜 怠速資料彙總</div>'+
+    '<div style="font-size:12.5px;color:var(--muted);line-height:1.7;margin-bottom:10px">'+
+      '目前怠速原始筆數:<b style="color:var(--txt);font-family:var(--mono)">'+fi(idleCnt)+'</b> 筆'+
+      (idleCnt>idleDrvDayCnt?(' → 彙總後可縮到 <b style="color:var(--good);font-family:var(--mono)">'+fi(idleDrvDayCnt)+'</b> 筆(每駕駛每日合併,約 '+((idleCnt-idleDrvDayCnt)/idleCnt*100).toFixed(0)+'% 減量)'):'')+
+      '<br>啟用後每次讀取雲端資料時會自動壓縮,大幅減輕負擔。個別事件的時間/地點會遺失,但累計時數、分級、處置/懲處都保留。'+
+    '</div>'+
+    '<label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;padding:8px 14px;background:#fff;border-radius:8px;border:2px solid '+(IDLE_COMPRESS?'var(--accent)':'var(--line)')+';font-weight:700"><input type="checkbox" id="dmgrIdleCmp"'+(IDLE_COMPRESS?' checked':'')+' style="margin:0"> 自動彙總怠速資料(每駕駛每日合併為一筆)</label>'+
+    (idleCnt>idleDrvDayCnt&&!IDLE_COMPRESS?' <button class="btn primary" id="dmgrIdleCmpNow" type="button" style="margin-left:8px">🗜 立刻壓縮</button>':'')+
+  '</div>';
+  // === 月份區塊 ===
+  if(!months.length){bodyHtml+='<p style="padding:20px;text-align:center;color:var(--muted)">目前沒有已載入的資料</p></div>';openModal('📦 資料管理',bodyHtml);return;}
+  bodyHtml+='<div style="background:#FFF7FB;padding:12px 14px;border-radius:8px;margin-bottom:14px;font-size:13px;color:var(--txt);line-height:1.7">'+
       '💡 <b>不讀取</b>:勾選的月份會在畫面上隱藏(釋放渲染效能),雲端資料仍保留、隨時可以取消勾選重新看到。<br>'+
       '💡 若要<b>徹底清除雲端資料</b>,請直接進 Google Sheet 手動刪除相應月份的列。'+
     '</div>'+
@@ -3150,7 +3211,28 @@ function openDataManager(){
     '</tr>';
   });
   bodyHtml+='</tbody></table></div>';
-  openModal('📦 資料管理 · 選擇要顯示的月份',bodyHtml);
+  openModal('📦 資料管理 · 怠速彙總 & 月份控制',bodyHtml);
+  // 怠速彙總 toggle
+  const cmpCb=document.getElementById('dmgrIdleCmp');
+  if(cmpCb)cmpCb.onchange=()=>{
+    IDLE_COMPRESS=cmpCb.checked;saveIdleCompress();
+    if(IDLE_COMPRESS){
+      const r=compressIdleRecords();
+      toast('怠速彙總已啟用','壓縮 '+fi(r.before)+' → '+fi(r.after)+' 筆','ok');
+      renderAll();
+      // 重開資料管理讓 UI 反映最新狀態
+      setTimeout(openDataManager,100);
+    }else{
+      toast('怠速彙總已停用','按「🔄 更新」重新從雲端載入原始資料','warn');
+    }
+  };
+  const cmpNowBtn=document.getElementById('dmgrIdleCmpNow');
+  if(cmpNowBtn)cmpNowBtn.onclick=()=>{
+    const r=compressIdleRecords();
+    toast('壓縮完成','怠速 '+fi(r.before)+' → '+fi(r.after)+' 筆','ok');
+    renderAll();
+    setTimeout(openDataManager,100);
+  };
   document.querySelectorAll('input.dmgr-skip').forEach(cb=>cb.onchange=async ()=>{
     const m=cb.dataset.m;
     if(cb.checked)SKIP_MONTHS.add(m);else SKIP_MONTHS.delete(m);

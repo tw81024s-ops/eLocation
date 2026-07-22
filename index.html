@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-W">
+<meta name="build-version" content="20260703-Y2">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -568,7 +568,7 @@ details.msf>.mspanel{display:none;position:absolute;top:calc(100% + 4px);left:0;
   <header class="app">
     <div class="brand">
       <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16V7a1 1 0 011-1h10a1 1 0 011 1v9"/><path d="M15 10h3.5a1 1 0 01.8.4l2.3 3.1a1 1 0 01.2.6V16a1 1 0 01-1 1h-1"/><circle cx="7" cy="17.5" r="1.8" fill="#fff" stroke="none"/><circle cx="17.5" cy="17.5" r="1.8" fill="#fff" stroke="none"/><path d="M9 17.5h6"/></svg></div>
-      <div class="title"><h1>富昇物流 · 駕駛行為安全管理看板</h1><div class="sub" id="deptline">FU-SHENG LOGISTICS · FLEET SAFETY CONSOLE</div><div class="latest-data" id="latestData"></div></div>
+      <div class="title"><h1>富昇物流 · 駕駛行為安全管理看板 <span id="verBadge" style="display:inline-block;margin-left:10px;padding:3px 10px;font-size:12px;font-weight:700;background:rgba(255,255,255,.25);color:#fff;border-radius:8px;letter-spacing:.5px;font-family:'Consolas',monospace;vertical-align:middle"></span></h1><div class="sub" id="deptline">FU-SHENG LOGISTICS · FLEET SAFETY CONSOLE</div><div class="latest-data" id="latestData"></div></div>
     </div>
     <div class="actions">
       <div class="fsbar" id="fsbar" title="字體大小">
@@ -628,6 +628,7 @@ details.msf>.mspanel{display:none;position:absolute;top:calc(100% + 4px);left:0;
 
   <section class="panel" id="p-detail">
     <div class="toolbar">
+      <div class="field"><label>時間範圍</label><select id="dfRange"></select></div>
       <div class="field"><label>日期</label><select id="dfDate"><option value="">全部（累積）</option></select></div>
       <div class="field"><label>課別</label>
         <details class="msf" id="ms-dfCourse">
@@ -652,6 +653,7 @@ details.msf>.mspanel{display:none;position:absolute;top:calc(100% + 4px);left:0;
 
   <section class="panel" id="p-speed">
     <div class="toolbar">
+      <div class="field"><label>時間範圍</label><select id="spRange"></select></div>
       <div class="field"><label>日期</label><select id="spDate"><option value="">全部（累積）</option></select></div>
       <div class="field"><label>課</label><select id="spCourse"><option value="">全部</option></select></div>
       <div class="field"><label>站所</label><select id="spBranch"><option value="">全部站所</option></select></div>
@@ -669,6 +671,7 @@ details.msf>.mspanel{display:none;position:absolute;top:calc(100% + 4px);left:0;
   <section class="panel on" id="p-branchppl">
     <div class="toolbar">
       <div class="field"><label>檢視</label><select id="bpView"><option value="branch">站所彙總</option><option value="person">人員明細</option></select></div>
+      <div class="field"><label>時間範圍</label><select id="bpRange"></select></div>
       <div class="field"><label>日期</label><select id="bpDate"><option value="">全部（累積）</option></select></div>
       <div class="field"><label>課別</label>
         <details class="msf" id="ms-bpCourse">
@@ -701,6 +704,7 @@ details.msf>.mspanel{display:none;position:absolute;top:calc(100% + 4px);left:0;
     </div>
     <div class="toolbar" id="idlDetailBar" style="margin-top:8px;display:none">
       <div class="field"><label>檢視</label><select id="idlView"><option value="rank">站所彙總</option><option value="detail" selected>明細清單</option></select></div>
+      <div class="field"><label>時間範圍</label><select id="idlRange"></select></div>
       <div class="field"><label>日期</label><select id="idlDate"><option value="">全部（累積）</option></select></div>
       <div class="field"><label>課別</label>
         <details class="msf" id="ms-idlCourse">
@@ -720,6 +724,7 @@ details.msf>.mspanel{display:none;position:absolute;top:calc(100% + 4px);left:0;
     </div>
     <div class="toolbar" id="idlViewBar" style="margin-top:8px">
       <div class="field"><label>檢視</label><select id="idlView2"><option value="rank">站所彙總</option><option value="detail" selected>明細清單</option></select></div>
+      <div class="field"><label>時間範圍</label><select id="idlRangeRank"></select></div>
       <div class="field"><label>日期</label><select id="idlDateRank"><option value="">全部（累積）</option></select></div>
     </div>
     <div id="idleView" class="rankview"></div>
@@ -1050,9 +1055,10 @@ async function handleFiles(files){
   let idleSheets=0;
   const perfImports=[];
   for(const f of files){
-    let wb;try{const buf=await f.arrayBuffer();wb=XLSX.read(buf,{type:'array'});}catch(e){bad++;continue;}
+    let wb;try{const buf=await f.arrayBuffer();wb=XLSX.read(buf,{type:'array',cellDates:true,cellNF:false,cellText:false});}catch(e){bad++;continue;}
     for(const name of wb.SheetNames){
-      const aoa=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:false,defval:''});
+      // dateNF 統一輸出格式,避免 Excel 格式化為短日期時遺失時間
+      const aoa=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:false,defval:'',dateNF:'yyyy/mm/dd hh:mm:ss'});
       // 駕駛月績效格式辨識(獨立於 DAILY/ANOM)
       const pf=parsePerfAOA(aoa);
       if(pf){PERF.months[pf.month]={ts:Date.now(),records:pf.records};savePerf();perfImports.push({month:pf.month,n:pf.records.length});continue;}
@@ -1178,6 +1184,30 @@ function anomView(){
   }
   return ANOM.records.filter(r=>inPeriod(r.date));
 }
+/* 每頁籤預設時間範圍(session-only,重整回預設) */
+const TAB_RANGE_DEFAULTS={branchppl:'1m',rank:'1m',trend:'1m',detail:'1w',speed:'1w',idle:'1w',perf:'1m'};
+const tabRange={}; // session-only,不寫 localStorage
+function getTabRange(tab){return tabRange[tab]||TAB_RANGE_DEFAULTS[tab]||'period';}
+function setTabRange(tab,v){tabRange[tab]=v;}
+function tabRangeCutoff(rangeCode){
+  if(rangeCode==='period')return null;
+  const cutoff=new Date();
+  if(rangeCode==='1w')cutoff.setDate(cutoff.getDate()-6);
+  else if(rangeCode==='1m')cutoff.setMonth(cutoff.getMonth()-1);
+  else if(rangeCode==='3m')cutoff.setMonth(cutoff.getMonth()-3);
+  else return null;
+  return cutoff.getFullYear()+'-'+pad(cutoff.getMonth()+1)+'-'+pad(cutoff.getDate());
+}
+function withinTabRange(dateStr,tab){
+  const cut=tabRangeCutoff(getTabRange(tab));
+  if(!cut)return true;
+  return dateStr && dateStr>=cut;
+}
+function tabRangeOptsHTML(tab){
+  const cur=getTabRange(tab);
+  const opts=[['1w','最近 7 天'],['1m','最近 1 個月'],['3m','最近 3 個月'],['period','依上方期間']];
+  return opts.map(o=>'<option value="'+o[0]+'"'+(cur===o[0]?' selected':'')+'>'+o[1]+'</option>').join('');
+}
 /* 月份跳過機制:localStorage 記住哪些月份不讀入,anomView 自動排除 */
 const SKIP_MONTHS_KEY='fleet_skip_months_v1';
 let SKIP_MONTHS=new Set();
@@ -1286,9 +1316,19 @@ function renderKpis(){
   if(!dates.length&&!anomView().length){k.innerHTML='';return;}
   const latest=dates[dates.length-1];let best='–',worst='–',avgScore='–';
   if(latest){const bs=DAILY.days[latest].branches;const br=[...bs].sort((a,b)=>a.rank-b.rank);best=br[0]?br[0].branch:'–';worst=br[br.length-1]?br[br.length-1].branch:'–';avgScore=r1(avg(bs.map(b=>b.score)));}
-  const anomN=anomView().filter(r=>r.behavior!=='怠速').length;
-  const idleN=anomView().filter(r=>r.behavior==='怠速').length;
-  // 站所數：用 ORG 編制(可由站所管理修改) 為主，副標顯示資料涵蓋情況
+  // 異常事件 · 用 DAILY 統計加總(不 iterate ANOM.records,大幅加速首頁載入)
+  let anomN='—';let anomEx='—';
+  if(dates.length){
+    let sum=0;
+    dates.forEach(d=>DAILY.days[d].branches.forEach(b=>sum+=(b.count||0)));
+    anomN=fi(sum)+'<small> 筆</small>';
+    anomEx='點擊查看明細 →';
+  }else{
+    anomEx='尚無 DAILY 資料';
+  }
+  // 怠速事件 · 只 filter 怠速這個小子集,不算全量
+  const idleN=ANOM.records.filter(r=>r.behavior==='怠速'&&inPeriod(r.date)).length;
+  // 站所數:用 ORG 編制(可由站所管理修改) 為主,副標顯示資料涵蓋情況
   const orgBranches=Object.keys(BR2CRS);
   const orgN=orgBranches.length;
   const dataBranches=new Set(allBranches());
@@ -1296,7 +1336,7 @@ function renderKpis(){
   const stationSub=(coveredN===orgN)?('編制 '+orgN+' · 全有資料'):('編制 '+orgN+' · 有資料 '+coveredN);
   const cards=[['c1','統計天數',dates.length+'<small> 天</small>',dates.length?dates[0]+' ~ '+latest:'',''],
     ['c2','站所數',orgN+'<small> 站</small>',stationSub,''],
-    ['c3','異常事件',anomN+'<small> 筆</small>','點擊查看明細 →','detail'],
+    ['c3','異常事件',anomN,anomEx,dates.length?'detail':''],
     ['c4','最新平均總分',avgScore,latest?('最佳 '+best):'',''],
     ['c5','最新待改善',worst,latest||'尚無資料','']];
   if(idleN)cards.push(['c3','怠速事件',idleN+'<small> 筆</small>','點擊查看 →','idle']);
@@ -1776,7 +1816,7 @@ let IDLE=[]; // 由 ANOM 推導：每筆 [分公司, 車號, 駕駛, 分鐘, 結
 let IDLE_DATE='';
 let idleSel={branch:null,plate:null};
 // 從共用的異常資料抽出怠速，讓所有開啟者看到同一份
-function refreshIdle(){const dtF=($('#idlDateRank')?$('#idlDateRank').value:'')||($('#idlDate')?$('#idlDate').value:'');const ir=anomView().filter(r=>txt(r.behavior)==='怠速'&&(!dtF||r.date===dtF));IDLE=ir.map(r=>[txt(r.branch),txt(r.plate),txt(r.driver),num(r.over),txt(r.time),txt(r.location)]);const ds=[...new Set(ir.map(r=>txt(r.date)).filter(Boolean))].sort();IDLE_DATE=ds[ds.length-1]||'';}
+function refreshIdle(){const dtF=($('#idlDateRank')?$('#idlDateRank').value:'')||($('#idlDate')?$('#idlDate').value:'');const ir=anomView().filter(r=>txt(r.behavior)==='怠速'&&withinTabRange(r.date,'idle')&&(!dtF||r.date===dtF));IDLE=ir.map(r=>[txt(r.branch),txt(r.plate),txt(r.driver),num(r.over),txt(r.time),txt(r.location)]);const ds=[...new Set(ir.map(r=>txt(r.date)).filter(Boolean))].sort();IDLE_DATE=ds[ds.length-1]||'';}
 // 怠速分級：依「每位駕駛累計怠速時數」分 A/B/C（單位：分鐘；90=1時30分、145=2時25分）
 const IDLE_RULE=[
   {code:'A',name:'輕度',color:'var(--t-light)',range:'≤ 1時30分',disp:'提醒注意',disc:'—',rule:'—'},
@@ -2109,7 +2149,7 @@ const IDLE_PAGE_SIZE=100;
 function renderIdleDetail(){
   const box=$('#idleView');
   // 拿本期所有怠速原始 ANOM 記錄(不是 IDLE 陣列,因為 IDLE 沒帶 disposal/disc)
-  const allIdle=anomView().filter(r=>txt(r.behavior)==='怠速');
+  const allIdle=anomView().filter(r=>txt(r.behavior)==='怠速'&&withinTabRange(r.date,'idle'));
   if(!allIdle.length){box.innerHTML='<div class="card"><div style="padding:40px;text-align:center;color:var(--muted)">本期沒有怠速資料</div></div>';return;}
   // 上方 KPI 卡(跟原本一樣)
   const agg=idleAgg(null);
@@ -2339,6 +2379,12 @@ function renderTrend(){
 }
 function setOpts(sel,arr,allLabel){const el=$(sel);const prev=el.value;el.innerHTML='<option value="">'+(allLabel||'全部')+'</option>'+arr.map(x=>'<option>'+x+'</option>').join('');if(arr.includes(prev))el.value=prev;}
 function fillDetailFilters(){
+  // 時間範圍下拉初始化(session 記住;預設依 TAB_RANGE_DEFAULTS)
+  ['bpRange','dfRange','spRange','idlRange','idlRangeRank'].forEach(id=>{
+    const tab=id==='bpRange'?'branchppl':id==='dfRange'?'detail':id==='spRange'?'speed':'idle';
+    const el=document.getElementById(id);
+    if(el)el.innerHTML=tabRangeOptsHTML(tab);
+  });
   const br=new Set(),be=new Set(),de=new Set();
   anomView().forEach(r=>{if(r.behavior==='怠速')return;if(r.branch)br.add(r.branch);if(r.behavior)be.add(r.behavior);if(r.degText)de.add(r.degText);});
   const beList=[...be].sort();beList.push('怠速');
@@ -2388,6 +2434,7 @@ function filteredAnom(){
   const selCrs=msSelected('dfCourse'),selBr=msSelected('dfBranch');
   return anomView().filter(r=>{
     if(r.behavior==='怠速'&&!includeIdle&&be!=='怠速')return false;
+    if(!withinTabRange(r.date,'detail'))return false;
     if(dt&&r.date!==dt)return false;
     if(!crsAll&&!selCrs.has(courseOf(r.branch)))return false;
     if(!brAll&&!selBr.has(r.branch))return false;
@@ -2683,7 +2730,7 @@ function renderSpeed(){
   const crsF=$('#spCourse')?$('#spCourse').value:'';
   const dF=$('#spDate')?$('#spDate').value:'';
   const sevFilter=it=>{const t=sevOf(it).text;if(minSev==='嚴重')return t==='嚴重';if(mi>=0)return ord.indexOf(t)>=mi;return true;};
-  let recs=anomView().filter(r=>r.behavior&&r.behavior.includes('超速'));
+  let recs=anomView().filter(r=>r.behavior&&r.behavior.includes('超速')&&withinTabRange(r.date,'speed'));
   if(dF)recs=recs.filter(r=>r.date===dF);
   if(crsF)recs=recs.filter(r=>courseOf(r.branch)===crsF);
   if(brF)recs=recs.filter(r=>r.branch===brF);
@@ -2992,7 +3039,7 @@ let bpRows=[];
 function bpData(){
   const ord=['輕度','中度','重度','嚴重'];
   const dF=$('#bpDate')?$('#bpDate').value:'';
-  let recs=anomView().filter(r=>r.behavior&&r.behavior.includes('超速'));
+  let recs=anomView().filter(r=>r.behavior&&r.behavior.includes('超速')&&withinTabRange(r.date,'branchppl'));
   if(dF)recs=recs.filter(r=>r.date===dF);
   const branches={};
   recs.forEach(r=>{
@@ -3538,6 +3585,8 @@ $('#idleFileInput').onchange=e=>{if(e.target.files.length)handleFiles([...e.targ
 if($('#idlView'))$('#idlView').onchange=()=>renderIdle();
 if($('#idlView2'))$('#idlView2').onchange=()=>renderIdle();
 ['#idlDate','#idlSev','#idlDisc','#idlDateRank'].forEach(s=>{if($(s))$(s).onchange=()=>renderIdle();});
+if($('#idlRange'))$('#idlRange').onchange=()=>{setTabRange('idle',$('#idlRange').value);if($('#idlRangeRank'))$('#idlRangeRank').value=$('#idlRange').value;fillDetailFilters();renderIdle();};
+if($('#idlRangeRank'))$('#idlRangeRank').onchange=()=>{setTabRange('idle',$('#idlRangeRank').value);if($('#idlRange'))$('#idlRange').value=$('#idlRangeRank').value;fillDetailFilters();renderIdle();};
 if($('#idlSave'))$('#idlSave').onclick=saveAllEdits;
 msBind('idlCourse',()=>{
   const br=new Set();anomView().filter(r=>txt(r.behavior)==='怠速').forEach(r=>{if(r.branch)br.add(r.branch);});
@@ -3558,6 +3607,7 @@ $('#idleExport').onclick=()=>{refreshIdle();if(!IDLE.length){toast('無資料可
 ['#rankDate','#rankSort'].forEach(s=>$(s).onchange=()=>{rankSort={key:'__base__',dir:1};renderRank();});
 ['#trendScope','#trendMetric'].forEach(s=>$(s).onchange=renderTrend);
 ['#dfBehavior','#dfDegree','#dfDate','#dfInclIdle'].forEach(s=>$(s).onchange=renderDetail);
+if($('#dfRange'))$('#dfRange').onchange=()=>{setTabRange('detail',$('#dfRange').value);fillDetailFilters();renderDetail();};
 // 課別多選變更 → 重建站所選項 + 重繪
 msBind('dfCourse',()=>{
   const br=new Set();anomView().forEach(r=>{if(r.behavior==='怠速')return;if(r.branch)br.add(r.branch);});
@@ -3570,6 +3620,7 @@ msBind('dfCourse',()=>{
 msBind('dfBranch',renderDetail);
 $('#dfSearch').oninput=renderDetail;
 ['#spBranch','#spSev','#spDate'].forEach(s=>$(s).onchange=renderSpeed);
+if($('#spRange'))$('#spRange').onchange=()=>{setTabRange('speed',$('#spRange').value);fillDetailFilters();renderSpeed();};
 if($('#spCourse'))$('#spCourse').onchange=()=>{
   const crs=$('#spCourse').value;
   const br=new Set();anomView().forEach(r=>{if(r.behavior==='怠速')return;if(r.branch)br.add(r.branch);});
@@ -3581,6 +3632,7 @@ $('#spDisc').onchange=renderSpeed;
 $('#spSave').onclick=saveAllEdits;
 window.addEventListener('beforeunload',e=>{if(pendingCount()>0){e.preventDefault();e.returnValue='';}});
 ['#bpView','#bpDate'].forEach(s=>$(s).onchange=renderBranchPpl);
+if($('#bpRange'))$('#bpRange').onchange=()=>{setTabRange('branchppl',$('#bpRange').value);fillDetailFilters();renderBranchPpl();};
 // 課別多選變更 → 重建站所選項 + 重繪
 msBind('bpCourse',()=>{
   const br=new Set();anomView().forEach(r=>{if(r.behavior==='怠速')return;if(r.branch)br.add(r.branch);});
@@ -4052,6 +4104,9 @@ $('#pptGen').onclick=openWeeklyPicker;
 
 /* ---------- init + auto refresh ---------- */
 (async()=>{
+  // 版本徽章(頂端一直顯示,方便確認強制更新是否生效)
+  const _vb=document.getElementById('verBadge');const _v=document.querySelector('meta[name="build-version"]')?.content||'';
+  if(_vb&&_v)_vb.textContent='v'+_v;
   if(ONLINE){
     try{await loadAll();setConn('cloud');}catch(e){setConn('err');toast('無法連線後台',String(e.message||e)+'（請檢查 GAS_URL 與部署權限）','err');}
   }else{

@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-Z2">
+<meta name="build-version" content="20260703-Z3">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2194,14 +2194,45 @@ function renderPerfDriverCard(all){
 function renderIdle(){
   const box=$('#idleView');if(!box)return;
   refreshIdle();
-  $('#idleExport').style.display=IDLE.length?'':'none';
+  // 判斷是「本期完全沒怠速資料」還是「有資料但被 from/to 篩掉了」
+  const hasAnyIdle=ANOM.records.some(r=>r.behavior==='怠速'&&inPeriod(r.date));
+  $('#idleExport').style.display=(IDLE.length||hasAnyIdle)?'':'none';
   if(!IDLE.length){idleSel={branch:null,plate:null};
-    // 沒資料時工具列切換也隱藏
-    if($('#idlDetailBar'))$('#idlDetailBar').style.display='none';
-    if($('#idlViewBar'))$('#idlViewBar').style.display='none';
-    box.innerHTML='<div class="card"><div style="text-align:center;padding:54px 24px">'+
-      '<div style="font-size:16px;color:var(--txt);font-weight:700;margin-bottom:8px">尚未匯入怠速資料</div>'+
-      '<div style="font-size:13px;color:var(--muted);line-height:1.7">點上方「匯入怠速 Excel」載入怠速明細（需含「分公司／車號／駕駛／持續時間」欄位）。匯入後會跟超速一樣<b>上傳到雲端</b>，其他人開啟也看得到。<br>分級依<b>每位駕駛累計怠速時數</b>：輕度（A）≤ 1時30分、中度（B）1時31分~2時24分、重度（C）≥ 2時25分。可一次匯入「依車輛」「依駕駛」兩份，系統自動去重。</div></div></div>';return;}
+    if(!hasAnyIdle){
+      // 情境 A · 本期完全沒有怠速資料 → 提示匯入
+      if($('#idlDetailBar'))$('#idlDetailBar').style.display='none';
+      if($('#idlViewBar'))$('#idlViewBar').style.display='none';
+      box.innerHTML='<div class="card"><div style="text-align:center;padding:54px 24px">'+
+        '<div style="font-size:16px;color:var(--txt);font-weight:700;margin-bottom:8px">尚未匯入怠速資料</div>'+
+        '<div style="font-size:13px;color:var(--muted);line-height:1.7">點上方「匯入怠速 Excel」載入怠速明細（需含「分公司／車號／駕駛／持續時間」欄位）。匯入後會跟超速一樣<b>上傳到雲端</b>，其他人開啟也看得到。<br>分級依<b>每位駕駛累計怠速時數</b>：輕度（A）≤ 1時30分、中度（B）1時31分~2時24分、重度（C）≥ 2時25分。可一次匯入「依車輛」「依駕駛」兩份，系統自動去重。</div></div></div>';return;
+    }
+    // 情境 B · 有資料但目前 from/to 篩選後為空 → 保留工具列讓使用者改
+    const _idlV=($('#idlView')?$('#idlView').value:null)||($('#idlView2')?$('#idlView2').value:null)||'detail';
+    if($('#idlView'))$('#idlView').value=_idlV;
+    if($('#idlView2'))$('#idlView2').value=_idlV;
+    if($('#idlDetailBar'))$('#idlDetailBar').style.display=(_idlV==='detail')?'flex':'none';
+    if($('#idlViewBar'))$('#idlViewBar').style.display=(_idlV==='detail')?'none':'flex';
+    // 找出實際有資料的日期範圍供提示
+    const dsAll=[...new Set(ANOM.records.filter(r=>r.behavior==='怠速'&&inPeriod(r.date)).map(r=>r.date).filter(Boolean))].sort();
+    const dsMin=dsAll[0]||'—',dsMax=dsAll[dsAll.length-1]||'—';
+    const fromV=$('#idlDateFrom')?$('#idlDateFrom').value:($('#idlDateFromR')?$('#idlDateFromR').value:'');
+    const toV=$('#idlDateTo')?$('#idlDateTo').value:($('#idlDateToR')?$('#idlDateToR').value:'');
+    box.innerHTML='<div class="card"><div style="text-align:center;padding:40px 24px">'+
+      '<div style="font-size:16px;color:var(--txt);font-weight:700;margin-bottom:10px">目前篩選範圍內沒有怠速資料</div>'+
+      '<div style="font-size:13px;color:var(--muted);line-height:1.8">'+
+        '本期共有 <b style="color:var(--accent);font-family:var(--mono)">'+fi(dsAll.length?ANOM.records.filter(r=>r.behavior==="怠速"&&inPeriod(r.date)).length:0)+'</b> 筆怠速資料,'+
+        '日期範圍 <b style="font-family:var(--mono)">'+dsMax+'</b> ~ <b style="font-family:var(--mono)">'+dsMin+'</b><br>'+
+        '目前篩選:<b style="font-family:var(--mono)">從 '+(fromV||'無')+' 到 '+(toV||'無')+'</b><br>'+
+        '<span style="color:var(--accent);font-weight:700">→ 請調整上方「從」「到」日期,或用「時間範圍」下拉切「最近 1 個月」/「依上方期間」查看更多資料</span>'+
+      '</div>'+
+      '<button class="btn primary" id="idlResetDate" style="margin-top:16px">📅 切到最新有資料日期('+esc(dsMax)+')</button>'+
+    '</div></div>';
+    if($('#idlResetDate'))$('#idlResetDate').onclick=()=>{
+      ['idlDateFrom','idlDateTo','idlDateFromR','idlDateToR'].forEach(id=>{const el=$('#'+id);if(el)el.value=dsMax;});
+      _idlDateDefaulted=true;renderIdle();
+    };
+    return;
+  }
   // 檢視模式:rank(彙總) / detail(明細清單) — 預設 detail
   const _idlV=($('#idlView')?$('#idlView').value:null)||($('#idlView2')?$('#idlView2').value:null)||'detail';
   if($('#idlView'))$('#idlView').value=_idlV;
@@ -2588,11 +2619,10 @@ function fillDetailFilters(){
   const idleBrList2=idleBrList.filter(b=>idleSelCrs.has(courseOf(b)));
   msInit('idlBranch',idleBrList2,true);
   const idlDates=[...new Set(idleRecs.map(r=>r.date).filter(Boolean))].sort().reverse();
-  // 預設昨日(僅在使用者未動過時套用)
-  if(!_idlDateDefaulted){
-    const y=new Date();y.setDate(y.getDate()-1);
-    const yStr=y.getFullYear()+'-'+pad(y.getMonth()+1)+'-'+pad(y.getDate());
-    ['idlDateFrom','idlDateTo','idlDateFromR','idlDateToR'].forEach(id=>{const el=$('#'+id);if(el&&!el.value)el.value=yStr;});
+  // 預設用「資料最新一天」(不是日曆昨天,因為資料通常晚 1~2 天才匯入)
+  if(!_idlDateDefaulted&&idlDates.length){
+    const defaultDate=idlDates[0];  // 已排序 desc,取最新
+    ['idlDateFrom','idlDateTo','idlDateFromR','idlDateToR'].forEach(id=>{const el=$('#'+id);if(el&&!el.value)el.value=defaultDate;});
     _idlDateDefaulted=true;
   }
 }

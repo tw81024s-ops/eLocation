@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-Z">
+<meta name="build-version" content="20260703-Z2">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -462,6 +462,24 @@ td.b{font-weight:700}
 .rules-info b{color:var(--accent)}
 .rules-edit-bar{position:sticky;bottom:12px;background:#fff;padding:14px 18px;border-radius:12px;box-shadow:0 -4px 20px rgba(230,0,126,.18);border:2px solid var(--accent);display:flex;gap:10px;justify-content:flex-end;align-items:center;margin-top:20px;z-index:5}
 .rules-edit-msg{margin-right:auto;color:#a36400;font-size:calc(12.5px*var(--fs));font-weight:700}
+/* 匯入進度 overlay */
+#importProg{position:fixed;inset:0;background:rgba(0,0,0,.55);backdrop-filter:blur(3px);z-index:9999;display:none;align-items:center;justify-content:center}
+#importProg.show{display:flex}
+#importProg .pg-card{background:#fff;border-radius:16px;padding:28px 32px;min-width:460px;max-width:600px;box-shadow:0 20px 60px rgba(230,0,126,.35);border:2px solid var(--accent)}
+#importProg .pg-title{font-size:calc(17px*var(--fs));font-weight:800;color:var(--accent);margin-bottom:6px;display:flex;align-items:center;gap:10px}
+#importProg .pg-spin{display:inline-block;width:20px;height:20px;border:3px solid var(--panel);border-top-color:var(--accent);border-radius:50%;animation:pgspin .9s linear infinite}
+@keyframes pgspin{to{transform:rotate(360deg)}}
+#importProg .pg-sub{font-size:calc(12.5px*var(--fs));color:var(--muted);margin-bottom:18px}
+#importProg .pg-bar{height:12px;background:var(--panel);border-radius:8px;overflow:hidden;margin-bottom:8px;position:relative}
+#importProg .pg-fill{height:100%;background:linear-gradient(90deg,#ffa6d0,#e6007e);border-radius:8px;transition:width .3s ease;width:0}
+#importProg .pg-pct{font-size:calc(11.5px*var(--fs));color:var(--muted);text-align:right;font-family:var(--mono),Consolas;font-weight:700;margin-bottom:16px}
+#importProg .pg-stages{background:var(--panel);border-radius:10px;padding:12px 14px;max-height:200px;overflow-y:auto;font-size:calc(12.5px*var(--fs));font-family:var(--mono),Consolas}
+#importProg .pg-stg{padding:3px 0;color:var(--muted)}
+#importProg .pg-stg.done{color:var(--good)}
+#importProg .pg-stg.active{color:var(--accent);font-weight:800}
+#importProg .pg-stg.done::before{content:'✓ ';color:var(--good);font-weight:800}
+#importProg .pg-stg.active::before{content:'▶ ';color:var(--accent)}
+#importProg .pg-stg.pending::before{content:'○ ';color:var(--dim)}
 /* 課分區標題列(站所異常統計、超速名單分類 等) */
 tr.course-hdr td{background:linear-gradient(90deg,rgba(230,0,126,.14),rgba(230,0,126,.02));border-top:2px solid var(--accent);border-bottom:1px solid var(--line);padding:10px 16px !important;letter-spacing:.3px;cursor:pointer;user-select:none;transition:background .12s}
 tr.course-hdr:hover td{background:linear-gradient(90deg,rgba(230,0,126,.24),rgba(230,0,126,.06))}
@@ -563,6 +581,7 @@ details.msf>.mspanel{display:none;position:absolute;top:calc(100% + 4px);left:0;
 </style>
 </head>
 <body>
+<div id="importProg"><div class="pg-card"><div class="pg-title"><span class="pg-spin"></span><span id="pgTitle">處理中…</span></div><div class="pg-sub" id="pgSub">系統正在整理資料,請稍候</div><div class="pg-bar"><div class="pg-fill" id="pgFill"></div></div><div class="pg-pct" id="pgPct">0%</div><div class="pg-stages" id="pgStages"></div></div></div>
 <div class="statusbar"></div>
 <div class="wrap">
   <header class="app">
@@ -1047,7 +1066,11 @@ const toAnomSnake=x=>({uniq:anomUniq(x),date:x.date,branch:x.branch,plate:x.plat
 async function handleFiles(files){
   if(busy)return;
   if(IMPORT_PASSCODE){const p=prompt('請輸入匯入通行碼：');if(p!==IMPORT_PASSCODE){toast('通行碼錯誤','未執行匯入','err');return;}}
+  // 顯示進度 overlay
+  pgStart('📥 匯入中…','系統正在整理資料,請稍候',['解析 Excel 檔案','識別站所/課別','更新雲端資料','建立駕駛索引','計算彙總','產生待處置名單']);
+  pgStep(0,5);
   setBusy(true,'解析中…');
+  await pgTick();
   let bad=0;
   const dailySnake=[],dateSet=new Set(),anomSnake=[];
   const byUniq={};ANOM.records.forEach(r=>{byUniq[anomUniq(r)]=r;});
@@ -1098,10 +1121,12 @@ async function handleFiles(files){
       });}
     }
   }
+  pgStep(1,25);await pgTick();
   try{
     if(ONLINE){
       const totalRows=dailySnake.length+anomSnake.length;
       setBusy(true,'上傳中…(共 '+totalRows+' 筆變動)');
+      pgStep(2,40);await pgTick();
       if(dailySnake.length)await gasPost({type:'daily',rows:dailySnake,dates:[...dateSet]});
       if(anomSnake.length)await gasPost({type:'anom',rows:anomSnake});
       // 註：不再呼叫 loadAll() 重新下載雲端全量資料。
@@ -1109,9 +1134,15 @@ async function handleFiles(files){
       // 若其他人同時有變更，AUTO_REFRESH_SEC 秒後的自動同步會處理。
       // 這步省下 5-10 分鐘等待時間（尤其資料量大時）。
     }else{ saveLocal(); }
-  }catch(e){ toast('上傳失敗',String(e.message||e)+'（請檢查 GAS 部署/網址）','err'); setBusy(false); renderAll(); return; }
+  }catch(e){ toast('上傳失敗',String(e.message||e)+'（請檢查 GAS 部署/網址）','err'); pgFail('上傳失敗'); setBusy(false); renderAll(); return; }
+  // 建立索引 + 預算彙總
+  pgStep(3,65);await pgTick();
+  await rebuildIndex(true);
+  pgStep(4,85);await pgTick();
+  pgStep(5,95);await pgTick();
   setBusy(false);
   lastSig=signature();renderAll();
+  pgDone();
   // 駕駛月績效匯入提示
   if(perfImports.length){
     const pmsg=perfImports.map(p=>p.month+'  共 '+p.n+' 筆').join('、');
@@ -1217,6 +1248,71 @@ let SKIP_MONTHS=new Set();
 function loadSkipMonths(){try{const s=localStorage.getItem(SKIP_MONTHS_KEY);if(s){const a=JSON.parse(s);if(Array.isArray(a))SKIP_MONTHS=new Set(a);}}catch(e){}}
 function saveSkipMonths(){try{localStorage.setItem(SKIP_MONTHS_KEY,JSON.stringify([...SKIP_MONTHS]));}catch(e){}}
 loadSkipMonths();
+/* === 索引 · 匯入/載入時預算好,後續查詢直接使用 === */
+const IDX={
+  ts:0,
+  idleByDriver:{},   // "branch|plate|driver" -> {branch,plate,driver,sumMin,events,dates,tier,latestDate}
+  speedByDriver:{},  // "branch|driver" -> {branch,driver,count,sev:{A,B,C,D},maxSpd,latestDate}
+  byBranch:{},       // branch -> {events,unhandled,sev:{A,B,C,D},drivers:Set,people:Set}
+  byCourse:{},       // course -> {branches:Set,events,unhandled,sev,drivers:Set}
+  pendingIdle:[],    // 中度以上、無處置 → 待處置怠速名單
+  pendingSpeed:[]    // 中度以上、無處置 → 待處置超速名單
+};
+async function rebuildIndex(withProgress){
+  // 清空
+  IDX.idleByDriver={};IDX.speedByDriver={};IDX.byBranch={};IDX.byCourse={};IDX.pendingIdle=[];IDX.pendingSpeed=[];
+  const recs=ANOM.records||[];const N=recs.length;
+  if(!N){IDX.ts=Date.now();return;}
+  const CHUNK=800;
+  for(let i=0;i<N;i+=CHUNK){
+    const end=Math.min(N,i+CHUNK);
+    for(let j=i;j<end;j++){
+      const r=recs[j];const bh=txt(r.behavior);const br=txt(r.branch);
+      if(!br)continue;
+      const B=(IDX.byBranch[br]=IDX.byBranch[br]||{events:0,unhandled:0,sev:{A:0,B:0,C:0,D:0},drivers:new Set(),people:new Set()});
+      const c=courseOf(br)||'未分類';
+      const C=(IDX.byCourse[c]=IDX.byCourse[c]||{branches:new Set(),events:0,unhandled:0,sev:{A:0,B:0,C:0,D:0},drivers:new Set()});
+      C.branches.add(br);
+      if(bh==='怠速'){
+        const k=br+'|'+txt(r.plate)+'|'+txt(r.driver);
+        const d=(IDX.idleByDriver[k]=IDX.idleByDriver[k]||{branch:br,plate:txt(r.plate),driver:txt(r.driver),sumMin:0,events:0,dates:new Set(),latestDate:''});
+        d.sumMin+=num(r.over);d.events++;d.dates.add(r.date);
+        if(r.date>d.latestDate)d.latestDate=r.date;
+      }else if(bh&&bh.includes('超速')){
+        const k=br+'|'+txt(r.driver);
+        const s=(IDX.speedByDriver[k]=IDX.speedByDriver[k]||{branch:br,driver:txt(r.driver),count:0,sev:{A:0,B:0,C:0,D:0},maxSpd:0,latestDate:''});
+        s.count++;
+        const sev=sevOf(r);const code=sev.code||'';
+        if(code&&s.sev[code]!==undefined)s.sev[code]++;
+        if(code&&B.sev[code]!==undefined)B.sev[code]++;
+        if(code&&C.sev[code]!==undefined)C.sev[code]++;
+        const spd=num(r.maxSpeed);if(spd>s.maxSpd)s.maxSpd=spd;
+        if(r.date>s.latestDate)s.latestDate=r.date;
+        B.events++;C.events++;
+        B.drivers.add(r.driver);C.drivers.add(r.driver);
+        B.people.add(txt(r.plate)+'|'+txt(r.driver));
+        if(isPending(r)){B.unhandled++;C.unhandled++;}
+      }
+    }
+    if(withProgress)await pgTick();  // 讓 UI 有機會更新
+  }
+  // 計算怠速 tier
+  Object.values(IDX.idleByDriver).forEach(d=>{d.tier=idleTierByMin(d.sumMin);});
+  // 建待處置名單:中度以上(B/C)且沒設處置的
+  IDX.pendingIdle=Object.values(IDX.idleByDriver).filter(d=>{
+    if(d.tier.code==='A')return false;
+    // 檢查該駕駛任一 怠速 事件是否已設處置
+    const anyDone=recs.some(r=>r.behavior==='怠速'&&r.branch===d.branch&&r.plate===d.plate&&r.driver===d.driver&&(effDisposal(r)||effDisc(r)));
+    return !anyDone;
+  }).sort((a,b)=>b.sumMin-a.sumMin);
+  IDX.pendingSpeed=Object.values(IDX.speedByDriver).filter(s=>{
+    if(s.sev.B+s.sev.C+s.sev.D===0)return false;  // 只有 A 級不算
+    // 檢查任一超速事件是否已設處置
+    const anyDone=recs.some(r=>r.behavior&&r.behavior.includes('超速')&&r.branch===s.branch&&r.driver===s.driver&&(effDisposal(r)||effDisc(r)));
+    return !anyDone;
+  }).sort((a,b)=>(b.sev.D*100+b.sev.C*10+b.count)-(a.sev.D*100+a.sev.C*10+a.count));
+  IDX.ts=Date.now();
+}
 /* 怠速資料自動彙總:每個駕駛每個日期合併為一筆(可大幅減量) */
 const IDLE_COMPRESS_KEY='fleet_idle_compress_v1';
 let IDLE_COMPRESS=(localStorage.getItem(IDLE_COMPRESS_KEY)==='1');
@@ -3279,6 +3375,42 @@ function renderLatestData(){
 /* ---------- conn / busy ---------- */
 function setConn(state){const p=$('#connPill'),t=$('#connTxt');p.className='pill '+(state==='cloud'?'cloud':state==='err'?'err':'local');t.textContent=state==='cloud'?'雲端已連線':state==='err'?'連線失敗':'本機預覽模式';}
 function setBusy(b,label){busy=b;const btn=$('#importBtn');btn.disabled=b;$('#refreshBtn').disabled=b;btn.innerHTML=b?('<span class="spin"></span>'+(label||'處理中…')):'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0-12l-4 4m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>匯入 Excel';}
+/* === 匯入進度 overlay === */
+const _pgStages=[];
+function pgStart(title,sub,stageList){
+  _pgStages.length=0;
+  stageList.forEach(s=>_pgStages.push({label:s,status:'pending'}));
+  $('#pgTitle').textContent=title||'處理中…';
+  $('#pgSub').textContent=sub||'系統正在整理資料,請稍候';
+  $('#pgFill').style.width='0%';
+  $('#pgPct').textContent='0%';
+  _pgRender();
+  $('#importProg').classList.add('show');
+}
+function pgRender(){
+  const box=$('#pgStages');if(!box)return;
+  box.innerHTML=_pgStages.map(s=>'<div class="pg-stg '+s.status+'">'+esc(s.label)+'</div>').join('');
+}
+function _pgRender(){pgRender();}
+function pgStep(idx,percent){
+  _pgStages.forEach((s,i)=>{if(i<idx)s.status='done';else if(i===idx)s.status='active';else s.status='pending';});
+  const p=Math.min(100,Math.max(0,Math.round(percent)));
+  $('#pgFill').style.width=p+'%';
+  $('#pgPct').textContent=p+'%';
+  _pgRender();
+}
+function pgDone(){
+  _pgStages.forEach(s=>s.status='done');
+  $('#pgFill').style.width='100%';$('#pgPct').textContent='100%';
+  _pgRender();
+  setTimeout(()=>$('#importProg').classList.remove('show'),450);
+}
+function pgFail(msg){
+  $('#pgTitle').textContent='❌ '+(msg||'處理失敗');
+  setTimeout(()=>$('#importProg').classList.remove('show'),1800);
+}
+// 給主 loop 一個「呼吸」的機會(避免 UI 凍結)
+const pgTick=()=>new Promise(r=>setTimeout(r,0));
 
 /* ---------- events ---------- */
 $('#importBtn').onclick=()=>{if(!busy)$('#fileInput').click();};
@@ -4194,12 +4326,25 @@ $('#pptGen').onclick=openWeeklyPicker;
   // 版本徽章(頂端一直顯示,方便確認強制更新是否生效)
   const _vb=document.getElementById('verBadge');const _v=document.querySelector('meta[name="build-version"]')?.content||'';
   if(_vb&&_v)_vb.textContent='v'+_v;
+  // 開機:如果資料量大先顯示載入進度
   if(ONLINE){
-    try{await loadAll();setConn('cloud');}catch(e){setConn('err');toast('無法連線後台',String(e.message||e)+'（請檢查 GAS_URL 與部署權限）','err');}
+    pgStart('🚀 啟動中…','正在從雲端拉取資料',['連線後台','下載資料','建立駕駛索引','計算彙總','完成準備']);
+    pgStep(0,10);
+    try{
+      pgStep(1,30);await pgTick();
+      await loadAll();
+      setConn('cloud');
+      pgStep(2,60);await pgTick();
+      await rebuildIndex(true);
+      pgStep(3,85);await pgTick();
+      pgStep(4,95);await pgTick();
+    }catch(e){setConn('err');pgFail('連線失敗');toast('無法連線後台',String(e.message||e)+'（請檢查 GAS_URL 與部署權限）','err');}
   }else{
     await loadAll();setConn('local');
+    await rebuildIndex(false);
   }
   lastSig=signature();renderAll();
+  pgDone();
   refreshBackupBanner();
   // 資料量大時提示使用者可用資料管理釋放效能
   const _totalAnom=ANOM.records.length;

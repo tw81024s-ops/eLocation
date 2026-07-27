@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-Z4">
+<meta name="build-version" content="20260703-Z5">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1223,12 +1223,22 @@ const tabRange={}; // session-only,不寫 localStorage
 let _idlDateDefaulted=false;  // 只在使用者首次進入時套用「昨日」預設
 function getTabRange(tab){return tabRange[tab]||TAB_RANGE_DEFAULTS[tab]||'period';}
 function setTabRange(tab,v){tabRange[tab]=v;}
+// 快取「資料最新日期」,避免每次 tabRangeCutoff 都重新掃全表
+let _maxAnomDate='',_maxAnomDateTs=0,_maxAnomRecCnt=0;
+function _getMaxAnomDate(){
+  const N=ANOM.records.length;const now=Date.now();
+  // 快取 3 秒,或記錄數改變時失效
+  if(_maxAnomDate&&now-_maxAnomDateTs<3000&&N===_maxAnomRecCnt)return _maxAnomDate;
+  let mx='';for(let i=0;i<N;i++){const d=ANOM.records[i].date;if(d&&d>mx)mx=d;}
+  _maxAnomDate=mx;_maxAnomDateTs=now;_maxAnomRecCnt=N;
+  return mx;
+}
 function tabRangeCutoff(rangeCode){
   if(rangeCode==='period')return null;
-  // 基準日:取 max(今天, 資料最新一天),避免系統時間跟資料時間不匹配時,剛上傳的資料落在窗口外
   const now=new Date();
   let base=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());
-  for(let i=0;i<ANOM.records.length;i++){const d=ANOM.records[i].date;if(d&&d>base)base=d;}
+  const dataMax=_getMaxAnomDate();
+  if(dataMax&&dataMax>base)base=dataMax;
   const cutoff=new Date(base+'T00:00:00');
   if(rangeCode==='1w')cutoff.setDate(cutoff.getDate()-6);
   else if(rangeCode==='1m')cutoff.setMonth(cutoff.getMonth()-1);
@@ -1271,6 +1281,9 @@ async function rebuildIndex(withProgress){
   const recs=ANOM.records||[];const N=recs.length;
   if(!N){IDX.ts=Date.now();return;}
   const CHUNK=800;
+  // 一併掃 · 建索引 + 建「有處置的駕駛集合」(避開 O(N²))
+  const idleDoneDrivers=new Set();
+  const speedDoneDrivers=new Set();
   for(let i=0;i<N;i+=CHUNK){
     const end=Math.min(N,i+CHUNK);
     for(let j=i;j<end;j++){
@@ -1280,14 +1293,16 @@ async function rebuildIndex(withProgress){
       const c=courseOf(br)||'未分類';
       const C=(IDX.byCourse[c]=IDX.byCourse[c]||{branches:new Set(),events:0,unhandled:0,sev:{A:0,B:0,C:0,D:0},drivers:new Set()});
       C.branches.add(br);
+      const hasDone=effDisposal(r)||effDisc(r);
       if(bh==='怠速'){
-        const k=br+'|'+txt(r.plate)+'|'+txt(r.driver);
-        const d=(IDX.idleByDriver[k]=IDX.idleByDriver[k]||{branch:br,plate:txt(r.plate),driver:txt(r.driver),sumMin:0,events:0,dates:new Set(),latestDate:''});
+        const dk=br+'|'+txt(r.plate)+'|'+txt(r.driver);
+        const d=(IDX.idleByDriver[dk]=IDX.idleByDriver[dk]||{branch:br,plate:txt(r.plate),driver:txt(r.driver),sumMin:0,events:0,dates:new Set(),latestDate:''});
         d.sumMin+=num(r.over);d.events++;d.dates.add(r.date);
         if(r.date>d.latestDate)d.latestDate=r.date;
+        if(hasDone)idleDoneDrivers.add(dk);
       }else if(bh&&bh.includes('超速')){
-        const k=br+'|'+txt(r.driver);
-        const s=(IDX.speedByDriver[k]=IDX.speedByDriver[k]||{branch:br,driver:txt(r.driver),count:0,sev:{A:0,B:0,C:0,D:0},maxSpd:0,latestDate:''});
+        const sk=br+'|'+txt(r.driver);
+        const s=(IDX.speedByDriver[sk]=IDX.speedByDriver[sk]||{branch:br,driver:txt(r.driver),count:0,sev:{A:0,B:0,C:0,D:0},maxSpd:0,latestDate:''});
         s.count++;
         const sev=sevOf(r);const code=sev.code||'';
         if(code&&s.sev[code]!==undefined)s.sev[code]++;
@@ -1299,24 +1314,21 @@ async function rebuildIndex(withProgress){
         B.drivers.add(r.driver);C.drivers.add(r.driver);
         B.people.add(txt(r.plate)+'|'+txt(r.driver));
         if(isPending(r)){B.unhandled++;C.unhandled++;}
+        if(hasDone)speedDoneDrivers.add(sk);
       }
     }
     if(withProgress)await pgTick();  // 讓 UI 有機會更新
   }
   // 計算怠速 tier
   Object.values(IDX.idleByDriver).forEach(d=>{d.tier=idleTierByMin(d.sumMin);});
-  // 建待處置名單:中度以上(B/C)且沒設處置的
+  // 建待處置名單 · 用 Set 查詢 O(1),不再 iterate 全表
   IDX.pendingIdle=Object.values(IDX.idleByDriver).filter(d=>{
     if(d.tier.code==='A')return false;
-    // 檢查該駕駛任一 怠速 事件是否已設處置
-    const anyDone=recs.some(r=>r.behavior==='怠速'&&r.branch===d.branch&&r.plate===d.plate&&r.driver===d.driver&&(effDisposal(r)||effDisc(r)));
-    return !anyDone;
+    return !idleDoneDrivers.has(d.branch+'|'+d.plate+'|'+d.driver);
   }).sort((a,b)=>b.sumMin-a.sumMin);
   IDX.pendingSpeed=Object.values(IDX.speedByDriver).filter(s=>{
-    if(s.sev.B+s.sev.C+s.sev.D===0)return false;  // 只有 A 級不算
-    // 檢查任一超速事件是否已設處置
-    const anyDone=recs.some(r=>r.behavior&&r.behavior.includes('超速')&&r.branch===s.branch&&r.driver===s.driver&&(effDisposal(r)||effDisc(r)));
-    return !anyDone;
+    if(s.sev.B+s.sev.C+s.sev.D===0)return false;
+    return !speedDoneDrivers.has(s.branch+'|'+s.driver);
   }).sort((a,b)=>(b.sev.D*100+b.sev.C*10+b.count)-(a.sev.D*100+a.sev.C*10+a.count));
   IDX.ts=Date.now();
 }

@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-Z3">
+<meta name="build-version" content="20260703-Z4">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -832,7 +832,7 @@ async function loadAll(){
     const d=await gasGet();
     if(!d||d.ok===false)throw new Error(d&&d.error||'load failed');
     // 讀取時就過濾 SKIP_MONTHS,不放進記憶體(降低整體渲染負擔)
-    const inSkip=r=>SKIP_MONTHS.size>0&&SKIP_MONTHS.has(String(r.date||'').substring(0,7));
+    const inSkip=r=>isDateSkipped(r.date);
     DAILY={dept:DEPT_NAME,days:{}};
     (d.daily||[]).forEach(r=>{if(inSkip(r))return;const dt=txt(r.date);if(!dt)return;(DAILY.days[dt]=DAILY.days[dt]||{branches:[]}).branches.push(fromDailyRow(r));});
     ANOM={records:(d.anom||[]).filter(r=>!inSkip(r)).map(fromAnomRow).filter(x=>x.plate||x.driver)};
@@ -1213,7 +1213,7 @@ function inPeriod(d){
 }
 function anomView(){
   if(SKIP_MONTHS&&SKIP_MONTHS.size){
-    return ANOM.records.filter(r=>{if(!inPeriod(r.date))return false;const m=String(r.date||'').substring(0,7);return !SKIP_MONTHS.has(m);});
+    return ANOM.records.filter(r=>{if(!inPeriod(r.date))return false;return !isDateSkipped(r.date);});
   }
   return ANOM.records.filter(r=>inPeriod(r.date));
 }
@@ -1225,7 +1225,11 @@ function getTabRange(tab){return tabRange[tab]||TAB_RANGE_DEFAULTS[tab]||'period
 function setTabRange(tab,v){tabRange[tab]=v;}
 function tabRangeCutoff(rangeCode){
   if(rangeCode==='period')return null;
-  const cutoff=new Date();
+  // 基準日:取 max(今天, 資料最新一天),避免系統時間跟資料時間不匹配時,剛上傳的資料落在窗口外
+  const now=new Date();
+  let base=now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate());
+  for(let i=0;i<ANOM.records.length;i++){const d=ANOM.records[i].date;if(d&&d>base)base=d;}
+  const cutoff=new Date(base+'T00:00:00');
   if(rangeCode==='1w')cutoff.setDate(cutoff.getDate()-6);
   else if(rangeCode==='1m')cutoff.setMonth(cutoff.getMonth()-1);
   else if(rangeCode==='3m')cutoff.setMonth(cutoff.getMonth()-3);
@@ -1244,10 +1248,13 @@ function tabRangeOptsHTML(tab){
 }
 /* 月份跳過機制:localStorage 記住哪些月份不讀入,anomView 自動排除 */
 const SKIP_MONTHS_KEY='fleet_skip_months_v1';
-let SKIP_MONTHS=new Set();
+let SKIP_MONTHS=new Set();  // 存 "YYYY-MM" 或 "YYYY-MM-Wn"(n=1..5,依日期分)
 function loadSkipMonths(){try{const s=localStorage.getItem(SKIP_MONTHS_KEY);if(s){const a=JSON.parse(s);if(Array.isArray(a))SKIP_MONTHS=new Set(a);}}catch(e){}}
 function saveSkipMonths(){try{localStorage.setItem(SKIP_MONTHS_KEY,JSON.stringify([...SKIP_MONTHS]));}catch(e){}}
 loadSkipMonths();
+// 依日期算「該月第幾週」(1~5, 依每月第 1~7 日=W1 依此類推)
+function dateWeekKey(dateStr){if(!dateStr||dateStr.length<10)return '';const day=parseInt(dateStr.substring(8,10),10);if(!day)return '';const wk=Math.min(5,Math.ceil(day/7));return dateStr.substring(0,7)+'-W'+wk;}
+function isDateSkipped(dateStr){if(!SKIP_MONTHS.size)return false;const m=String(dateStr||'').substring(0,7);if(SKIP_MONTHS.has(m))return true;const w=dateWeekKey(dateStr);return w&&SKIP_MONTHS.has(w);}
 /* === 索引 · 匯入/載入時預算好,後續查詢直接使用 === */
 const IDX={
   ts:0,
@@ -3480,18 +3487,41 @@ function openDataManager(){
         '<th style="padding:8px 10px;text-align:center">狀態</th>'+
         '<th style="padding:8px 10px;text-align:center">動作</th>'+
       '</tr></thead><tbody id="dmgrBody">';
+  // 計算每月每週的筆數
+  const wkCnt={};ANOM.records.forEach(r=>{const w=dateWeekKey(r.date);if(w)wkCnt[w]=(wkCnt[w]||0)+1;});
+  const wkOfMonth={};Object.keys(wkCnt).forEach(w=>{const m=w.substring(0,7);(wkOfMonth[m]=wkOfMonth[m]||[]).push(w);});
+  Object.values(wkOfMonth).forEach(a=>a.sort());
   months.forEach(m=>{
     const skipped=SKIP_MONTHS.has(m);
     bodyHtml+='<tr style="border-bottom:1px solid var(--line)'+(skipped?';background:#FFE3EF':'')+'">'+
-      '<td style="padding:9px 10px;font-family:var(--mono);font-weight:700">'+esc(m)+'</td>'+
+      '<td style="padding:9px 10px;font-family:var(--mono);font-weight:800;font-size:13px">'+
+        '<span class="dmgr-mtoggle" data-m="'+m+'" style="cursor:pointer;color:var(--accent);margin-right:6px;user-select:none">▶</span>'+
+        esc(m)+'</td>'+
       '<td style="padding:9px 10px;text-align:right;font-family:var(--mono);font-weight:700">'+fi(monCnt[m])+'</td>'+
       '<td style="padding:9px 10px;text-align:center">'+
         (skipped?'<span style="color:var(--bad);font-weight:800">已不讀取</span>':'<span style="color:var(--good);font-weight:700">讀取中</span>')+
       '</td>'+
       '<td style="padding:9px 10px;text-align:center">'+
-        '<label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none;padding:4px 10px;border-radius:6px;border:1px solid var(--line);background:#fff"><input type="checkbox" class="dmgr-skip" data-m="'+m+'"'+(skipped?' checked':'')+' style="margin:0"> 不讀取</label>'+
+        '<label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none;padding:4px 10px;border-radius:6px;border:1px solid var(--line);background:#fff"><input type="checkbox" class="dmgr-skip" data-m="'+m+'"'+(skipped?' checked':'')+' style="margin:0"> 不讀取整月</label>'+
       '</td>'+
     '</tr>';
+    // 週細分列(預設隱藏)
+    (wkOfMonth[m]||[]).forEach(w=>{
+      const wSkipped=SKIP_MONTHS.has(w);
+      const wLabel=w.substring(8);  // e.g. "W1"
+      const wNum=parseInt(wLabel.substring(1),10);
+      const dayFrom=(wNum-1)*7+1,dayTo=Math.min(wNum*7,31);
+      bodyHtml+='<tr class="dmgr-week dmgr-wk-'+m+'" data-parent="'+m+'" style="border-bottom:1px solid var(--line);display:none;background:#FFF9FC">'+
+        '<td style="padding:6px 10px 6px 32px;font-family:var(--mono);font-size:12px;color:var(--muted)">└ '+wLabel+' (每月 '+dayFrom+'~'+dayTo+' 日)</td>'+
+        '<td style="padding:6px 10px;text-align:right;font-family:var(--mono);font-size:12px">'+fi(wkCnt[w])+'</td>'+
+        '<td style="padding:6px 10px;text-align:center;font-size:12px">'+
+          (skipped||wSkipped?'<span style="color:var(--bad);font-weight:700">不讀取</span>':'<span style="color:var(--good)">讀取中</span>')+
+        '</td>'+
+        '<td style="padding:6px 10px;text-align:center">'+
+          '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:12px'+(skipped?';opacity:0.4;pointer-events:none':'')+'"><input type="checkbox" class="dmgr-skip-wk" data-w="'+w+'"'+(wSkipped?' checked':'')+' style="margin:0"> 不讀取此週</label>'+
+        '</td>'+
+      '</tr>';
+    });
   });
   bodyHtml+='</tbody></table></div>';
   openModal('📦 資料管理 · 怠速彙總 & 月份控制',bodyHtml);
@@ -3516,6 +3546,31 @@ function openDataManager(){
     renderAll();
     setTimeout(openDataManager,100);
   };
+  // 月份展開/收合 · 顯示週細分
+  document.querySelectorAll('span.dmgr-mtoggle').forEach(sp=>sp.onclick=()=>{
+    const m=sp.dataset.m;
+    const wkRows=document.querySelectorAll('tr.dmgr-wk-'+m.replace(/-/g,'\\-'));
+    const isOpen=sp.textContent==='▼';
+    wkRows.forEach(tr=>tr.style.display=isOpen?'none':'');
+    sp.textContent=isOpen?'▶':'▼';
+  });
+  // 週細分:勾選/取消(不影響月狀態,但月被勾時週會 disabled)
+  document.querySelectorAll('input.dmgr-skip-wk').forEach(cb=>cb.onchange=()=>{
+    const w=cb.dataset.w;
+    if(cb.checked)SKIP_MONTHS.add(w);else SKIP_MONTHS.delete(w);
+    saveSkipMonths();
+    const tr=cb.closest('tr');
+    tr.children[2].innerHTML=cb.checked?'<span style="color:var(--bad);font-weight:700">不讀取</span>':'<span style="color:var(--good)">讀取中</span>';
+    if(cb.checked){
+      const before=ANOM.records.length;
+      ANOM.records=ANOM.records.filter(r=>dateWeekKey(r.date)!==w);
+      const cleared=before-ANOM.records.length;
+      toast('已釋放 '+w,'清掉 '+fi(cleared)+' 筆','ok');
+      renderAll();
+    }else{
+      toast('已改為讀取 '+w,'請按「🔄 更新」重新從雲端載入','warn');
+    }
+  });
   document.querySelectorAll('input.dmgr-skip').forEach(cb=>cb.onchange=async ()=>{
     const m=cb.dataset.m;
     if(cb.checked)SKIP_MONTHS.add(m);else SKIP_MONTHS.delete(m);

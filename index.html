@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-Z5">
+<meta name="build-version" content="20260703-Z6">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -2685,14 +2685,24 @@ function bindCrsExpand(container,renderFn){
 /* ===== 多選下拉 ===== */
 const msState={};   // id -> Set of selected values
 const msAllOpts={}; // id -> full options list
+const msWasAll={};  // id -> 上一次是否全選(用來決定要不要自動加入新項目)
 function msInit(id,opts,keepPrev){
   msAllOpts[id]=opts.slice();
   if(keepPrev&&msState[id]){
-    const kept=new Set([...msState[id]].filter(v=>opts.indexOf(v)>=0));
-    msState[id]=kept.size?kept:new Set(opts);
+    if(msWasAll[id]){
+      // 上次全選 → 新項目也自動加入(避免匯入新站所後被過濾掉)
+      msState[id]=new Set(opts);
+    }else{
+      // 部分選擇 → 保留仍存在的,但新項目也加進來(比較保險)
+      const cur=msState[id];
+      const kept=new Set([...cur].filter(v=>opts.indexOf(v)>=0));
+      opts.forEach(o=>{if(!cur.has(o))kept.add(o);});  // 新項目也加入
+      msState[id]=kept.size?kept:new Set(opts);
+    }
   }else{
     msState[id]=new Set(opts);  // 預設全選
   }
+  msWasAll[id]=(msState[id].size===opts.length);
   msRender(id);
 }
 function msRender(id){
@@ -2720,7 +2730,7 @@ function msBind(id,onChange){
     let s=msState[id]||new Set(all);
     if(v==='__all'){s=inp.checked?new Set(all):new Set();}
     else{if(inp.checked)s.add(v);else s.delete(v);}
-    msState[id]=s;msRender(id);
+    msState[id]=s;msWasAll[id]=(s.size===all.length);msRender(id);
     if(onChange)onChange();
   });
 }

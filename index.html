@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-Z6">
+<meta name="build-version" content="20260703-Z7">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3480,6 +3480,12 @@ let _smState={q:'',filter:'all',showInactive:false};
 function openDataManager(){
   const monCnt={};
   ANOM.records.forEach(r=>{const m=String(r.date||'').substring(0,7);if(m)monCnt[m]=(monCnt[m]||0)+1;});
+  // 把已被勾選「不讀取」的月份也加進來(即使沒載入資料),否則使用者看不到、無法取消勾選
+  SKIP_MONTHS.forEach(k=>{
+    // 月份 key 是 "YYYY-MM"(7 字元);週 key 是 "YYYY-MM-Wn"(取前 7 字為月)
+    const m=k.substring(0,7);
+    if(m&&!monCnt[m])monCnt[m]=0;
+  });
   const months=Object.keys(monCnt).sort().reverse();
   // 統計怠速資料量
   const idleCnt=ANOM.records.filter(r=>txt(r.behavior)==='怠速').length;
@@ -3577,7 +3583,7 @@ function openDataManager(){
     sp.textContent=isOpen?'▶':'▼';
   });
   // 週細分:勾選/取消(不影響月狀態,但月被勾時週會 disabled)
-  document.querySelectorAll('input.dmgr-skip-wk').forEach(cb=>cb.onchange=()=>{
+  document.querySelectorAll('input.dmgr-skip-wk').forEach(cb=>cb.onchange=async ()=>{
     const w=cb.dataset.w;
     if(cb.checked)SKIP_MONTHS.add(w);else SKIP_MONTHS.delete(w);
     saveSkipMonths();
@@ -3590,7 +3596,28 @@ function openDataManager(){
       toast('已釋放 '+w,'清掉 '+fi(cleared)+' 筆','ok');
       renderAll();
     }else{
-      toast('已改為讀取 '+w,'請按「🔄 更新」重新從雲端載入','warn');
+      // 取消跳過 → 自動從雲端重新載入
+      toast('正在載入 '+w,'從雲端重新拉取…','ok');
+      if(ONLINE){
+        try{
+          pgStart('🔄 重新載入 '+w,'從雲端拉取被跳過的資料',['連線後台','下載資料','建立索引','完成']);
+          pgStep(0,20);await pgTick();
+          pgStep(1,50);await pgTick();
+          await loadAll();
+          pgStep(2,80);await pgTick();
+          await rebuildIndex(true);
+          pgStep(3,95);await pgTick();
+          renderAll();
+          pgDone();
+          toast('✅ '+w+' 已回來','資料已重新載入','ok');
+          setTimeout(openDataManager,600);
+        }catch(e){
+          pgFail('載入失敗');
+          toast('載入失敗',String(e.message||e),'err');
+        }
+      }else{
+        toast('離線模式','請按「🔄 更新」重新載入','warn');
+      }
     }
   });
   document.querySelectorAll('input.dmgr-skip').forEach(cb=>cb.onchange=async ()=>{
@@ -3610,8 +3637,29 @@ function openDataManager(){
       toast('已釋放 '+m,'清掉 '+fi(cleared)+' 筆(記憶體釋放)','ok');
       renderAll();
     }else{
-      // 取消跳過 → 建議重新載入雲端
-      toast('已改為讀取 '+m,'請按「🔄 更新」重新從雲端載入該月份','warn');
+      // 取消跳過 → 自動從雲端重新載入該月份資料
+      toast('正在載入 '+m,'從雲端重新拉取…','ok');
+      if(ONLINE){
+        try{
+          pgStart('🔄 重新載入 '+m,'從雲端拉取被跳過的資料',['連線後台','下載資料','建立索引','完成']);
+          pgStep(0,20);await pgTick();
+          pgStep(1,50);await pgTick();
+          await loadAll();
+          pgStep(2,80);await pgTick();
+          await rebuildIndex(true);
+          pgStep(3,95);await pgTick();
+          renderAll();
+          pgDone();
+          toast('✅ '+m+' 已回來','資料已重新載入,可正常查看','ok');
+          // 重開資料管理讓使用者看到最新狀態
+          setTimeout(openDataManager,600);
+        }catch(e){
+          pgFail('載入失敗');
+          toast('載入失敗',String(e.message||e)+'(請手動按 🔄 更新)','err');
+        }
+      }else{
+        toast('離線模式','已改為讀取 '+m+',請按「🔄 更新」重新從雲端載入','warn');
+      }
     }
   });
 }

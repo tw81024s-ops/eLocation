@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-Z7">
+<meta name="build-version" content="20260703-Z9">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -836,6 +836,29 @@ async function loadAll(){
     DAILY={dept:DEPT_NAME,days:{}};
     (d.daily||[]).forEach(r=>{if(inSkip(r))return;const dt=txt(r.date);if(!dt)return;(DAILY.days[dt]=DAILY.days[dt]||{branches:[]}).branches.push(fromDailyRow(r));});
     ANOM={records:(d.anom||[]).filter(r=>!inSkip(r)).map(fromAnomRow).filter(x=>x.plate||x.driver)};
+    // 自動去除怠速重複(修 8/17 8/18 每筆算兩次的 bug · 有時間欄的優先保留)
+    const idleDedup={};const otherRecs=[];const idleRecs=[];
+    ANOM.records.forEach(r=>{
+      if(r.behavior==='怠速'){
+        const k=anomUniq(r);
+        const ex=idleDedup[k];
+        if(!ex){idleDedup[k]=r;}
+        else{
+          // 已有一筆 · 優先保留「有時間」的那筆(表示有處置的合併)
+          const exHasTime=ex.time&&/\d{1,2}:\d{2}/.test(ex.time);
+          const cuHasTime=r.time&&/\d{1,2}:\d{2}/.test(r.time);
+          if(!exHasTime&&cuHasTime)idleDedup[k]=r;
+          // 若已有處置 · 保留該筆
+          if(effDisposal(ex)||effDisc(ex))idleDedup[k]=ex;
+          else if(effDisposal(r)||effDisc(r))idleDedup[k]=r;
+        }
+      }else{otherRecs.push(r);}
+    });
+    Object.values(idleDedup).forEach(r=>idleRecs.push(r));
+    const beforeDedup=ANOM.records.length;
+    ANOM.records=otherRecs.concat(idleRecs);
+    const dedupCleared=beforeDedup-ANOM.records.length;
+    if(dedupCleared>0)console.log('[怠速去重] 清掉 '+dedupCleared+' 筆重複');
     // 若開啟自動彙總,雲端拉回後立刻壓縮怠速
     if(IDLE_COMPRESS){const r=compressIdleRecords();if(r.before>r.after)console.log('[怠速彙總] '+r.before+' 筆 → '+r.after+' 筆');}
     // 統計原始總量 vs 過濾後,提示使用者
@@ -933,7 +956,11 @@ function parseSpeedDetailAOA(aoa){
   }
   return recs.length?recs:null;
 }
-const anomUniq=x=>[x.date,x.plate,x.driver,x.time,x.location,x.maxSpeed].join('|');
+const anomUniq=x=>{
+  // 怠速去重不看時間欄(時間可能空/有,同事件重複計算之 bug 修正)
+  if(x.behavior==='怠速')return ['I',x.date,x.plate,x.driver,x.location,x.over].join('|');
+  return [x.date,x.plate,x.driver,x.time,x.location,x.maxSpeed].join('|');
+};
 /* === 駕駛月績效 PERF（單獨儲存於 localStorage，與 DAILY/ANOM 分開）=== */
 const PERF_KEY='fleet_perf_v1';
 let PERF={months:{}};
@@ -1046,7 +1073,18 @@ function effDisc(it){const v=txt(it.disc);return (v&&v!=='-')?v:'';}
 // 待處理判定:未設定 disposal/disc 且非輕度(輕度免處理,不列入待處理)
 function isPending(r){if(effDisposal(r)||effDisc(r))return false;return sevOf(r).text!=='輕度';}
 // 時間縮短格式:"7/2 14:35"(用於超速/怠速明細表格)
-function shortTime(t){if(!t)return '';const m=String(t).match(/(\d{1,2})\/(\d{1,2})\D+(\d{1,2}:\d{2})/);return m?(pad(m[1])+'/'+pad(m[2])+' '+m[3]):String(t);}
+function shortTime(t,fbDate){
+  if(!t){
+    if(fbDate){const m=String(fbDate).match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);if(m)return pad(m[2])+'/'+pad(m[3])+' (僅日期)';}
+    return '';
+  }
+  const m=String(t).match(/(\d{1,2})\/(\d{1,2})\D+(\d{1,2}:\d{2})/);
+  if(m)return pad(m[1])+'/'+pad(m[2])+' '+m[3];
+  // time 存的是 ISO 或純日期 · 給個 fallback
+  const m2=String(t).match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if(m2)return pad(m2[2])+'/'+pad(m2[3])+' (僅日期)';
+  return String(t);
+}
 // 怠速結束時間格式化(統一顯示)
 // 處理多種輸入:"7/17/26"(M/D/YY,無時間) / "2026/07/17 12:50:47" / "2026-07-17" 等
 function normIdleTime(t){
@@ -1115,6 +1153,11 @@ async function handleFiles(files){
           if(same){isIdle?rep.iDup++:rep.aDup.push(x);return;}                    // 已存在且內容相同 → 重複略過
           const keepDisp=txt(ex.disposal)&&txt(ex.disposal)!=='-';const keepDisc=txt(ex.disc)&&txt(ex.disc)!=='-';
           Object.assign(ex,{legal:x.legal,selfLimit:x.selfLimit,over:x.over,maxSpeed:x.maxSpeed,location:x.location,level:x.level,degText:x.degText,degCode:x.degCode});
+          // 保留較完整的 time · 新的含 HH:MM 優先(修 8/17 8/18 上傳後時間消失)
+          const exHasT=ex.time&&/\d{1,2}:\d{2}/.test(ex.time);
+          const cuHasT=x.time&&/\d{1,2}:\d{2}/.test(x.time);
+          if(cuHasT&&!exHasT)ex.time=x.time;
+          else if(x.time&&!ex.time)ex.time=x.time;
           if(!keepDisp)ex.disposal=x.disposal;if(!keepDisc)ex.disc=x.disc;
           anomSnake.push(toAnomSnake(ex));if(isIdle)rep.iUpd++;else{rep.aUpd++;rep.aUpdList.push(x);}
         }else{byUniq[u]=x;ANOM.records.push(x);anomSnake.push(toAnomSnake(x));if(isIdle)rep.iNew++;else rep.aNew++;}
@@ -2396,7 +2439,7 @@ function renderIdleDetail(){
           '<td>'+esc(r.driver)+'</td>'+
           '<td style="font-family:var(--mono)">'+esc(r.plate)+'</td>'+
           '<td class="num" style="font-family:var(--mono);font-weight:700">'+num(r.over)+'</td>'+
-          '<td style="font-family:var(--mono)">'+esc(shortTime(r.time))+'</td>'+
+          '<td style="font-family:var(--mono)">'+esc(shortTime(r.time,r.date))+'</td>'+
           '<td><span class="sev '+sevCls+'">'+sevName+'（'+tier.code+'）</span></td>'+
           '<td class="loc" title="'+esc((r.location||'').replace(/"/g,""))+'">'+esc(r.location||'')+'</td>'+
           '<td><select class="iesel" data-idx="'+idx+'" data-field="disposal">'+optsHtml(dispVal,DISPOSAL_OPTIONS)+'</select></td>'+
@@ -3005,7 +3048,7 @@ function renderSpeed(){
         '<td>'+it.driver+'</td>'+
         '<td class="num">'+(drvCount[it.branch+'|'+it.driver])+'</td>'+
         '<td style="font-family:var(--mono)">'+it.plate+'</td>'+
-        '<td style="font-family:var(--mono)">'+shortTime(it.time)+'</td>'+
+        '<td style="font-family:var(--mono)">'+shortTime(it.time,it.date)+'</td>'+
         '<td class="num">'+(it.maxSpeed||'')+'</td>'+
         '<td class="num">'+(it.legal||'')+'</td>'+
         '<td class="num'+overCls+'">'+(over?('+'+over):'')+'</td>'+

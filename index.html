@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-Z10">
+<meta name="build-version" content="20260703-AA">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -599,7 +599,7 @@ details.msf>.mspanel{display:none;position:absolute;top:calc(100% + 4px);left:0;
       <button class="btn" id="refreshBtn" title="重新抓取最新資料"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 11-2.6-6.4M21 4v5h-5"/></svg>更新</button>
       <button class="btn primary" id="importBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0-12l-4 4m4-4l4 4M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>匯入 Excel</button>
       <button class="btn ghost" id="stationMgrBtn" type="button" title="管理站所主檔與課/組歸屬">⚙ 站所管理</button>
-      <button class="btn ghost" id="dataMgrBtn" type="button" title="資料管理:選擇某些月份不讀取(釋放效能)">📦 資料管理</button>
+      <button class="btn ghost" id="loadPanelBtn" type="button" title="月份載入面板:選要載入的月份 · 打開網頁只載當月">📅 月份載入 <span id="loadPanelBadge" style="display:inline-block;margin-left:4px;padding:1px 7px;background:var(--accent);color:#fff;border-radius:10px;font-size:11px;font-weight:800">1</span></button>
       <button class="btn ghost" id="forceReloadBtn" type="button" title="遇到匯入問題或看板行為異常時，可強制清除瀏覽器快取重載入最新版">🔄 強制更新</button>
       <button class="btn ghost danger" id="clearBtn">清除全部</button>
       <input type="file" id="fileInput" accept=".xlsx,.xls" multiple hidden>
@@ -820,51 +820,130 @@ const fi=n=>{const x=Number(n)||0;return String(Math.round(x));}; // 整數（�
 function toast(m,s,t){const e=document.createElement('div');e.className='tmsg '+(t||'');e.innerHTML='<b>'+m+'</b>'+(s?('<span style="color:var(--muted)">'+s+'</span>'):'');$('#toast').appendChild(e);setTimeout(()=>{e.style.opacity=0;e.style.transform='translateX(30px)';setTimeout(()=>e.remove(),300);},4600);}
 
 /* ---------- store (GAS 或 本機) ---------- */
-async function gasGet(){const r=await fetch(GAS_URL+'?action=load&t='+Date.now(),{redirect:'follow'});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json();}
+async function gasGet(params){
+  // params 可傳 {meta:true} 或 {months:'2026-09,2026-08'} · 舊行為 = 不傳
+  let url=GAS_URL+'?t='+Date.now();
+  if(params){
+    if(params.meta)url+='&meta=true';
+    if(params.months)url+='&months='+encodeURIComponent(params.months);
+  }
+  const r=await fetch(url,{redirect:'follow'});if(!r.ok)throw new Error('HTTP '+r.status);
+  return await r.json();
+}
 async function gasPost(p){const r=await fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(p),redirect:'follow'});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json();}
 function saveLocal(){localStorage.setItem(LKEY,JSON.stringify({DAILY,ANOM}));}
 
 const fromDailyRow=r=>({branch:txt(r.branch),grade:txt(r.grade),rank:num(r.rank),score:num(r.score),vehicles:num(r.vehicles),km:num(r.km),count:num(r.count),speedG:txt(r.speed_g),speedR:num(r.speed_r),turnG:txt(r.turn_g),turnR:num(r.turn_r),decelG:txt(r.decel_g),decelR:num(r.decel_r),accelG:txt(r.accel_g),accelR:num(r.accel_r)});
 const fromAnomRow=r=>({date:txt(r.date),branch:txt(r.branch),plate:txt(r.plate),driver:txt(r.driver),behavior:txt(r.behavior),level:txt(r.level),time:txt(r.time),maxSpeed:txt(r.max_speed),location:txt(r.location),legal:txt(r.legal),over:num(r.over_km),degText:txt(r.deg_text),degCode:txt(r.deg_code),disposal:txt(r.disposal),disc:txt(r.disc)});
 
+/* === 分月載入系統 · v2 GAS(meta + months 參數) === */
+const LOADED_MONTHS=new Set();  // 目前記憶體中的月份 · 例 {"2026-09"}
+let AVAILABLE_MONTHS={anom:[],daily:[]};  // 從 meta 拿到的月份清單 [{month, count}]
+
+/* 從雲端載入月份清單(meta) · 只回哪些月有多少筆 · 不撈實際資料 */
+async function loadMeta(){
+  const d=await gasGet({meta:true});
+  if(!d||d.ok===false)throw new Error(d&&d.error||'meta failed');
+  // 新版 GAS 回傳 anom_months / daily_months
+  if(Array.isArray(d.anom_months)||Array.isArray(d.daily_months)){
+    AVAILABLE_MONTHS={anom:d.anom_months||[],daily:d.daily_months||[]};
+    return true;  // 新版 GAS
+  }
+  return false;  // 舊版 GAS · 沒 meta 功能
+}
+
+/* 依 date 字串抽出月份 YYYY-MM */
+function _monthOf(dateStr){const s=String(dateStr||'');return s.length>=7?s.substring(0,7):'';}
+
+/* 去除怠速重複的邏輯(獨立出來以便多處使用) */
+function _dedupIdleRecs(recs){
+  const idleDedup={};const other=[];
+  recs.forEach(r=>{
+    if(r.behavior==='怠速'){
+      const k=anomUniq(r);
+      const ex=idleDedup[k];
+      if(!ex)idleDedup[k]=r;
+      else{
+        const exHasTime=ex.time&&/\d{1,2}:\d{2}/.test(ex.time);
+        const cuHasTime=r.time&&/\d{1,2}:\d{2}/.test(r.time);
+        if(!exHasTime&&cuHasTime)idleDedup[k]=r;
+        if(effDisposal(ex)||effDisc(ex))idleDedup[k]=ex;
+        else if(effDisposal(r)||effDisc(r))idleDedup[k]=r;
+      }
+    }else other.push(r);
+  });
+  return other.concat(Object.values(idleDedup));
+}
+
+/* 載入指定月份 · 累積到現有記憶體(不清掉已有的) */
+async function loadMonths(monthList,opts){
+  opts=opts||{};
+  const monthsToLoad=monthList.filter(m=>opts.force||!LOADED_MONTHS.has(m));
+  if(!monthsToLoad.length)return {loaded:0,anomAdded:0,dailyAdded:0};
+  const d=await gasGet({months:monthsToLoad.join(',')});
+  if(!d||d.ok===false)throw new Error(d&&d.error||'load months failed');
+  // 若 force · 先把這些月的舊資料從記憶體剔除
+  if(opts.force){
+    ANOM.records=ANOM.records.filter(r=>!monthsToLoad.includes(_monthOf(r.date)));
+    Object.keys(DAILY.days).forEach(dt=>{if(monthsToLoad.includes(_monthOf(dt)))delete DAILY.days[dt];});
+  }
+  // 塞 anom
+  const anomNew=(d.anom||[]).map(fromAnomRow).filter(x=>x.plate||x.driver);
+  ANOM.records=ANOM.records.concat(anomNew);
+  ANOM.records=_dedupIdleRecs(ANOM.records);
+  // 塞 daily
+  let dailyAdded=0;
+  (d.daily||[]).forEach(r=>{
+    const dt=txt(r.date);if(!dt)return;
+    const day=DAILY.days[dt]=DAILY.days[dt]||{branches:[]};
+    const b=fromDailyRow(r);
+    const i=day.branches.findIndex(x=>x.branch===b.branch);
+    if(i>=0)day.branches[i]=b;else{day.branches.push(b);dailyAdded++;}
+  });
+  monthsToLoad.forEach(m=>LOADED_MONTHS.add(m));
+  return {loaded:monthsToLoad.length,anomAdded:anomNew.length,dailyAdded,months:monthsToLoad};
+}
+
+/* 卸載月份 · 從記憶體剔除(釋放資源) */
+function unloadMonth(month){
+  const before=ANOM.records.length;
+  ANOM.records=ANOM.records.filter(r=>_monthOf(r.date)!==month);
+  Object.keys(DAILY.days).forEach(dt=>{if(_monthOf(dt)===month)delete DAILY.days[dt];});
+  LOADED_MONTHS.delete(month);
+  return before-ANOM.records.length;
+}
+
+/* 舊版 loadAll · 保留當備援 · 若 meta 失敗就跑舊行為 */
+async function loadAllLegacy(){
+  const d=await gasGet();
+  if(!d||d.ok===false)throw new Error(d&&d.error||'load failed');
+  DAILY={dept:DEPT_NAME,days:{}};
+  (d.daily||[]).forEach(r=>{const dt=txt(r.date);if(!dt)return;(DAILY.days[dt]=DAILY.days[dt]||{branches:[]}).branches.push(fromDailyRow(r));});
+  ANOM={records:_dedupIdleRecs((d.anom||[]).map(fromAnomRow).filter(x=>x.plate||x.driver))};
+  // 舊版沒 meta · LOADED_MONTHS 用實際載入的推算
+  const monthSet=new Set();ANOM.records.forEach(r=>{const m=_monthOf(r.date);if(m)monthSet.add(m);});
+  monthSet.forEach(m=>LOADED_MONTHS.add(m));
+}
+
+/* 主載入函式 · 優先跑分月載入 · 失敗才退回舊版 */
 async function loadAll(){
   if(ONLINE){
-    const d=await gasGet();
-    if(!d||d.ok===false)throw new Error(d&&d.error||'load failed');
-    // 讀取時就過濾 SKIP_MONTHS,不放進記憶體(降低整體渲染負擔)
-    const inSkip=r=>isDateSkipped(r.date);
-    DAILY={dept:DEPT_NAME,days:{}};
-    (d.daily||[]).forEach(r=>{if(inSkip(r))return;const dt=txt(r.date);if(!dt)return;(DAILY.days[dt]=DAILY.days[dt]||{branches:[]}).branches.push(fromDailyRow(r));});
-    ANOM={records:(d.anom||[]).filter(r=>!inSkip(r)).map(fromAnomRow).filter(x=>x.plate||x.driver)};
-    // 自動去除怠速重複(修 8/17 8/18 每筆算兩次的 bug · 有時間欄的優先保留)
-    const idleDedup={};const otherRecs=[];const idleRecs=[];
-    ANOM.records.forEach(r=>{
-      if(r.behavior==='怠速'){
-        const k=anomUniq(r);
-        const ex=idleDedup[k];
-        if(!ex){idleDedup[k]=r;}
-        else{
-          // 已有一筆 · 優先保留「有時間」的那筆(表示有處置的合併)
-          const exHasTime=ex.time&&/\d{1,2}:\d{2}/.test(ex.time);
-          const cuHasTime=r.time&&/\d{1,2}:\d{2}/.test(r.time);
-          if(!exHasTime&&cuHasTime)idleDedup[k]=r;
-          // 若已有處置 · 保留該筆
-          if(effDisposal(ex)||effDisc(ex))idleDedup[k]=ex;
-          else if(effDisposal(r)||effDisc(r))idleDedup[k]=r;
-        }
-      }else{otherRecs.push(r);}
-    });
-    Object.values(idleDedup).forEach(r=>idleRecs.push(r));
-    const beforeDedup=ANOM.records.length;
-    ANOM.records=otherRecs.concat(idleRecs);
-    const dedupCleared=beforeDedup-ANOM.records.length;
-    if(dedupCleared>0)console.log('[怠速去重] 清掉 '+dedupCleared+' 筆重複');
-    // 若開啟自動彙總,雲端拉回後立刻壓縮怠速
-    if(IDLE_COMPRESS){const r=compressIdleRecords();if(r.before>r.after)console.log('[怠速彙總] '+r.before+' 筆 → '+r.after+' 筆');}
-    // 統計原始總量 vs 過濾後,提示使用者
-    const skippedCnt=(d.anom||[]).length-ANOM.records.length;
-    if(skippedCnt>0&&SKIP_MONTHS.size>0){
-      console.log('[資料管理] 已跳過 '+SKIP_MONTHS.size+' 個月份,共 '+skippedCnt+' 筆異常沒讀入(釋放效能)');
+    DAILY={dept:DEPT_NAME,days:{}};ANOM={records:[]};LOADED_MONTHS.clear();
+    try{
+      const hasMeta=await loadMeta();
+      if(hasMeta&&AVAILABLE_MONTHS.anom.length){
+        // v2 GAS · 只載當月(最新的月份)
+        const targetMonth=AVAILABLE_MONTHS.anom[0].month;  // meta 已排序 desc
+        await loadMonths([targetMonth]);
+        console.log('[分月載入] 首次載入 '+targetMonth+' · '+ANOM.records.length+' 筆');
+      }else{
+        // 舊版 GAS 或空表 · 用舊行為
+        console.log('[相容模式] 舊版 GAS · 撈全部');
+        await loadAllLegacy();
+      }
+    }catch(e){
+      console.warn('[分月載入失敗 · 改用舊版] '+e.message);
+      await loadAllLegacy();
     }
   }else{
     const raw=localStorage.getItem(LKEY);
@@ -1184,16 +1263,34 @@ async function handleFiles(files){
   pgStep(4,85);await pgTick();
   pgStep(5,95);await pgTick();
   setBusy(false);
+  // 匯入若含新資料 · 自動偵測最新資料月份 · 切換 PERIOD 過去避免資料被過濾掉
+  const allDates=[];
+  anomSnake.forEach(r=>{if(r.date)allDates.push(r.date);});
+  dailySnake.forEach(r=>{if(r.date)allDates.push(r.date);});
+  allDates.sort();
+  const maxImportDate=allDates[allDates.length-1];
+  // 本次匯入涉及的月份 · 加進 LOADED_MONTHS(記憶體已有)
+  const importedMonths=new Set();
+  allDates.forEach(d=>{const m=d.substring(0,7);if(m)importedMonths.add(m);});
+  importedMonths.forEach(m=>LOADED_MONTHS.add(m));
+  updateLoadPanelBadge();
+  if(maxImportDate){
+    const y=parseInt(maxImportDate.substring(0,4),10);
+    const m=parseInt(maxImportDate.substring(5,7),10);
+    if(PERIOD.type!=='all'&&(PERIOD.type!=='month'||PERIOD.y!==y||PERIOD.m!==m)){
+      PERIOD={type:'month',y,m};
+      renderPeriodBar&&renderPeriodBar();
+      toast('已切換到 '+y+'/'+pad(m),'配合本次匯入的資料月份','ok');
+    }
+  }
   // 匯入若含怠速 · 自動把怠速的「從/到」拉到最新資料日期,避免使用者上次選的日期把新資料篩掉
   if(rep.iNew>0||rep.iUpd>0||idleSheets>0){
     const idleDates=[...new Set(ANOM.records.filter(r=>r.behavior==='怠速').map(r=>r.date).filter(Boolean))].sort();
     const idleMax=idleDates[idleDates.length-1];
     if(idleMax){
-      // 拉到「最新資料日期」單日
       ['idlDateFrom','idlDateTo','idlDateFromR','idlDateToR'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=idleMax;});
     }
-    _idlDateDefaulted=true;  // 已手動設 · 不再自動套用
-    // 「時間範圍」若非 period · 也拉到 period(依上方期間)確保新資料可見
+    _idlDateDefaulted=true;
     setTabRange('idle','period');
     ['idlRange','idlRangeRank'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='period';});
   }
@@ -1312,15 +1409,14 @@ function tabRangeOptsHTML(tab){
   const opts=[['1w','最近 7 天'],['1m','最近 1 個月'],['3m','最近 3 個月'],['period','依上方期間']];
   return opts.map(o=>'<option value="'+o[0]+'"'+(cur===o[0]?' selected':'')+'>'+o[1]+'</option>').join('');
 }
-/* 月份跳過機制:localStorage 記住哪些月份不讀入,anomView 自動排除 */
+/* 月份跳過機制:已由「分月載入面板」取代 · 保留舊 stub 避免引用錯誤 */
 const SKIP_MONTHS_KEY='fleet_skip_months_v1';
-let SKIP_MONTHS=new Set();  // 存 "YYYY-MM" 或 "YYYY-MM-Wn"(n=1..5,依日期分)
-function loadSkipMonths(){try{const s=localStorage.getItem(SKIP_MONTHS_KEY);if(s){const a=JSON.parse(s);if(Array.isArray(a))SKIP_MONTHS=new Set(a);}}catch(e){}}
-function saveSkipMonths(){try{localStorage.setItem(SKIP_MONTHS_KEY,JSON.stringify([...SKIP_MONTHS]));}catch(e){}}
+let SKIP_MONTHS=new Set();  // 保留物件,但不再實際使用
+function loadSkipMonths(){try{localStorage.removeItem(SKIP_MONTHS_KEY);}catch(e){}}  // 清掉舊設定
+function saveSkipMonths(){}
 loadSkipMonths();
-// 依日期算「該月第幾週」(1~5, 依每月第 1~7 日=W1 依此類推)
 function dateWeekKey(dateStr){if(!dateStr||dateStr.length<10)return '';const day=parseInt(dateStr.substring(8,10),10);if(!day)return '';const wk=Math.min(5,Math.ceil(day/7));return dateStr.substring(0,7)+'-W'+wk;}
-function isDateSkipped(dateStr){if(!SKIP_MONTHS.size)return false;const m=String(dateStr||'').substring(0,7);if(SKIP_MONTHS.has(m))return true;const w=dateWeekKey(dateStr);return w&&SKIP_MONTHS.has(w);}
+function isDateSkipped(dateStr){return false;}  // 分月載入取代此機制
 /* === 索引 · 匯入/載入時預算好,後續查詢直接使用 === */
 const IDX={
   ts:0,
@@ -1458,17 +1554,55 @@ function renderPeriodBar(){
     '<button type="button" class="pb-btn '+(isAll?'active':'')+'" data-pt="all">全部資料</button>'+
     '<button type="button" class="pb-btn '+(isCustom?'active':'')+'" data-pt="custom">自訂區間…'+(isCustom?(' ('+PERIOD.from+'~'+PERIOD.to+')'):'')+'</button>'+
     '<span class="pb-meta">'+periodLabel()+' · 含 '+dCnt+' 天 / 異常 '+aCnt+' 筆 / 怠速 '+iCnt+' 筆</span>';
-  // 綁定事件
-  const applyMonth=()=>{
+  // 綁定事件 · 自動載入該月資料
+  const applyMonth=async ()=>{
     const y=parseInt(document.getElementById('pbYear').value);
     const m=parseInt(document.getElementById('pbMonth').value);
-    PERIOD={type:'month',y,m};renderPeriodBar();renderAll();
+    const monthKey=y+'-'+pad(m);
+    PERIOD={type:'month',y,m};
+    // 若該月未載入 · 自動去雲端拉
+    if(ONLINE&&!LOADED_MONTHS.has(monthKey)){
+      const meta=AVAILABLE_MONTHS.anom.find(x=>x.month===monthKey);
+      if(meta){
+        pgStart('📥 載入 '+monthKey,'該月未在記憶體 · 自動從雲端拉取',['連線','下載','建立索引','完成']);
+        pgStep(0,20);await pgTick();
+        try{
+          pgStep(1,50);await pgTick();
+          await loadMonths([monthKey]);
+          pgStep(2,80);await pgTick();
+          await rebuildIndex(true);
+          pgStep(3,95);await pgTick();
+          updateLoadPanelBadge();
+          pgDone();
+        }catch(e){pgFail('載入失敗');toast('載入失敗',String(e.message||e),'err');}
+      }
+    }
+    renderPeriodBar();renderAll();
   };
   document.getElementById('pbYear').onchange=applyMonth;
   document.getElementById('pbMonth').onchange=applyMonth;
-  bar.querySelectorAll('.pb-quick').forEach(b=>b.onclick=()=>{
-    if(b.dataset.q==='cur'){PERIOD={type:'month',y:curY,m:curM};}
-    else{const p=new Date();p.setDate(1);p.setMonth(p.getMonth()-1);PERIOD={type:'month',y:p.getFullYear(),m:p.getMonth()+1};}
+  bar.querySelectorAll('.pb-quick').forEach(b=>b.onclick=async ()=>{
+    let y,m;
+    if(b.dataset.q==='cur'){y=curY;m=curM;}
+    else{const p=new Date();p.setDate(1);p.setMonth(p.getMonth()-1);y=p.getFullYear();m=p.getMonth()+1;}
+    const monthKey=y+'-'+pad(m);
+    PERIOD={type:'month',y,m};
+    if(ONLINE&&!LOADED_MONTHS.has(monthKey)){
+      const meta=AVAILABLE_MONTHS.anom.find(x=>x.month===monthKey);
+      if(meta){
+        pgStart('📥 載入 '+monthKey,'從雲端拉取',['連線','下載','建立索引','完成']);
+        pgStep(0,20);await pgTick();
+        try{
+          pgStep(1,50);await pgTick();
+          await loadMonths([monthKey]);
+          pgStep(2,80);await pgTick();
+          await rebuildIndex(true);
+          pgStep(3,95);await pgTick();
+          updateLoadPanelBadge();
+          pgDone();
+        }catch(e){pgFail('載入失敗');}
+      }
+    }
     renderPeriodBar();renderAll();
   });
   bar.querySelectorAll('.pb-btn[data-pt]').forEach(b=>b.onclick=()=>{
@@ -3531,194 +3665,123 @@ const pgTick=()=>new Promise(r=>setTimeout(r,0));
 $('#importBtn').onclick=()=>{if(!busy)$('#fileInput').click();};
 $('#fileInput').onchange=e=>{if(e.target.files.length)handleFiles([...e.target.files]);e.target.value='';};
 $('#refreshBtn').onclick=async()=>{if(busy)return;if(!ONLINE){toast('本機模式','無雲端後台可更新','warn');return;}setBusy(true,'更新中…');try{await loadAll();lastSig=signature();renderAll();toast('已更新','');}catch(e){setConn('err');toast('更新失敗',String(e.message||e),'err');}setBusy(false);};
-/* ===== 站所管理 UI ===== */
-let _smState={q:'',filter:'all',showInactive:false};
-function openDataManager(){
-  const monCnt={};
-  ANOM.records.forEach(r=>{const m=String(r.date||'').substring(0,7);if(m)monCnt[m]=(monCnt[m]||0)+1;});
-  // 把已被勾選「不讀取」的月份也加進來(即使沒載入資料),否則使用者看不到、無法取消勾選
-  SKIP_MONTHS.forEach(k=>{
-    // 月份 key 是 "YYYY-MM"(7 字元);週 key 是 "YYYY-MM-Wn"(取前 7 字為月)
-    const m=k.substring(0,7);
-    if(m&&!monCnt[m])monCnt[m]=0;
-  });
-  const months=Object.keys(monCnt).sort().reverse();
-  // 統計怠速資料量
-  const idleCnt=ANOM.records.filter(r=>txt(r.behavior)==='怠速').length;
-  const idleDrvDayCnt=new Set(ANOM.records.filter(r=>txt(r.behavior)==='怠速').map(r=>r.branch+'|'+r.plate+'|'+r.driver+'|'+r.date)).size;
+/* ===== 月份載入面板 UI(v2) ===== */
+function updateLoadPanelBadge(){
+  const b=$('#loadPanelBadge');if(!b)return;
+  b.textContent=LOADED_MONTHS.size;
+  b.style.background=LOADED_MONTHS.size===0?'var(--bad)':'var(--accent)';
+}
+async function openLoadPanel(){
+  // 每次打開先重新拿最新 meta
+  let metaOk=false;
+  try{if(ONLINE){metaOk=await loadMeta();}}catch(e){console.warn('[meta 更新失敗]',e);}
+  const anomList=(AVAILABLE_MONTHS.anom||[]).slice();
+  const dailyList=(AVAILABLE_MONTHS.daily||[]).slice();
+  const allMonths=[...new Set(anomList.map(x=>x.month).concat(dailyList.map(x=>x.month)))].sort().reverse();
+  const anomMap={};anomList.forEach(x=>anomMap[x.month]=x.count);
+  const dailyMap={};dailyList.forEach(x=>dailyMap[x.month]=x.count);
   let bodyHtml='<div style="padding:0 4px 16px">';
-  // === 怠速彙總區塊 ===
+  if(!metaOk&&ONLINE){
+    bodyHtml+='<div style="background:#FFE3EF;padding:12px 14px;border-radius:8px;margin-bottom:14px;font-size:13px;color:var(--bad)">⚠ 無法取得月份清單 · 可能後台是舊版 GAS · 請聯繫維護</div>';
+  }
   bodyHtml+='<div style="background:linear-gradient(90deg,#FFE3EF,#FFF7FB);padding:14px 16px;border-radius:10px;margin-bottom:14px;border:1px solid var(--accent)">'+
-    '<div style="font-weight:800;color:var(--accent);font-size:14px;margin-bottom:8px">🗜 怠速資料彙總</div>'+
-    '<div style="font-size:12.5px;color:var(--muted);line-height:1.7;margin-bottom:10px">'+
-      '目前怠速原始筆數:<b style="color:var(--txt);font-family:var(--mono)">'+fi(idleCnt)+'</b> 筆'+
-      (idleCnt>idleDrvDayCnt?(' → 彙總後可縮到 <b style="color:var(--good);font-family:var(--mono)">'+fi(idleDrvDayCnt)+'</b> 筆(每駕駛每日合併,約 '+((idleCnt-idleDrvDayCnt)/idleCnt*100).toFixed(0)+'% 減量)'):'')+
-      '<br>啟用後每次讀取雲端資料時會自動壓縮,大幅減輕負擔。個別事件的時間/地點會遺失,但累計時數、分級、處置/懲處都保留。'+
+    '<div style="font-weight:800;color:var(--accent);font-size:14px;margin-bottom:6px">📅 分月載入 · 節省開啟時間</div>'+
+    '<div style="font-size:12.5px;color:var(--muted);line-height:1.7">'+
+      '打開網頁預設只載入「當月」資料 · 想看其他月請點下方勾選 · 累積載入(舊月不會清掉)。取消勾選會釋放記憶體。'+
     '</div>'+
-    '<label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;padding:8px 14px;background:#fff;border-radius:8px;border:2px solid '+(IDLE_COMPRESS?'var(--accent)':'var(--line)')+';font-weight:700"><input type="checkbox" id="dmgrIdleCmp"'+(IDLE_COMPRESS?' checked':'')+' style="margin:0"> 自動彙總怠速資料(每駕駛每日合併為一筆)</label>'+
-    (idleCnt>idleDrvDayCnt&&!IDLE_COMPRESS?' <button class="btn primary" id="dmgrIdleCmpNow" type="button" style="margin-left:8px">🗜 立刻壓縮</button>':'')+
   '</div>';
-  // === 月份區塊 ===
-  if(!months.length){bodyHtml+='<p style="padding:20px;text-align:center;color:var(--muted)">目前沒有已載入的資料</p></div>';openModal('📦 資料管理',bodyHtml);return;}
-  bodyHtml+='<div style="background:#FFF7FB;padding:12px 14px;border-radius:8px;margin-bottom:14px;font-size:13px;color:var(--txt);line-height:1.7">'+
-      '💡 <b>不讀取</b>:勾選的月份會在畫面上隱藏(釋放渲染效能),雲端資料仍保留、隨時可以取消勾選重新看到。<br>'+
-      '💡 若要<b>徹底清除雲端資料</b>,請直接進 Google Sheet 手動刪除相應月份的列。'+
-    '</div>'+
-    '<table style="width:100%;border-collapse:collapse;font-size:13px">'+
-      '<thead><tr style="background:var(--panel2);color:var(--muted);font-size:12px">'+
-        '<th style="padding:8px 10px;text-align:left">月份</th>'+
-        '<th style="padding:8px 10px;text-align:right">筆數</th>'+
-        '<th style="padding:8px 10px;text-align:center">狀態</th>'+
-        '<th style="padding:8px 10px;text-align:center">動作</th>'+
-      '</tr></thead><tbody id="dmgrBody">';
-  // 計算每月每週的筆數
-  const wkCnt={};ANOM.records.forEach(r=>{const w=dateWeekKey(r.date);if(w)wkCnt[w]=(wkCnt[w]||0)+1;});
-  const wkOfMonth={};Object.keys(wkCnt).forEach(w=>{const m=w.substring(0,7);(wkOfMonth[m]=wkOfMonth[m]||[]).push(w);});
-  Object.values(wkOfMonth).forEach(a=>a.sort());
-  months.forEach(m=>{
-    const skipped=SKIP_MONTHS.has(m);
-    bodyHtml+='<tr style="border-bottom:1px solid var(--line)'+(skipped?';background:#FFE3EF':'')+'">'+
-      '<td style="padding:9px 10px;font-family:var(--mono);font-weight:800;font-size:13px">'+
-        '<span class="dmgr-mtoggle" data-m="'+m+'" style="cursor:pointer;color:var(--accent);margin-right:6px;user-select:none">▶</span>'+
-        esc(m)+'</td>'+
-      '<td style="padding:9px 10px;text-align:right;font-family:var(--mono);font-weight:700">'+fi(monCnt[m])+'</td>'+
+  if(!allMonths.length){
+    bodyHtml+='<p style="padding:20px;text-align:center;color:var(--muted)">後台沒有分月表 · 請聯繫維護</p></div>';
+    openModal('📅 月份載入面板',bodyHtml);return;
+  }
+  bodyHtml+='<table style="width:100%;border-collapse:collapse;font-size:13px">'+
+    '<thead><tr style="background:var(--panel2);color:var(--muted);font-size:12px">'+
+      '<th style="padding:8px 10px;text-align:left">月份</th>'+
+      '<th style="padding:8px 10px;text-align:right">異常</th>'+
+      '<th style="padding:8px 10px;text-align:right">日報</th>'+
+      '<th style="padding:8px 10px;text-align:center">狀態</th>'+
+      '<th style="padding:8px 10px;text-align:center">動作</th>'+
+    '</tr></thead><tbody>';
+  allMonths.forEach(m=>{
+    const isLoaded=LOADED_MONTHS.has(m);
+    const anomN=anomMap[m]||0,dailyN=dailyMap[m]||0;
+    bodyHtml+='<tr style="border-bottom:1px solid var(--line)'+(isLoaded?';background:#F0FCF4':'')+'">'+
+      '<td style="padding:9px 10px;font-family:var(--mono);font-weight:800">'+esc(m)+'</td>'+
+      '<td style="padding:9px 10px;text-align:right;font-family:var(--mono)">'+(anomN?fi(anomN):'-')+'</td>'+
+      '<td style="padding:9px 10px;text-align:right;font-family:var(--mono)">'+(dailyN?fi(dailyN):'-')+'</td>'+
       '<td style="padding:9px 10px;text-align:center">'+
-        (skipped?'<span style="color:var(--bad);font-weight:800">已不讀取</span>':'<span style="color:var(--good);font-weight:700">讀取中</span>')+
+        (isLoaded?'<span style="color:var(--good);font-weight:800">已載入</span>':'<span style="color:var(--muted)">未載入</span>')+
       '</td>'+
       '<td style="padding:9px 10px;text-align:center">'+
-        '<label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none;padding:4px 10px;border-radius:6px;border:1px solid var(--line);background:#fff"><input type="checkbox" class="dmgr-skip" data-m="'+m+'"'+(skipped?' checked':'')+' style="margin:0"> 不讀取整月</label>'+
+        '<label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:4px 10px;border-radius:6px;border:1px solid var(--line);background:#fff"><input type="checkbox" class="lp-toggle" data-m="'+m+'"'+(isLoaded?' checked':'')+' style="margin:0"> 載入此月</label>'+
       '</td>'+
     '</tr>';
-    // 週細分列(預設隱藏)
-    (wkOfMonth[m]||[]).forEach(w=>{
-      const wSkipped=SKIP_MONTHS.has(w);
-      const wLabel=w.substring(8);  // e.g. "W1"
-      const wNum=parseInt(wLabel.substring(1),10);
-      const dayFrom=(wNum-1)*7+1,dayTo=Math.min(wNum*7,31);
-      bodyHtml+='<tr class="dmgr-week dmgr-wk-'+m+'" data-parent="'+m+'" style="border-bottom:1px solid var(--line);display:none;background:#FFF9FC">'+
-        '<td style="padding:6px 10px 6px 32px;font-family:var(--mono);font-size:12px;color:var(--muted)">└ '+wLabel+' (每月 '+dayFrom+'~'+dayTo+' 日)</td>'+
-        '<td style="padding:6px 10px;text-align:right;font-family:var(--mono);font-size:12px">'+fi(wkCnt[w])+'</td>'+
-        '<td style="padding:6px 10px;text-align:center;font-size:12px">'+
-          (skipped||wSkipped?'<span style="color:var(--bad);font-weight:700">不讀取</span>':'<span style="color:var(--good)">讀取中</span>')+
-        '</td>'+
-        '<td style="padding:6px 10px;text-align:center">'+
-          '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;font-size:12px'+(skipped?';opacity:0.4;pointer-events:none':'')+'"><input type="checkbox" class="dmgr-skip-wk" data-w="'+w+'"'+(wSkipped?' checked':'')+' style="margin:0"> 不讀取此週</label>'+
-        '</td>'+
-      '</tr>';
-    });
   });
-  bodyHtml+='</tbody></table></div>';
-  openModal('📦 資料管理 · 怠速彙總 & 月份控制',bodyHtml);
-  // 怠速彙總 toggle
-  const cmpCb=document.getElementById('dmgrIdleCmp');
-  if(cmpCb)cmpCb.onchange=()=>{
-    IDLE_COMPRESS=cmpCb.checked;saveIdleCompress();
-    if(IDLE_COMPRESS){
-      const r=compressIdleRecords();
-      toast('怠速彙總已啟用','壓縮 '+fi(r.before)+' → '+fi(r.after)+' 筆','ok');
-      renderAll();
-      // 重開資料管理讓 UI 反映最新狀態
-      setTimeout(openDataManager,100);
-    }else{
-      toast('怠速彙總已停用','按「🔄 更新」重新從雲端載入原始資料','warn');
-    }
-  };
-  const cmpNowBtn=document.getElementById('dmgrIdleCmpNow');
-  if(cmpNowBtn)cmpNowBtn.onclick=()=>{
-    const r=compressIdleRecords();
-    toast('壓縮完成','怠速 '+fi(r.before)+' → '+fi(r.after)+' 筆','ok');
-    renderAll();
-    setTimeout(openDataManager,100);
-  };
-  // 月份展開/收合 · 顯示週細分
-  document.querySelectorAll('span.dmgr-mtoggle').forEach(sp=>sp.onclick=()=>{
-    const m=sp.dataset.m;
-    const wkRows=document.querySelectorAll('tr.dmgr-wk-'+m.replace(/-/g,'\\-'));
-    const isOpen=sp.textContent==='▼';
-    wkRows.forEach(tr=>tr.style.display=isOpen?'none':'');
-    sp.textContent=isOpen?'▶':'▼';
-  });
-  // 週細分:勾選/取消(不影響月狀態,但月被勾時週會 disabled)
-  document.querySelectorAll('input.dmgr-skip-wk').forEach(cb=>cb.onchange=async ()=>{
-    const w=cb.dataset.w;
-    if(cb.checked)SKIP_MONTHS.add(w);else SKIP_MONTHS.delete(w);
-    saveSkipMonths();
-    const tr=cb.closest('tr');
-    tr.children[2].innerHTML=cb.checked?'<span style="color:var(--bad);font-weight:700">不讀取</span>':'<span style="color:var(--good)">讀取中</span>';
-    if(cb.checked){
-      const before=ANOM.records.length;
-      ANOM.records=ANOM.records.filter(r=>dateWeekKey(r.date)!==w);
-      const cleared=before-ANOM.records.length;
-      toast('已釋放 '+w,'清掉 '+fi(cleared)+' 筆','ok');
-      renderAll();
-    }else{
-      // 取消跳過 → 自動從雲端重新載入
-      toast('正在載入 '+w,'從雲端重新拉取…','ok');
-      if(ONLINE){
-        try{
-          pgStart('🔄 重新載入 '+w,'從雲端拉取被跳過的資料',['連線後台','下載資料','建立索引','完成']);
-          pgStep(0,20);await pgTick();
-          pgStep(1,50);await pgTick();
-          await loadAll();
-          pgStep(2,80);await pgTick();
-          await rebuildIndex(true);
-          pgStep(3,95);await pgTick();
-          renderAll();
-          pgDone();
-          toast('✅ '+w+' 已回來','資料已重新載入','ok');
-          setTimeout(openDataManager,600);
-        }catch(e){
-          pgFail('載入失敗');
-          toast('載入失敗',String(e.message||e),'err');
-        }
-      }else{
-        toast('離線模式','請按「🔄 更新」重新載入','warn');
-      }
-    }
-  });
-  document.querySelectorAll('input.dmgr-skip').forEach(cb=>cb.onchange=async ()=>{
+  bodyHtml+='</tbody></table>';
+  bodyHtml+='<div style="margin-top:14px;display:flex;gap:10px"><button class="btn primary" id="lpLoadAll" type="button">📥 載入全部歷史</button><button class="btn ghost" id="lpUnloadAll" type="button">🗑 只保留當月</button></div>';
+  bodyHtml+='</div>';
+  openModal('📅 月份載入面板',bodyHtml);
+
+  document.querySelectorAll('input.lp-toggle').forEach(cb=>cb.onchange=async ()=>{
     const m=cb.dataset.m;
-    if(cb.checked)SKIP_MONTHS.add(m);else SKIP_MONTHS.delete(m);
-    saveSkipMonths();
-    const tr=cb.closest('tr');
-    if(cb.checked){tr.style.background='#FFE3EF';tr.children[2].innerHTML='<span style="color:var(--bad);font-weight:800">已不讀取</span>';}
-    else{tr.style.background='';tr.children[2].innerHTML='<span style="color:var(--good);font-weight:700">讀取中</span>';}
-    // 勾「不讀取」→ 直接把記憶體那部分清掉(下次重載/refresh 也不會回來)
-    // 取消勾 → 需要重新從雲端拉那個月份
     if(cb.checked){
-      const before=ANOM.records.length;
-      ANOM.records=ANOM.records.filter(r=>String(r.date||'').substring(0,7)!==m);
-      Object.keys(DAILY.days).forEach(d=>{if(d.substring(0,7)===m)delete DAILY.days[d];});
-      const cleared=before-ANOM.records.length;
-      toast('已釋放 '+m,'清掉 '+fi(cleared)+' 筆(記憶體釋放)','ok');
-      renderAll();
+      pgStart('📥 載入 '+m,'從雲端拉取…',['連線','下載資料','建立索引','完成']);
+      pgStep(0,20);await pgTick();
+      try{
+        pgStep(1,50);await pgTick();
+        const r=await loadMonths([m]);
+        pgStep(2,80);await pgTick();
+        await rebuildIndex(true);
+        pgStep(3,95);await pgTick();
+        renderAll();updateLoadPanelBadge();
+        pgDone();
+        toast('✅ '+m+' 已載入','+ '+fi(r.anomAdded)+' 筆異常','ok');
+        setTimeout(openLoadPanel,500);
+      }catch(e){pgFail('載入失敗');toast('載入失敗',String(e.message||e),'err');cb.checked=false;}
     }else{
-      // 取消跳過 → 自動從雲端重新載入該月份資料
-      toast('正在載入 '+m,'從雲端重新拉取…','ok');
-      if(ONLINE){
-        try{
-          pgStart('🔄 重新載入 '+m,'從雲端拉取被跳過的資料',['連線後台','下載資料','建立索引','完成']);
-          pgStep(0,20);await pgTick();
-          pgStep(1,50);await pgTick();
-          await loadAll();
-          pgStep(2,80);await pgTick();
-          await rebuildIndex(true);
-          pgStep(3,95);await pgTick();
-          renderAll();
-          pgDone();
-          toast('✅ '+m+' 已回來','資料已重新載入,可正常查看','ok');
-          // 重開資料管理讓使用者看到最新狀態
-          setTimeout(openDataManager,600);
-        }catch(e){
-          pgFail('載入失敗');
-          toast('載入失敗',String(e.message||e)+'(請手動按 🔄 更新)','err');
-        }
-      }else{
-        toast('離線模式','已改為讀取 '+m+',請按「🔄 更新」重新從雲端載入','warn');
-      }
+      const cleared=unloadMonth(m);
+      await rebuildIndex(false);
+      renderAll();updateLoadPanelBadge();
+      toast('已釋放 '+m,'清掉 '+fi(cleared)+' 筆','ok');
+      setTimeout(openLoadPanel,300);
     }
   });
+  const loadAllBtn=document.getElementById('lpLoadAll');
+  if(loadAllBtn)loadAllBtn.onclick=async ()=>{
+    const targets=allMonths.filter(m=>!LOADED_MONTHS.has(m));
+    if(!targets.length){toast('全部已載入','','ok');return;}
+    pgStart('📥 載入全部歷史','拉取 '+targets.length+' 個月份',['連線','下載資料','建立索引','完成']);
+    pgStep(0,15);await pgTick();
+    try{
+      pgStep(1,50);await pgTick();
+      const r=await loadMonths(targets);
+      pgStep(2,80);await pgTick();
+      await rebuildIndex(true);
+      pgStep(3,95);await pgTick();
+      renderAll();updateLoadPanelBadge();
+      pgDone();
+      toast('✅ 全部歷史已載入','+ '+fi(r.anomAdded)+' 筆異常','ok');
+      setTimeout(openLoadPanel,500);
+    }catch(e){pgFail('載入失敗');toast('載入失敗',String(e.message||e),'err');}
+  };
+  const unloadAllBtn=document.getElementById('lpUnloadAll');
+  if(unloadAllBtn)unloadAllBtn.onclick=async ()=>{
+    const curMonth=allMonths[0];  // 最新一月
+    const toDrop=[...LOADED_MONTHS].filter(m=>m!==curMonth);
+    if(!toDrop.length){toast('已經只有當月','','ok');return;}
+    let total=0;toDrop.forEach(m=>{total+=unloadMonth(m);});
+    await rebuildIndex(false);
+    renderAll();updateLoadPanelBadge();
+    toast('已釋放 '+toDrop.length+' 個月','清掉 '+fi(total)+' 筆','ok');
+    setTimeout(openLoadPanel,300);
+  };
 }
+
+/* 舊 API · 保留當 alias · 現有呼叫不會壞 */
+function openDataManager(){openLoadPanel();}
+
+/* ===== 站所管理 UI ===== */
+let _smState={q:'',filter:'all',showInactive:false};
 function openStationManager(){
   let m=document.getElementById('stationMgr');
   if(!m){
@@ -3855,7 +3918,7 @@ function openAddStationDialog(){
 function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 // 綁定按鈕
 $('#stationMgrBtn').onclick=openStationManager;
-$('#dataMgrBtn').onclick=openDataManager;
+const _lpBtn=$('#loadPanelBtn');if(_lpBtn)_lpBtn.onclick=openLoadPanel;
 $('#forceReloadBtn').onclick=()=>{
   if(!confirm('強制重新載入會清除瀏覽器對本頁的快取(不影響雲端資料、也不影響站所管理設定)，載入完成後可能需要重新選擇時間範圍。\n\n確定要繼續嗎？'))return;
   // 嘗試清 service worker cache
@@ -4537,28 +4600,34 @@ $('#pptGen').onclick=openWeeklyPicker;
   // 版本徽章(頂端一直顯示,方便確認強制更新是否生效)
   const _vb=document.getElementById('verBadge');const _v=document.querySelector('meta[name="build-version"]')?.content||'';
   if(_vb&&_v)_vb.textContent='v'+_v;
-  // 開機:如果資料量大先顯示載入進度
+  // 開機:v2 分月載入 · 預設只載當月 · 秒開
   if(ONLINE){
-    pgStart('🚀 啟動中…','正在從雲端拉取資料',['連線後台','下載資料','建立駕駛索引','計算彙總','完成準備']);
+    pgStart('🚀 啟動中…','分月載入 · 預設只載當月(秒開)',['連線後台','查詢月份清單','載入當月','建立索引','完成']);
     pgStep(0,10);
     try{
-      pgStep(1,30);await pgTick();
+      pgStep(1,25);await pgTick();
       await loadAll();
       setConn('cloud');
-      pgStep(2,60);await pgTick();
+      pgStep(2,55);await pgTick();
+      pgStep(3,80);await pgTick();
       await rebuildIndex(true);
-      pgStep(3,85);await pgTick();
       pgStep(4,95);await pgTick();
-    }catch(e){setConn('err');pgFail('連線失敗');toast('無法連線後台',String(e.message||e)+'（請檢查 GAS_URL 與部署權限）','err');}
+      updateLoadPanelBadge();
+    }catch(e){setConn('err');pgFail('連線失敗');toast('無法連線後台',String(e.message||e)+'(請檢查 GAS_URL 與部署權限)','err');}
   }else{
     await loadAll();setConn('local');
     await rebuildIndex(false);
+    updateLoadPanelBadge();
   }
   lastSig=signature();renderAll();
   pgDone();
   refreshBackupBanner();
-  // 資料量大時提示使用者可用資料管理釋放效能
+  // v2 版本 · 顯示已載入資訊
   const _totalAnom=ANOM.records.length;
+  const _loadedM=[...LOADED_MONTHS].sort().reverse();
+  if(_loadedM.length){
+    console.log('[分月載入] 已載入 '+_loadedM.length+' 個月:'+_loadedM.join(', ')+' · '+fi(_totalAnom)+' 筆');
+  }
   if(_totalAnom>=5000){
     setTimeout(()=>{
       toast('資料量偏大('+fi(_totalAnom)+' 筆)','建議按右上「📦 資料管理」把不需要的舊月份設為「不讀取」以加快速度','warn');

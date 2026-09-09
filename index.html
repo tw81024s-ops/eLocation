@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<meta name="build-version" content="20260703-AA">
+<meta name="build-version" content="20260703-AA2">
 <title>駕駛行為安全管理看板</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -833,8 +833,42 @@ async function gasGet(params){
 async function gasPost(p){const r=await fetch(GAS_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(p),redirect:'follow'});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json();}
 function saveLocal(){localStorage.setItem(LKEY,JSON.stringify({DAILY,ANOM}));}
 
+/* 統一日期格式 · 修 Google Sheet 回傳 Date 變 ISO UTC 的問題 */
+function _normDate(v){
+  if(!v)return '';
+  const s=String(v);
+  // 已是 YYYY-MM-DD 純日期(無 T)
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s.substring(0,10))&&!/T/.test(s))return s.substring(0,10);
+  // ISO 帶 T · 轉本地日期(避免 UTC 偏移一天)
+  if(/T/.test(s)){
+    const d=new Date(s);
+    if(!isNaN(d.getTime())){
+      const y=d.getFullYear();const m=String(d.getMonth()+1);const dd=String(d.getDate());
+      return y+'-'+(m.length<2?'0'+m:m)+'-'+(dd.length<2?'0'+dd:dd);
+    }
+  }
+  // 斜線格式
+  const m=s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if(m){const mm=String(m[2]),dd=String(m[3]);return m[1]+'-'+(mm.length<2?'0'+mm:mm)+'-'+(dd.length<2?'0'+dd:dd);}
+  return s;
+}
+/* 統一 time 格式 · 保留時分秒 */
+function _normTime(v){
+  if(!v)return '';
+  const s=String(v);
+  // ISO 帶 T · 轉本地時間字串
+  if(/T/.test(s)){
+    const d=new Date(s);
+    if(!isNaN(d.getTime())){
+      const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');
+      const h=String(d.getHours()).padStart(2,'0'),mn=String(d.getMinutes()).padStart(2,'0'),ss=String(d.getSeconds()).padStart(2,'0');
+      return y+'/'+m+'/'+dd+' '+h+':'+mn+':'+ss;
+    }
+  }
+  return s;
+}
 const fromDailyRow=r=>({branch:txt(r.branch),grade:txt(r.grade),rank:num(r.rank),score:num(r.score),vehicles:num(r.vehicles),km:num(r.km),count:num(r.count),speedG:txt(r.speed_g),speedR:num(r.speed_r),turnG:txt(r.turn_g),turnR:num(r.turn_r),decelG:txt(r.decel_g),decelR:num(r.decel_r),accelG:txt(r.accel_g),accelR:num(r.accel_r)});
-const fromAnomRow=r=>({date:txt(r.date),branch:txt(r.branch),plate:txt(r.plate),driver:txt(r.driver),behavior:txt(r.behavior),level:txt(r.level),time:txt(r.time),maxSpeed:txt(r.max_speed),location:txt(r.location),legal:txt(r.legal),over:num(r.over_km),degText:txt(r.deg_text),degCode:txt(r.deg_code),disposal:txt(r.disposal),disc:txt(r.disc)});
+const fromAnomRow=r=>({date:_normDate(r.date),branch:txt(r.branch),plate:txt(r.plate),driver:txt(r.driver),behavior:txt(r.behavior),level:txt(r.level),time:_normTime(r.time),maxSpeed:txt(r.max_speed),location:txt(r.location),legal:txt(r.legal),over:num(r.over_km),degText:txt(r.deg_text),degCode:txt(r.deg_code),disposal:txt(r.disposal),disc:txt(r.disc)});
 
 /* === 分月載入系統 · v2 GAS(meta + months 參數) === */
 const LOADED_MONTHS=new Set();  // 目前記憶體中的月份 · 例 {"2026-09"}
@@ -894,7 +928,7 @@ async function loadMonths(monthList,opts){
   // 塞 daily
   let dailyAdded=0;
   (d.daily||[]).forEach(r=>{
-    const dt=txt(r.date);if(!dt)return;
+    const dt=_normDate(r.date);if(!dt)return;
     const day=DAILY.days[dt]=DAILY.days[dt]||{branches:[]};
     const b=fromDailyRow(r);
     const i=day.branches.findIndex(x=>x.branch===b.branch);
@@ -918,7 +952,7 @@ async function loadAllLegacy(){
   const d=await gasGet();
   if(!d||d.ok===false)throw new Error(d&&d.error||'load failed');
   DAILY={dept:DEPT_NAME,days:{}};
-  (d.daily||[]).forEach(r=>{const dt=txt(r.date);if(!dt)return;(DAILY.days[dt]=DAILY.days[dt]||{branches:[]}).branches.push(fromDailyRow(r));});
+  (d.daily||[]).forEach(r=>{const dt=_normDate(r.date);if(!dt)return;(DAILY.days[dt]=DAILY.days[dt]||{branches:[]}).branches.push(fromDailyRow(r));});
   ANOM={records:_dedupIdleRecs((d.anom||[]).map(fromAnomRow).filter(x=>x.plate||x.driver))};
   // 舊版沒 meta · LOADED_MONTHS 用實際載入的推算
   const monthSet=new Set();ANOM.records.forEach(r=>{const m=_monthOf(r.date);if(m)monthSet.add(m);});
